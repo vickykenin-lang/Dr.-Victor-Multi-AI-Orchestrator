@@ -5,13 +5,13 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 20,
+      "attempts": 22,
       "last_target": "rio",
       "recommended_department": "rio",
       "last_status": "GOAL_PROGRESS_VERIFIED",
       "last_next_action": "After validator pass, commit, submit for indexing, and publish Instagram promo with direct link to new guide.",
-      "last_attempt_at_utc": "2026-08-29T19:17:27.272Z",
-      "last_verified_progress_at_utc": "2026-08-29T19:17:27.272Z",
+      "last_attempt_at_utc": "2026-08-29T19:32:27.003Z",
+      "last_verified_progress_at_utc": "2026-08-29T19:32:27.003Z",
       "goal_achieved_at_utc": null,
       "evidence": [
         "data/RIO_3.0_DEFINITION.md",
@@ -53,7 +53,10 @@
         "data/content_publish_state.json",
         "site/content/buying-guides/under-sink-storage-rack-buying-guide-2026-08-30.md",
         "integration/results/victor_tasks/victor-rio-1788030923566-goal-auto.json",
-        "integration/results/victor_tasks/victor-rio-1788030985511-goal-auto.json"
+        "integration/results/victor_tasks/victor-rio-1788030985511-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788031823570-goal-auto.json",
+        "site/content/policies/cta-under-sink-storage-rack-buying-guide-2026-08-30.md",
+        "integration/results/victor_tasks/victor-rio-1788031885302-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
