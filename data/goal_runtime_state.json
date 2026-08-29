@@ -5,13 +5,13 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 14,
+      "attempts": 16,
       "last_target": "rio",
       "recommended_department": "rio",
       "last_status": "GOAL_PROGRESS_VERIFIED",
-      "last_next_action": "After validator pass, commit, and submit for indexing, monitor for 48h; if no improvement, rotate to Pillar 2 (affiliate network discovery) or Pillar 5 (Flipkart/other platform) for new offer integration.",
-      "last_attempt_at_utc": "2026-08-29T18:32:27.325Z",
-      "last_verified_progress_at_utc": "2026-08-29T18:32:27.325Z",
+      "last_next_action": "After validator pass, commit, and submit for indexing, publish Instagram content with updated CTA and internal link to offer page.",
+      "last_attempt_at_utc": "2026-08-29T18:47:26.971Z",
+      "last_verified_progress_at_utc": "2026-08-29T18:47:26.971Z",
       "goal_achieved_at_utc": null,
       "evidence": [
         "data/RIO_3.0_DEFINITION.md",
@@ -45,7 +45,9 @@
         "integration/results/victor_tasks/victor-rio-1788028223332-goal-auto.json",
         "data/offer_page_optimization_state.json",
         "site/content/policies/offer-page-cta-3-tier-rolling-cart-2026-08-30.md",
-        "integration/results/victor_tasks/victor-rio-1788028285076-goal-auto.json"
+        "integration/results/victor_tasks/victor-rio-1788028285076-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788029123679-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788029185331-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
