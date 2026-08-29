@@ -1,19 +1,32 @@
 {
   "schema_version": 1,
-  "runtime_status": "READY_FOR_GOAL_DRIVEN_CYCLE",
+  "runtime_status": "GOAL_DRIVEN_ACTIVE",
   "active_goal_id": "ORG-REVENUE-001",
   "goals": {
     "ORG-REVENUE-001": {
-      "state": "READY",
-      "attempts": 0,
-      "last_target": null,
+      "state": "WORKING",
+      "attempts": 2,
+      "last_target": "rio",
       "recommended_department": "rio",
-      "last_status": null,
-      "last_next_action": null,
-      "last_attempt_at_utc": null,
-      "last_verified_progress_at_utc": null,
+      "last_status": "GOAL_PROGRESS_VERIFIED",
+      "last_next_action": "After validator pass, commit changes, submit plan for Founder review and approval, then implement internal linking changes and rotate to Pillar 1 (website development/conversion/SEO) for post-publish SEO monitoring.",
+      "last_attempt_at_utc": "2026-08-29T17:02:27.419Z",
+      "last_verified_progress_at_utc": "2026-08-29T17:02:27.419Z",
       "goal_achieved_at_utc": null,
-      "evidence": [],
+      "evidence": [
+        "data/RIO_3.0_DEFINITION.md",
+        "data/COMMERCIAL_VALIDATION_POLICY.json",
+        "data/production_control.json",
+        "data/status.json",
+        "data/rio_work_status.json",
+        "data/dashboard_snapshot.json",
+        "data/internal_linking_qa_buying_guide_state.json",
+        "site/content/policies/internal-linking-qa-buying-guide-3-tier-rolling-cart-2026-08-29.md",
+        "integration/results/victor_tasks/victor-rio-1788022823981-goal-auto.json",
+        "data/internal_linking_qa_product_page_state.json",
+        "site/content/policies/internal-linking-qa-product-page-3-tier-rolling-cart-2026-08-29.md",
+        "integration/results/victor_tasks/victor-rio-1788022885724-goal-auto.json"
+      ],
       "failure_fingerprint": null
     }
   },
