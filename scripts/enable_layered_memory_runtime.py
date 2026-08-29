@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Idempotent runtime integration trigger for Victor layered memory.
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -22,8 +23,10 @@ new="""  ['FOUNDER_MEMORY', 'memory/founder_memory.json', false],
   ['MEMORY_INDEX_MD', 'memory/INDEX.md', false],
   ['MEMORY_INDEX', 'memory/memory_index.json', false],
 """
-if old not in w: raise SystemExit('WORKER_MEMORY_SOURCE_BLOCK_NOT_FOUND')
-w=w.replace(old,new,1)
+if old in w:
+    w=w.replace(old,new,1)
+elif "['LONG_TERM_MEMORY', 'memory/MEMORY.md', false]" not in w:
+    raise SystemExit('WORKER_MEMORY_SOURCE_BLOCK_NOT_FOUND')
 w=w.replace("memory_recall_mode: 'REPO_CANONICAL_RELEVANCE_V2'", "memory_recall_mode: 'LAYERED_REPO_MEMORY_V3'")
 w=w.replace("['FOUNDER_MEMORY','DECISIONS','OPERATIONAL_MEMORY','MEMORY_INDEX']", "['FOUNDER_MEMORY','DECISIONS','LONG_TERM_MEMORY','ACTIVE_PROJECTS_MEMORY','WORKING_MEMORY','LEARNINGS_MEMORY','OPERATIONAL_MEMORY','ACTIVITY_MEMORY','MEMORY_INDEX_MD','MEMORY_INDEX']")
 worker.write_text(w,encoding='utf-8')
@@ -41,7 +44,7 @@ anchor="""    if (source.name === 'DECISIONS' || source.name === 'OPERATIONAL_ME
       }
     }
 """
-addition=anchor+"""    const layered = {
+layered="""    const layered = {
       LONG_TERM_MEMORY: ['long_term', 88],
       ACTIVE_PROJECTS_MEMORY: ['active_projects', 84],
       WORKING_MEMORY: ['working', 80],
@@ -59,7 +62,8 @@ addition=anchor+"""    const layered = {
       });
     }
 """
-if anchor not in m: raise SystemExit('MEMORY_PARSE_ANCHOR_NOT_FOUND')
-m=m.replace(anchor,addition,1)
+if 'const layered = {' not in m:
+    if anchor not in m: raise SystemExit('MEMORY_PARSE_ANCHOR_NOT_FOUND')
+    m=m.replace(anchor,anchor+layered,1)
 mem.write_text(m,encoding='utf-8')
 print('LAYERED_MEMORY_RUNTIME_PATCHED')
