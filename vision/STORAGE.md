@@ -6,21 +6,26 @@
 
 OmniRoute OFF. AURA2 / interiors Drive folders **not** used.
 
+## Bound folder (Founder 30 Aug 2026)
+
+- URL: https://drive.google.com/drive/folders/1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U
+- Folder ID: `1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U`
+- Visibility: private (login required). Do not make public.
+- Treat this folder as `Vision/EP001_Last_Delivery` root.
+
 ## Why Drive
 Founder-provided. Fits zero-cost start for EP001 (~10 min now, ~30 min later).
 GitHub Actions artifacts = temporary preview only (90 days).
 
-## Folder layout (create exactly)
+## Folder layout (create inside the bound folder)
 
 ```text
-Vision/
-  EP001_Last_Delivery/
-    01_stills/
-    02_clips/
-    03_audio/
-    04_edit/
-    05_masters/
-    06_qc/
+01_stills/
+02_clips/
+03_audio/
+04_edit/
+05_masters/
+06_qc/
 ```
 
 | Folder | What |
@@ -48,15 +53,9 @@ Add when upload automation is enabled:
 
 | Secret | Purpose |
 |---|---|
-| `GOOGLE_DRIVE_FOLDER_ID` | ID of `Vision/EP001_Last_Delivery` |
+| `GOOGLE_DRIVE_FOLDER_ID` | `1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U` |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Drive-limited service account |
 
 Do **not** put these in AURA2. Do not commit JSON. Do not paste keys in chat.
 
 Until those two secrets exist, Founder can drop files into the same folders manually. Pipeline still generates via `vision_stills.yml`.
-
-## Founder setup (once)
-1. Drive me folder `Vision/EP001_Last_Delivery` + 6 subfolders above
-2. Folder link / folder ID Victor ko process me do (URL theek, key nahi)
-3. Optional: service account email ko Editor access
-4. Hub pe do secrets tab add jab auto-upload chahiye
