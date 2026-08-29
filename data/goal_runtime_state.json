@@ -5,13 +5,13 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 24,
+      "attempts": 26,
       "last_target": "rio",
       "recommended_department": "rio",
       "last_status": "GOAL_PROGRESS_VERIFIED",
-      "last_next_action": "After Instagram post is published, monitor for verified clicks/conversions once Instagram metrics collector is restored, or proceed to next revenue action if telemetry remains unavailable.",
-      "last_attempt_at_utc": "2026-08-29T19:47:26.978Z",
-      "last_verified_progress_at_utc": "2026-08-29T19:47:26.978Z",
+      "last_next_action": "After validator pass, commit, submit for indexing, then publish Instagram promo with direct link to drive verified conversions.",
+      "last_attempt_at_utc": "2026-08-29T20:02:27.964Z",
+      "last_verified_progress_at_utc": "2026-08-29T20:02:27.964Z",
       "goal_achieved_at_utc": null,
       "evidence": [
         "data/RIO_3.0_DEFINITION.md",
@@ -59,7 +59,9 @@
         "integration/results/victor_tasks/victor-rio-1788031885302-goal-auto.json",
         "data/autonomy_audit.jsonl",
         "integration/results/victor_tasks/victor-rio-1788032723512-goal-auto.json",
-        "integration/results/victor_tasks/victor-rio-1788032785202-goal-auto.json"
+        "integration/results/victor_tasks/victor-rio-1788032785202-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788033624544-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788033686267-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
