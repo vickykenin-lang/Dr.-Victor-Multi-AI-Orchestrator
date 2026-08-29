@@ -23,11 +23,19 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "repo=$GITHUB_REPOSITORY"
-          if [ -n "$NVIDIA_API_KEY" ]; then echo "NVIDIA_API_KEY=SET len=${#NVIDIA_API_KEY}"; else echo "NVIDIA_API_KEY=EMPTY"; fi
+          if [ -n "$NVIDIA_API_KEY" ]; then echo "NVIDIA_API_KEY=SET"; else echo "NVIDIA_API_KEY=EMPTY"; fi
           if [ -n "$GEMINI_API_KEY" ]; then echo "GEMINI_API_KEY=SET"; else echo "GEMINI_API_KEY=EMPTY"; fi
-          ls -la vision/scripts/auto_generate_stills_nvidia.py
 
-      - name: Generate stills (NVIDIA FLUX)
+      - name: Generate stills (Gemini primary)
+        id: gemini
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ONLY_IDS: ${{ inputs.only_ids }}
+        run: python3 vision/scripts/auto_generate_stills.py
+
+      - name: Generate stills (NVIDIA fallback)
+        if: steps.gemini.outcome != 'success'
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           ONLY_IDS: ${{ inputs.only_ids }}
@@ -47,5 +55,5 @@ jobs:
           git config user.name vision-bot
           git config user.email vision-bot@users.noreply.github.com
           git add vision/episodes/EP001_Last_Delivery/stills/ || true
-          git diff --staged --quiet || git commit -m "vision: EP001 stills via NVIDIA"
+          git diff --staged --quiet || git commit -m "vision: EP001 stills"
           git push || true
