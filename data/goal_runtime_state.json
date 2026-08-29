@@ -5,22 +5,15 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 30,
+      "attempts": 32,
       "last_target": "rio",
-      "recommended_department": "rio",
+      "recommended_department": "tony_stark",
       "last_status": "GOAL_PROGRESS_VERIFIED",
-      "last_next_action": "After validator pass, commit, submit for indexing, then publish Instagram promo with direct link to drive verified conversions.",
-      "last_attempt_at_utc": "2026-08-29T20:47:26.935Z",
-      "last_verified_progress_at_utc": "2026-08-29T20:47:26.935Z",
+      "last_next_action": "After deployment/index submission, publish Instagram promo with direct link to new guide.",
+      "last_attempt_at_utc": "2026-08-29T21:02:23.469Z",
+      "last_verified_progress_at_utc": "2026-08-29T21:02:23.469Z",
       "goal_achieved_at_utc": null,
       "evidence": [
-        "data/status.json",
-        "data/rio_work_status.json",
-        "data/dashboard_snapshot.json",
-        "data/internal_linking_qa_buying_guide_state.json",
-        "site/content/policies/internal-linking-qa-buying-guide-3-tier-rolling-cart-2026-08-29.md",
-        "integration/results/victor_tasks/victor-rio-1788022823981-goal-auto.json",
-        "data/internal_linking_qa_product_page_state.json",
         "site/content/policies/internal-linking-qa-product-page-3-tier-rolling-cart-2026-08-29.md",
         "integration/results/victor_tasks/victor-rio-1788022885724-goal-auto.json",
         "data/publish_product_page_state.json",
@@ -63,7 +56,14 @@
         "integration/results/victor_tasks/victor-rio-1788034585198-goal-auto.json",
         "integration/results/victor_tasks/victor-rio-1788036323556-goal-auto.json",
         "data/RIO_3.0_DEFINITION.md",
-        "integration/results/victor_tasks/victor-rio-1788036385257-goal-auto.json"
+        "integration/results/victor_tasks/victor-rio-1788036385257-goal-auto.json",
+        "data/COMMERCIAL_VALIDATION_POLICY.json",
+        "data/production_control.json",
+        "integration/results/victor_tasks/victor-rio-1788037219609-goal-auto.json",
+        "data/status.json",
+        "data/rio_work_status.json",
+        "data/dashboard_snapshot.json",
+        "integration/results/victor_tasks/victor-rio-1788037281451-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
