@@ -13,6 +13,8 @@ import {
   verifyRioResult,
 } from './department_bridge.mjs';
 
+import { isExecutionPaused } from './emergency_pause_runtime.mjs';
+
 const TELEGRAM_API = 'https://api.telegram.org';
 const SUPERVISION_CRON = '*/15 * * * *';
 const DAILY_REPORT_CRON = '30 16 * * *';
@@ -412,6 +414,9 @@ export async function runAutonomousCycle(controller, env) {
   }
 
   if (controller.cron !== SUPERVISION_CRON) return { status: 'IGNORED_UNKNOWN_CRON', cron: controller.cron };
+
+  const pause = await isExecutionPaused(env);
+  if (pause.paused) return { status: 'SAFE_STOP', goalId: null, target: null, error_code: 'EMERGENCY_PAUSE_ACTIVE', diagnostics: pause };
 
   const registry = await loadGoalRegistry(env);
   let state = await loadGoalRuntimeState(env);

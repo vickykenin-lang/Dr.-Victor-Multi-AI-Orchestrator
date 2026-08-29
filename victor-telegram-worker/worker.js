@@ -36,6 +36,7 @@ import {
 } from './department_bridge.mjs';
 
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
+import { parseEmergencyCommand, applyEmergencyCommand } from './emergency_pause_runtime.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
@@ -195,6 +196,20 @@ export default {
     if (!text) return json({ ok: true, ignored: true });
 
     const traceId = buildTraceId(update?.update_id, message.message_id);
+    const emergencyCommand = parseEmergencyCommand(text);
+    if (emergencyCommand) {
+      try {
+        const pauseResult = await applyEmergencyCommand(env, emergencyCommand, { chatId, messageId: message.message_id });
+        const label = pauseResult.status === 'PAUSE_UNCONFIRMED'
+          ? 'Emergency pause requested but RIO acknowledgement failed. Victor remains fail-closed for new dispatch; check RIO mirror before assuming organization-wide pause.'
+          : `${pauseResult.status}: ${emergencyCommand.scope === 'system' ? 'SYSTEM' : emergencyCommand.department}. RIO mirror: ${pauseResult.rio_mirror}.`;
+        await sendTelegramMessage(env, chatId, label, message.message_id);
+        return json({ ok: true, emergency_pause: pauseResult.status, rio_mirror: pauseResult.rio_mirror });
+      } catch (pauseError) {
+        await sendTelegramMessage(env, chatId, 'Emergency pause command failed to persist. Treat execution state as unconfirmed; no success claimed.', message.message_id);
+        return json({ ok: false, emergency_pause: 'FAILED' }, 503);
+      }
+    }
     let processingStage = 'REQUEST_ACCEPTED';
 
     try {
