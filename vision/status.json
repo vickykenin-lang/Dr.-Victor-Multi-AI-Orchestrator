@@ -1,19 +1,18 @@
 {
   "department": "VISION",
-  "updated": "2026-08-30T01:02+05:30",
+  "updated": "2026-08-30T01:07+05:30",
   "overall": "production",
   "phase": "EP001_stills",
   "omniroute": "off_deferred",
   "storage": {
     "working": "google_drive",
     "publish": "youtube",
-    "git": "docs_and_logs_only",
     "folder_url": "https://drive.google.com/drive/folders/1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U",
     "folder_id": "1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U",
     "visibility": "private",
     "layout": ["01_stills", "02_clips", "03_audio", "04_edit", "05_masters", "06_qc"],
-    "auto_upload": false,
-    "blocked_on": "gemini_image_quota_or_nvidia_fallback"
+    "founder_folders": "done",
+    "auto_upload": false
   },
   "current_episode": "EP001_Last_Delivery",
   "episode_status": {
@@ -21,15 +20,15 @@
     "characters": "done",
     "script": "founder_ok",
     "shot_list": "done",
-    "stills": "gemini_key_set_quota_429",
+    "storage": "drive_bound",
+    "stills": "retrying_after_founder_done",
     "stills_qc": "pending_stills",
     "video": "after_stills",
     "youtube": "pending_channel"
   },
   "next": [
-    "Create 01_stills .. 06_qc inside bound Drive folder",
-    "Unblock Gemini image quota or add NVIDIA_API_KEY",
     "System rerun vision_stills.yml only_ids=A1",
+    "If 429: founder Gemini billing or NVIDIA_API_KEY",
     "Place A1 in Drive 01_stills",
     "Founder visual OK / redo"
   ]
