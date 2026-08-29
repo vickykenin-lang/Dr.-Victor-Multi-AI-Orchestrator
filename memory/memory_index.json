@@ -1,55 +1,33 @@
 {
-  "schema_version": 1,
-  "engine": "victor-memory-v1",
-  "storage_mode": "LOCAL_PRIMARY_DRIVE_BACKUP_PLANNED",
+  "schema_version": 2,
+  "engine": "victor-memory-v2-layered",
+  "storage_mode": "GITHUB_CANONICAL_WITH_OPTIONAL_DRIVE_BACKUP",
   "sources": [
-    {
-      "path": "memory/founder_memory.json",
-      "class": "founder",
-      "priority": 100
-    },
-    {
-      "path": "memory/decisions.jsonl",
-      "class": "decision",
-      "priority": 90
-    },
-    {
-      "path": "memory/operational_memory.jsonl",
-      "class": "operational",
-      "priority": 70
-    }
+    {"path":"memory/founder_memory.json","class":"founder","priority":100,"mode":"canonical"},
+    {"path":"memory/decisions.jsonl","class":"decision","priority":95,"mode":"append_only"},
+    {"path":"memory/MEMORY.md","class":"long_term","priority":90,"mode":"compacted"},
+    {"path":"memory/ACTIVE_PROJECTS.md","class":"active_projects","priority":85,"mode":"rewritable"},
+    {"path":"memory/WORKING_MEMORY.md","class":"working","priority":80,"mode":"rewritable_compacted"},
+    {"path":"memory/LEARNINGS.md","class":"learning","priority":75,"mode":"append_then_compact"},
+    {"path":"memory/operational_memory.jsonl","class":"operational","priority":70,"mode":"append_only"},
+    {"path":"memory/ACTIVITY_LOG.md","class":"activity","priority":60,"mode":"high_signal_append"},
+    {"path":"memory/INDEX.md","class":"index","priority":50,"mode":"routing"}
   ],
-  "retrieval_order": [
-    "founder",
-    "decision",
-    "operational"
-  ],
-  "write_triggers": [
-    "remember",
-    "yaad rakho",
-    "lock",
-    "final",
-    "permanent",
-    "save",
-    "store",
-    "important_founder_preference",
-    "material_decision",
-    "major_failure_or_fix",
-    "department_milestone"
-  ],
-  "exclude": [
-    "secrets",
-    "api_keys",
-    "tokens",
-    "passwords",
-    "otp",
-    "raw_credentials",
-    "low_value_chitchat"
-  ],
-  "drive_sync": {
-    "enabled": false,
-    "status": "IMPLEMENTATION_READY_PENDING_OAUTH_VERIFICATION",
-    "folder_binding": "GOOGLE_DRIVE_FOLDER_ID",
-    "verification": "SHA256_UPLOAD_DOWNLOAD"
-  }
+  "retrieval_order": ["founder","decision","long_term","active_projects","working","learning","operational","activity"],
+  "conflict_precedence": ["active_founder_decision","founder","long_term","active_projects","working","learning","operational","activity"],
+  "promotion_rules": {
+    "working_to_long_term": "stable_and_repeatedly_useful",
+    "working_to_learning": "verified_reusable_lesson",
+    "operational_to_activity": "material_milestone_failure_or_fix",
+    "activity_to_long_term": "durable_strategic_significance"
+  },
+  "semantic_rules": {
+    "unknown_telemetry_is_zero": false,
+    "memory_is_business_evidence": false,
+    "fresh_evidence_required_for_external_claims": true,
+    "newer_active_founder_decision_overrides_conflict": true
+  },
+  "write_triggers": ["remember","yaad rakho","lock","final","permanent","save","store","important_founder_preference","material_decision","major_failure_or_fix","department_milestone","verified_learning","active_project_change"],
+  "exclude": ["secrets","api_keys","tokens","passwords","otp","raw_credentials","low_value_chitchat"],
+  "drive_sync": {"enabled":false,"status":"OPTIONAL_BACKUP_PENDING_OAUTH_VERIFICATION","folder_binding":"GOOGLE_DRIVE_FOLDER_ID","verification":"SHA256_UPLOAD_DOWNLOAD"}
 }
