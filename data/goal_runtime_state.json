@@ -5,13 +5,13 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 6,
+      "attempts": 8,
       "last_target": "rio",
       "recommended_department": "rio",
       "last_status": "GOAL_PROGRESS_VERIFIED",
-      "last_next_action": "After validator pass, draft the full buying guide content with verified product data, publish, internal-link to the product page, and submit for indexing.",
-      "last_attempt_at_utc": "2026-08-29T17:32:26.959Z",
-      "last_verified_progress_at_utc": "2026-08-29T17:32:26.959Z",
+      "last_next_action": "After validator pass, commit, submit for indexing, and rotate to Pillar 6 (Instagram) to drive initial traffic to the guide and offer page.",
+      "last_attempt_at_utc": "2026-08-29T17:47:27.501Z",
+      "last_verified_progress_at_utc": "2026-08-29T17:47:27.501Z",
       "goal_achieved_at_utc": null,
       "evidence": [
         "data/RIO_3.0_DEFINITION.md",
@@ -33,7 +33,9 @@
         "integration/results/victor_tasks/victor-rio-1788024623280-goal-auto.json",
         "data/buying_guide_3_tier_rolling_cart_state.json",
         "site/content/policies/buying-guide-3-tier-rolling-cart-2026-08-29.md",
-        "integration/results/victor_tasks/victor-rio-1788024684994-goal-auto.json"
+        "integration/results/victor_tasks/victor-rio-1788024684994-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788025523375-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788025585193-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
