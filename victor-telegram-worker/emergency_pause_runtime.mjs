@@ -3,7 +3,7 @@ const RIO_REPO='vickykenin-lang/rio-affiliate-engine';
 const VICTOR_PATH='data/emergency_pause_state.json';
 const RIO_PATH='data/emergency_pause_state.json';
 
-function headers(token){return {Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json','User-Agent':'Victor-Emergency-Pause/1.0'};}
+function headers(token){return {Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json','User-Agent':'Victor-Emergency-Pause/1.1'};}
 function enc(text){const bytes=new TextEncoder().encode(text);let b='';for(const x of bytes)b+=String.fromCharCode(x);return btoa(b);}
 function dec(text){const b=atob(String(text||'').replace(/\n/g,''));return new TextDecoder().decode(Uint8Array.from(b,c=>c.charCodeAt(0)));}
 async function readJson(env,repo,path,fallback={}){
@@ -32,21 +32,30 @@ export function parseEmergencyCommand(text){
   return {scope:'department',action:m[1]==='PAUSE'?'pause':'resume',department:map[m[2]]};
 }
 
-export async function getPauseState(env){return readJson(env,VICTOR_REPO,VICTOR_PATH,{global_pause_active:false,departments:{}});}
+export async function getPauseState(env){return readJson(env,VICTOR_REPO,VICTOR_PATH,{global_pause_active:false,system_state:'RUNNING',departments:{}});}
 export async function isExecutionPaused(env,department=null){
   const s=await getPauseState(env);const ds=department?s.departments?.[department]:null;
-  return {paused:s.global_pause_active===true||String(s.system_state||'').toUpperCase()==='PAUSED'||ds?.pause_active===true,global_pause_active:s.global_pause_active===true,department_pause_active:ds?.pause_active===true,department};
+  const global=s.global_pause_active===true||String(s.system_state||'').toUpperCase()==='PAUSED';
+  return {paused:global||ds?.pause_active===true,global_pause_active:global,department_pause_active:ds?.pause_active===true,department};
 }
 
 export async function applyEmergencyCommand(env,command,metadata={}){
   if(!command)throw new Error('INVALID_PAUSE_COMMAND');const now=new Date().toISOString();let s=await getPauseState(env);s={...s,schema_version:1,canonical:true,authority:'FOUNDER_VIA_VICTOR',departments:{...(s.departments||{})},last_command:command.scope==='system'?`SYSTEM ${command.action.toUpperCase()}`:`${command.action.toUpperCase()} ${command.department}`,last_command_at_utc:now,last_command_source:'FOUNDER_TELEGRAM'};
   if(command.scope==='system'){
     const paused=command.action==='pause';s.global_pause_active=paused;s.system_state=paused?'PAUSED':'RUNNING';s.pause_reason=paused?(metadata.reason||'FOUNDER_SYSTEM_PAUSE'):null;
-  }else{s.departments[command.department]={...(s.departments[command.department]||{}),pause_active:command.action==='pause',state:command.action==='pause'?'PAUSED':'RUNNING',updated_at_utc:now,authority:'FOUNDER_VIA_VICTOR'};}
+  }else{
+    // Department commands are scope-isolated. They must never create or clear a global pause.
+    s.global_pause_active=s.global_pause_active===true;
+    s.system_state=s.global_pause_active?'PAUSED':'RUNNING';
+    s.pause_reason=s.global_pause_active?(s.pause_reason||'FOUNDER_SYSTEM_PAUSE'):null;
+    s.departments[command.department]={...(s.departments[command.department]||{}),pause_active:command.action==='pause',state:command.action==='pause'?'PAUSED':'RUNNING',updated_at_utc:now,authority:'FOUNDER_VIA_VICTOR'};
+  }
   await writeJson(env,VICTOR_REPO,VICTOR_PATH,s,`safety: ${s.last_command}`);
   let rioMirror='NOT_APPLICABLE';
   if(command.scope==='system'||command.department==='rio'){
-    const rs=await readJson(env,RIO_REPO,RIO_PATH,{schema_version:1});const global=command.scope==='system'?command.action==='pause':Boolean(rs.global_pause_active);const dept=command.scope==='department'?command.action==='pause':Boolean(rs.department_pause_active);
+    const rs=await readJson(env,RIO_REPO,RIO_PATH,{schema_version:1});
+    const global=command.scope==='system'?command.action==='pause':Boolean(s.global_pause_active);
+    const dept=command.scope==='department'?command.action==='pause':Boolean(rs.department_pause_active);
     const next={...rs,schema_version:1,system_state:global?'PAUSED':'RUNNING',global_pause_active:global,department_pause_active:dept,authority:'FOUNDER_VIA_VICTOR',last_command:s.last_command,last_command_at_utc:now};
     try{await writeJson(env,RIO_REPO,RIO_PATH,next,`safety: mirror ${s.last_command}`);rioMirror='ACKNOWLEDGED';}catch(e){rioMirror='PAUSE_UNCONFIRMED';if(command.action==='pause')return {status:'PAUSE_UNCONFIRMED',state:s,rio_mirror:rioMirror,error:String(e.message||e)};}
   }
