@@ -5,13 +5,13 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 16,
+      "attempts": 18,
       "last_target": "rio",
       "recommended_department": "rio",
       "last_status": "GOAL_PROGRESS_VERIFIED",
-      "last_next_action": "After validator pass, commit, and submit for indexing, publish Instagram content with updated CTA and internal link to offer page.",
-      "last_attempt_at_utc": "2026-08-29T18:47:26.971Z",
-      "last_verified_progress_at_utc": "2026-08-29T18:47:26.971Z",
+      "last_next_action": "Choose a different highest-impact executable revenue action.",
+      "last_attempt_at_utc": "2026-08-29T19:02:27.981Z",
+      "last_verified_progress_at_utc": "2026-08-29T19:02:27.981Z",
       "goal_achieved_at_utc": null,
       "evidence": [
         "data/RIO_3.0_DEFINITION.md",
@@ -47,7 +47,9 @@
         "site/content/policies/offer-page-cta-3-tier-rolling-cart-2026-08-30.md",
         "integration/results/victor_tasks/victor-rio-1788028285076-goal-auto.json",
         "integration/results/victor_tasks/victor-rio-1788029123679-goal-auto.json",
-        "integration/results/victor_tasks/victor-rio-1788029185331-goal-auto.json"
+        "integration/results/victor_tasks/victor-rio-1788029185331-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788030024312-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788030086141-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
