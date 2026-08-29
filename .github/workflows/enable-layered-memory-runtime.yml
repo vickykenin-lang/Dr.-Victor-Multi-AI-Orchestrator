@@ -1,0 +1,40 @@
+name: Enable Layered Victor Memory Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/enable_layered_memory_runtime.py'
+      - 'memory/MEMORY.md'
+      - 'memory/WORKING_MEMORY.md'
+      - 'memory/LEARNINGS.md'
+      - 'memory/ACTIVE_PROJECTS.md'
+      - 'memory/ACTIVITY_LOG.md'
+      - 'memory/INDEX.md'
+      - 'memory/memory_index.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch Victor layered memory runtime
+        run: python scripts/enable_layered_memory_runtime.py
+      - name: Run memory tests
+        run: node --test victor-telegram-worker/memory_runtime.test.mjs
+      - name: Commit runtime integration
+        run: |
+          git config user.name "victor-memory-runtime"
+          git config user.email "actions@users.noreply.github.com"
+          git add victor-telegram-worker/worker.js victor-telegram-worker/memory_runtime.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m "runtime: enable layered long-term memory context"
+          git pull --rebase --autostash
+          git push
