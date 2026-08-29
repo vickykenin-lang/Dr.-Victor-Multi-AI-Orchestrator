@@ -5,13 +5,13 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 10,
+      "attempts": 12,
       "last_target": "rio",
       "recommended_department": "rio",
       "last_status": "GOAL_PROGRESS_VERIFIED",
-      "last_next_action": "After posting, monitor initial engagement/clicks; if no clicks within 24h, A/B test hook/CTA or rotate to Pillar 1 (website) for internal linking/CTA optimization.",
-      "last_attempt_at_utc": "2026-08-29T18:02:28.451Z",
-      "last_verified_progress_at_utc": "2026-08-29T18:02:28.451Z",
+      "last_next_action": "Replan autonomously toward the closest valid revenue action.",
+      "last_attempt_at_utc": "2026-08-29T18:17:27.361Z",
+      "last_verified_progress_at_utc": "2026-08-29T18:17:27.361Z",
       "goal_achieved_at_utc": null,
       "evidence": [
         "data/RIO_3.0_DEFINITION.md",
@@ -39,7 +39,9 @@
         "integration/results/victor_tasks/victor-rio-1788026424650-goal-auto.json",
         "data/instagram_publish_state.json",
         "site/content/instagram/captions/ig-caption-buying-guide-promo-3-tier-rolling-cart-2026-08-29.md",
-        "integration/results/victor_tasks/victor-rio-1788026486537-goal-auto.json"
+        "integration/results/victor_tasks/victor-rio-1788026486537-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788027323568-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788027385611-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
