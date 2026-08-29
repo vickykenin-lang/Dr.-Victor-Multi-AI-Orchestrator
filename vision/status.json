@@ -1,9 +1,18 @@
 {
   "department": "VISION",
-  "updated": "2026-08-21T23:55+05:30",
+  "updated": "2026-08-30T00:58+05:30",
   "overall": "production",
   "phase": "EP001_stills",
   "omniroute": "off_deferred",
+  "storage": {
+    "working": "google_drive",
+    "publish": "youtube",
+    "git": "docs_and_logs_only",
+    "folder": "Vision/EP001_Last_Delivery",
+    "layout": ["01_stills", "02_clips", "03_audio", "04_edit", "05_masters", "06_qc"],
+    "auto_upload": false,
+    "blocked_on": "gemini_image_quota_or_nvidia_fallback"
+  },
   "router": null,
   "agents": {
     "ceo": "Victor (Grok)",
@@ -18,15 +27,16 @@
     "characters": "done",
     "script": "founder_ok",
     "shot_list": "done",
-    "stills": "gemini_prompts_ready",
-    "stills_qc": "deepseek",
+    "stills": "gemini_key_set_quota_429",
+    "stills_qc": "pending_stills",
     "video": "after_stills",
     "youtube": "pending_channel"
   },
   "next": [
-    "Generate EP001 stills with Gemini (PROMPTS_GEMINI.md)",
-    "DeepSeek QC on stills",
-    "Founder visual OK",
-    "Video phase"
+    "Founder: create Drive folder Vision/EP001_Last_Delivery",
+    "Unblock Gemini image quota or add NVIDIA_API_KEY",
+    "System rerun vision_stills.yml only_ids=A1",
+    "Upload A1 to Drive 01_stills",
+    "Founder visual OK / redo"
   ]
 }
