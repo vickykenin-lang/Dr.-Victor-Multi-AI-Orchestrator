@@ -45,6 +45,23 @@ export function parseMemorySources(sourceRecords = []) {
         } catch (_) {}
       }
     }
+    const layered = {
+      LONG_TERM_MEMORY: ['long_term', 88],
+      ACTIVE_PROJECTS_MEMORY: ['active_projects', 84],
+      WORKING_MEMORY: ['working', 80],
+      LEARNINGS_MEMORY: ['learning', 76],
+      ACTIVITY_MEMORY: ['activity', 60],
+      MEMORY_INDEX_MD: ['index', 50],
+    };
+    if (layered[source.name]) {
+      const [cls, priority] = layered[source.name];
+      records.push({
+        class: cls,
+        priority,
+        data: { type: cls, source: source.name, content: source.text },
+        text: source.text,
+      });
+    }
   }
   return records;
 }

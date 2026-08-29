@@ -58,7 +58,13 @@ const CORE_SOURCES = [
   ['TELEGRAM_RUNTIME_STATUS', 'data/telegram_runtime_status.json', false],
   ['FOUNDER_MEMORY', 'memory/founder_memory.json', false],
   ['DECISIONS', 'memory/decisions.jsonl', false],
+  ['LONG_TERM_MEMORY', 'memory/MEMORY.md', false],
+  ['ACTIVE_PROJECTS_MEMORY', 'memory/ACTIVE_PROJECTS.md', false],
+  ['WORKING_MEMORY', 'memory/WORKING_MEMORY.md', false],
+  ['LEARNINGS_MEMORY', 'memory/LEARNINGS.md', false],
   ['OPERATIONAL_MEMORY', 'memory/operational_memory.jsonl', false],
+  ['ACTIVITY_MEMORY', 'memory/ACTIVITY_LOG.md', false],
+  ['MEMORY_INDEX_MD', 'memory/INDEX.md', false],
   ['MEMORY_INDEX', 'memory/memory_index.json', false],
 ];
 
@@ -97,7 +103,7 @@ export default {
         telegram_diagnostics: 'ACTIONABLE_V4_GROUP_STATUS_FIX',
         operating_mode: 'GOVERNED_SELF_MODE',
         founder_approval_gate: 'CREDENTIAL_ADMINISTRATION_ONLY',
-        memory_recall_mode: 'REPO_CANONICAL_RELEVANCE_V2',
+        memory_recall_mode: 'LAYERED_REPO_MEMORY_V3',
         memory_write_configured: Boolean(env.GITHUB_MEMORY_TOKEN),
         aura3_bridge_configured: aura3BridgeConfigured(env),
         tony_bridge_configured: tonyBridgeConfigured(env),
@@ -160,7 +166,7 @@ export default {
         required_sources_ok: core.requiredSourcesOk,
         precedence_mode: PRECEDENCE_VERSION,
         truth_guard: 'DETERMINISTIC_V3',
-        memory_sources: core.sourceStatus.filter(x => ['FOUNDER_MEMORY','DECISIONS','OPERATIONAL_MEMORY','MEMORY_INDEX'].includes(x.name)),
+        memory_sources: core.sourceStatus.filter(x => ['FOUNDER_MEMORY','DECISIONS','LONG_TERM_MEMORY','ACTIVE_PROJECTS_MEMORY','WORKING_MEMORY','LEARNINGS_MEMORY','OPERATIONAL_MEMORY','ACTIVITY_MEMORY','MEMORY_INDEX_MD','MEMORY_INDEX'].includes(x.name)),
         resolved_runtime_rules: RESOLVED_RUNTIME_RULES,
         sources: core.sourceStatus,
       }, core.ready ? 200 : 503);
@@ -465,7 +471,7 @@ async function loadVictorCore() {
     sourceStatus: results.map(({ name, path, required, ok, status }) => ({ name, path, required, ok, status })),
     sourceRecords: results,
     context: results
-      .filter(r => r.ok && !['FOUNDER_MEMORY','DECISIONS','OPERATIONAL_MEMORY','MEMORY_INDEX'].includes(r.name))
+      .filter(r => r.ok && !['FOUNDER_MEMORY','DECISIONS','LONG_TERM_MEMORY','ACTIVE_PROJECTS_MEMORY','WORKING_MEMORY','LEARNINGS_MEMORY','OPERATIONAL_MEMORY','ACTIVITY_MEMORY','MEMORY_INDEX_MD','MEMORY_INDEX'].includes(r.name))
       .map(r => `\n===== ${r.name} :: ${r.path} =====\n${r.text}`).join('\n'),
     architectureLockLoaded: Boolean(byName.ARCHITECTURE_LOCK?.ok),
   };
