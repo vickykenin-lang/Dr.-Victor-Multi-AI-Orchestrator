@@ -5,13 +5,13 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 2,
+      "attempts": 4,
       "last_target": "rio",
       "recommended_department": "rio",
       "last_status": "GOAL_PROGRESS_VERIFIED",
-      "last_next_action": "After validator pass, commit changes, submit plan for Founder review and approval, then implement internal linking changes and rotate to Pillar 1 (website development/conversion/SEO) for post-publish SEO monitoring.",
-      "last_attempt_at_utc": "2026-08-29T17:02:27.419Z",
-      "last_verified_progress_at_utc": "2026-08-29T17:02:27.419Z",
+      "last_next_action": "After validator pass, commit changes, submit indexing request, then rotate to Pillar 4 (product-led blog/content) to create high-intent supporting content for this product to drive qualified traffic.",
+      "last_attempt_at_utc": "2026-08-29T17:17:27.556Z",
+      "last_verified_progress_at_utc": "2026-08-29T17:17:27.556Z",
       "goal_achieved_at_utc": null,
       "evidence": [
         "data/RIO_3.0_DEFINITION.md",
@@ -25,7 +25,11 @@
         "integration/results/victor_tasks/victor-rio-1788022823981-goal-auto.json",
         "data/internal_linking_qa_product_page_state.json",
         "site/content/policies/internal-linking-qa-product-page-3-tier-rolling-cart-2026-08-29.md",
-        "integration/results/victor_tasks/victor-rio-1788022885724-goal-auto.json"
+        "integration/results/victor_tasks/victor-rio-1788022885724-goal-auto.json",
+        "data/publish_product_page_state.json",
+        "site/content/policies/publish-product-page-3-tier-rolling-cart-2026-08-29.md",
+        "integration/results/victor_tasks/victor-rio-1788023723227-goal-auto.json",
+        "integration/results/victor_tasks/victor-rio-1788023785512-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
