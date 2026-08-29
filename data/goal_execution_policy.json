@@ -1,89 +1,86 @@
 {
-  "schema_version": 1,
-  "status": "ACTIVE_TRIAL",
+  "schema_version": 2,
+  "status": "ACTIVE",
   "authority": "Founder Vicky",
-  "architecture_ref": "docs/VICTOR_GOAL_DRIVEN_EXECUTIVE_ARCHITECTURE.md",
-  "operating_doctrine": "FOUNDER_DEFINES_DESTINATION_VICTOR_OWNS_ROUTE",
-  "goal_contract": {
+  "architecture_ref": "docs/VICTOR_FREE_EXECUTIVE_REVENUE_MODE.md",
+  "operating_doctrine": "FOUNDER_SETS_DESTINATION_AND_CREDENTIALS_VICTOR_OWNS_EXECUTION",
+  "founder_contract": {
     "founder_owned": [
       "OBJECTIVE",
-      "SUCCESS_CRITERIA",
-      "EXPLICIT_DEADLINE",
-      "EXPLICIT_BUDGET_CEILING",
-      "HARD_BOUNDARIES",
-      "CREDENTIAL_OR_ACCOUNT_IDENTITY_SCOPE",
+      "CREDENTIAL_OR_ACCOUNT_IDENTITY_ADMINISTRATION",
+      "EXPLICIT_BUDGET_CEILING_IF_ANY",
       "PAUSE_OR_REVOKE"
     ],
     "victor_owned": [
       "STRATEGY",
+      "RESEARCH",
+      "MEMORY_DEVELOPMENT",
       "PLAN",
       "TASK_DECOMPOSITION",
       "SEQUENCING",
       "DEPARTMENT_ASSIGNMENT",
-      "QUALIFIED_TOOL_OR_PROVIDER_SELECTION",
+      "RIO_COMMUNICATION_BRIDGE_DESIGN",
+      "TOOL_SELECTION",
       "EXPERIMENTS",
       "RETRIES_AND_FALLBACKS",
       "RECOVERY_ROUTE",
-      "RESOURCE_ALLOCATION",
+      "RESOURCE_ALLOCATION_WITHIN_CONFIGURED_LIMITS",
       "SUBGOAL_PRIORITY",
-      "EVIDENCE_GATHERING_METHOD"
-    ],
-    "department_owned_within_delegation": [
-      "EXECUTION_METHOD",
-      "LOCAL_TASK_SEQUENCE",
-      "QUALIFIED_CAPABILITY_SELECTION",
-      "SAFE_RECOVERY_INSIDE_DELEGATED_SCOPE"
+      "EVIDENCE_GATHERING_METHOD",
+      "NEXT_BEST_ACTION",
+      "STOP_OR_DOUBLE_DOWN_DECISIONS"
     ]
   },
   "decision_loop": [
-    "LOAD_ACTIVE_GOALS",
-    "RECONCILE_GOAL_STATE_AND_EVIDENCE",
-    "SELECT_HIGHEST_VALUE_UNRESOLVED_GOAL",
-    "SELECT_BEST_QUALIFIED_ROUTE",
-    "DISPATCH_OUTCOME_CONTRACT",
-    "VERIFY_PROGRESS_EVIDENCE",
-    "UPDATE_GOAL_RUNTIME_STATE",
-    "REPLAN_IF_TARGET_NOT_MET",
-    "CONTINUE_UNTIL_VERIFIED_TARGET_OR_FOUNDER_ONLY_BLOCKER"
+    "OBSERVE_MARKET_AND_SYSTEM_STATE",
+    "RESEARCH_HIGHEST_VALUE_REVENUE_OPPORTUNITY",
+    "SELECT_CLOSEST_VALID_PATH_TO_VERIFIED_REVENUE",
+    "DELEGATE_OR_EXECUTE",
+    "MEASURE_REAL_RESULT",
+    "WRITE_DURABLE_MEMORY",
+    "REPLAN_FROM_EVIDENCE",
+    "CONTINUE_UNTIL_VERIFIED_REVENUE_OR_FOUNDER_ONLY_BLOCKER"
   ],
-  "replanning": {
-    "plan_is_mutable": true,
-    "objective_is_not_mutable_by_victor": true,
-    "change_route_on_unchanged_failure": true,
-    "change_route_on_low_progress": true,
-    "change_route_when_higher_expected_value_route_exists": true,
-    "blind_retry_prohibited": true,
-    "failure_fingerprint_required": true
-  },
-  "heartbeat": {
-    "role": "WATCHDOG_AND_WAKE_NOT_FIXED_DEPARTMENT_ROTATION",
-    "baseline_minutes": 15,
-    "event_wake_preferred_when_available": true
+  "approval_model": {
+    "routine_founder_approval_required": false,
+    "routine_plan_approval_required": false,
+    "routine_department_approval_required": false,
+    "routine_publish_or_execution_approval_required": false,
+    "routine_recovery_approval_required": false,
+    "internal_validation_is_self_check_not_approval_gate": true
   },
   "founder_escalation": {
-    "routine_plan_approval_required": false,
-    "routine_department_selection_approval_required": false,
-    "routine_recovery_approval_required": false,
     "required_only_for": [
       "CREDENTIAL_OR_ACCOUNT_IDENTITY_ADMINISTRATION",
-      "OBJECTIVE_IMPOSSIBLE_AFTER_GOVERNED_RECOVERY",
-      "HARD_BOUNDARY_CONFLICT",
-      "OBJECTIVE_OR_SUCCESS_CRITERIA_CHANGE",
-      "EXPLICIT_DEADLINE_CHANGE_REQUIRING_FOUNDER",
-      "EXPLICIT_BUDGET_CEILING_CHANGE",
-      "UNRESOLVED_LEGAL_COMPLIANCE_OR_SECURITY_JUDGMENT"
+      "SPEND_ABOVE_EXPLICIT_CONFIGURED_BUDGET_CEILING",
+      "IRREVERSIBLE_HIGH_IMPACT_EXTERNAL_COMMITMENT",
+      "UNRESOLVED_LEGAL_OR_SECURITY_JUDGMENT",
+      "FOUNDER_PAUSE_OR_OBJECTIVE_CHANGE"
     ]
   },
-  "mandatory_controls": [
-    "TRUTH_AND_EVIDENCE_VALIDATION",
-    "LEAST_PRIVILEGE",
-    "LEGAL_AND_PLATFORM_COMPLIANCE",
-    "CONFIGURED_COST_LIMITS",
-    "CAPABILITY_QUALIFICATION",
-    "REVERSIBILITY_OR_RECOVERY_CONTROL_WHERE_APPLICABLE",
+  "mandatory_hard_boundaries": [
+    "NO_FALSE_REVENUE_OR_SUCCESS_CLAIM",
     "NO_RAW_SECRET_DISCLOSURE",
-    "POST_ACTION_VERIFICATION",
-    "DEPARTMENT_CREDENTIAL_ISOLATION"
+    "LEGAL_AND_PLATFORM_COMPLIANCE",
+    "NO_SECURITY_BYPASS",
+    "CONFIGURED_COST_LIMITS",
+    "POST_ACTION_RESULT_VERIFICATION"
   ],
-  "success_rule": "TASK_COMPLETION_IS_NOT_SUCCESS_TARGET_ACHIEVEMENT_REQUIRES_GOAL_CONTRACT_EVIDENCE"
+  "memory_policy": {
+    "victor_may_develop_operational_memory_autonomously": true,
+    "store_reusable_research_findings": true,
+    "store_experiment_results": true,
+    "store_failure_patterns": true,
+    "store_revenue_signals": true,
+    "memory_must_not_store_raw_credentials": true,
+    "new_memory_must_not_redefine_founder_objective": true
+  },
+  "rio_relationship": {
+    "model": "VICTOR_STRATEGIC_NAVIGATION_RIO_AUTONOMOUS_EXECUTION",
+    "victor_may_create_or_change_communication_bridge": true,
+    "rio_should_not_be_micro_managed": true,
+    "rio_returns_evidence_and_results": true,
+    "victor_replans_from_rio_evidence": true
+  },
+  "success_rule": "ONLY_VERIFIED_REAL_COMMERCIAL_OUTCOME_COUNTS_AS_REVENUE_SUCCESS"
 }
