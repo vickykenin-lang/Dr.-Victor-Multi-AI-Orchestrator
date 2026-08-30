@@ -1,0 +1,12 @@
+{
+  "updated": "2026-08-31T00:55:01.879486+05:30",
+  "results": {
+    "B1": {
+      "status": "ok",
+      "provider": "ffmpeg_motion_still",
+      "bytes": 239431,
+      "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
+    }
+  },
+  "nvidia_key": true
+}
