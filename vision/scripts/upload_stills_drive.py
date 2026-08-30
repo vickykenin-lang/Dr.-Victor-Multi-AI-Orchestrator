@@ -4,15 +4,29 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 
-ROOT_FOLDER = os.environ.get("GOOGLE_DRIVE_FOLDER_ID", "1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U").strip()
+DEFAULT_FOLDER = "1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U"
 STILLS = os.path.join(os.path.dirname(__file__), "..", "episodes", "EP001_Last_Delivery", "stills")
 DRIVE_FILES = "https://www.googleapis.com/drive/v3/files"
 DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
+
+
+def normalize_folder_id(raw: str) -> str:
+    raw = (raw or "").strip().strip('"').strip("'")
+    if not raw:
+        return DEFAULT_FOLDER
+    m = re.search(r"/folders/([A-Za-z0-9_-]+)", raw)
+    if m:
+        return m.group(1)
+    m = re.search(r"[?&]id=([A-Za-z0-9_-]+)", raw)
+    if m:
+        return m.group(1)
+    return raw.split()[0]
 
 
 def load_sa() -> dict:
@@ -37,15 +51,27 @@ def jwt_bearer(sa: dict) -> str:
     return creds.token
 
 
+def drive_json(req: urllib.request.Request):
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.load(resp)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"HTTP {e.code} {req.full_url[:180]} :: {body}") from e
+
+
 def find_or_create_child(token: str, parent: str, name: str) -> str:
     q = (
         f"name = '{name}' and '{parent}' in parents and "
         "mimeType = 'application/vnd.google-apps.folder' and trashed = false"
     )
-    url = DRIVE_FILES + "?q=" + urllib.parse.quote(q) + "&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true"
+    url = (
+        DRIVE_FILES
+        + "?q=" + urllib.parse.quote(q)
+        + "&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true"
+    )
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        files = json.load(resp).get("files") or []
+    files = drive_json(req).get("files") or []
     if files:
         return files[0]["id"]
     body = json.dumps({
@@ -62,8 +88,7 @@ def find_or_create_child(token: str, parent: str, name: str) -> str:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.load(resp)["id"]
+    return drive_json(req)["id"]
 
 
 def upload_png(token: str, folder_id: str, path: str) -> str:
@@ -88,15 +113,16 @@ def upload_png(token: str, folder_id: str, path: str) -> str:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.load(resp).get("id", "")
+    return drive_json(req).get("id", "")
 
 
 def main() -> int:
     sa = load_sa()
+    root = normalize_folder_id(os.environ.get("GOOGLE_DRIVE_FOLDER_ID", DEFAULT_FOLDER))
     print("SA email:", sa.get("client_email", "?"))
+    print("folder_id:", root)
     token = jwt_bearer(sa)
-    stills_id = find_or_create_child(token, ROOT_FOLDER, "01_stills")
+    stills_id = find_or_create_child(token, root, "01_stills")
     print("Drive 01_stills id", stills_id)
     if not os.path.isdir(STILLS):
         print("no local stills dir")
@@ -110,8 +136,6 @@ def main() -> int:
             fid = upload_png(token, stills_id, path)
             print(f"uploaded {name} -> {fid}")
             ok += 1
-        except urllib.error.HTTPError as e:
-            print(f"FAIL {name}: HTTP {e.code} {e.read()[:400]}")
         except Exception as e:
             print(f"FAIL {name}: {e}")
     print("uploaded", ok)
