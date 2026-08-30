@@ -4,11 +4,18 @@
   "system_state": "RUNNING",
   "global_pause_active": false,
   "authority": "FOUNDER_VIA_VICTOR",
-  "last_command": "SYSTEM RESUME",
-  "last_command_at_utc": "2026-08-29T19:05:18.336Z",
+  "last_command": "PAUSE rio",
+  "last_command_at_utc": "2026-08-30T07:20:55.135Z",
   "last_command_source": "FOUNDER_TELEGRAM",
   "pause_reason": null,
-  "departments": {},
+  "departments": {
+    "rio": {
+      "pause_active": true,
+      "state": "PAUSED",
+      "updated_at_utc": "2026-08-30T07:20:55.135Z",
+      "authority": "FOUNDER_VIA_VICTOR"
+    }
+  },
   "required_behavior": {
     "fail_closed": true,
     "block_new_dispatch_when_global_paused": true,
