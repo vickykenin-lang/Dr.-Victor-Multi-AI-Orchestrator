@@ -16,17 +16,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Show env (safe)
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_VICTOR_VISION_KEY: ${{ secrets.NVIDIA_VICTOR_VISION_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: |
           echo "repo=$GITHUB_REPOSITORY"
           if [ -n "$NVIDIA_API_KEY" ]; then echo "NVIDIA_API_KEY=SET"; else echo "NVIDIA_API_KEY=EMPTY"; fi
           if [ -n "$NVIDIA_VICTOR_VISION_KEY" ]; then echo "NVIDIA_VICTOR_VISION_KEY=SET"; else echo "NVIDIA_VICTOR_VISION_KEY=EMPTY"; fi
           if [ -n "$GEMINI_API_KEY" ]; then echo "GEMINI_API_KEY=SET"; else echo "GEMINI_API_KEY=EMPTY"; fi
+          if [ -n "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then echo "DRIVE_SA=SET"; else echo "DRIVE_SA=EMPTY"; fi
 
       - name: Generate stills (Gemini primary)
         id: gemini
@@ -57,11 +61,28 @@ jobs:
           path: vision/episodes/EP001_Last_Delivery/stills/
           if-no-files-found: warn
 
-      - name: Commit stills
-        if: success()
+      - name: Commit stills to repo
+        if: always()
         run: |
           git config user.name vision-bot
           git config user.email vision-bot@users.noreply.github.com
           git add vision/episodes/EP001_Last_Delivery/stills/ || true
-          git diff --staged --quiet || git commit -m "vision: EP001 stills"
-          git push || true
+          if git diff --staged --quiet; then
+            echo "nothing to commit"
+          else
+            git commit -m "vision: EP001 stills"
+            git pull --rebase origin main || git pull --rebase --autostash origin main || true
+            git push
+          fi
+
+      - name: Upload to Google Drive 01_stills
+        if: always()
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: |
+          if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "DRIVE_SA=EMPTY — skip Drive upload. Add GOOGLE_SERVICE_ACCOUNT_JSON on hub."
+            exit 0
+          fi
+          python3 vision/scripts/upload_stills_drive.py
