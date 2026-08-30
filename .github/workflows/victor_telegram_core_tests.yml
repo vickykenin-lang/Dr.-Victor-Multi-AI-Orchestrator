@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'victor-telegram-worker/**'
+      - 'brain/**'
       - '.github/workflows/victor_telegram_core_tests.yml'
   workflow_dispatch:
 
@@ -20,11 +21,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run deterministic Victor truth-guard and memory tests
-        run: node --test victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs
+      - name: Run deterministic Victor truth-guard, memory, autonomy and brain tests
+        run: node --test victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs brain/runtime.test.mjs
       - name: Syntax-check Worker
         run: node --check victor-telegram-worker/worker.js
       - name: Syntax-check Memory Runtime
         run: node --check victor-telegram-worker/memory_runtime.mjs
       - name: Syntax-check Autonomy Runtime
         run: node --check victor-telegram-worker/autonomy_runtime.mjs
+      - name: Syntax-check Brain Runtime
+        run: node --check brain/runtime.mjs
