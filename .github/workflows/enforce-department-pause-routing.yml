@@ -1,0 +1,33 @@
+name: Enforce Department Pause Routing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/enforce_department_pause_routing.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch pause-aware routing
+        run: python scripts/enforce_department_pause_routing.py
+      - name: Run Victor worker tests
+        run: node --test victor-telegram-worker/*.test.mjs
+      - name: Commit runtime integration
+        run: |
+          git config user.name "Victor Safety"
+          git config user.email "actions@users.noreply.github.com"
+          git add victor-telegram-worker/autonomy_runtime.mjs victor-telegram-worker/worker.js
+          git diff --cached --quiet && exit 0
+          git commit -m "safety: exclude paused departments from Victor routing"
+          git pull --rebase --autostash
+          git push
