@@ -14,6 +14,7 @@ import {
 } from './department_bridge.mjs';
 
 import { isExecutionPaused } from './emergency_pause_runtime.mjs';
+import { shouldRunFiveWhys, reviewOutcome, departmentCapabilityFit } from '../brain/runtime.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const SUPERVISION_CRON = '*/15 * * * *';
@@ -72,6 +73,8 @@ export function classifyAutonomyResult(result) {
     requiresFollowUp: strict.requires_follow_up === true,
     nextAction: strict.next_action || 'NOT_PROVIDED',
     outcomeProgress: strict.outcome_progress || result?.outcome_progress || null,
+    rootCause: strict.root_cause || result?.root_cause || null,
+    solution: strict.solution || result?.solution || null,
     evidence,
     finalOutcome,
   };
@@ -168,9 +171,10 @@ export function selectAutonomyGoal(registry, runtimeState, availableDepartments 
   return candidates[0] || null;
 }
 
-export function buildGoalTaskPrompt(goal, phase = 'EXECUTE') {
+export function buildGoalTaskPrompt(goal, phase = 'EXECUTE', runtimeGoal = {}) {
   const success = Array.isArray(goal?.success_conditions) ? goal.success_conditions : [];
   const boundaries = Array.isArray(goal?.hard_boundaries) ? goal.hard_boundaries : [];
+  const fiveWhysMode = phase === 'FIVE_WHYS_DIAGNOSIS' || runtimeGoal?.brain_required_mode === 'FIVE_WHYS_BEFORE_NEXT_DISPATCH';
   return [
     `VICTOR GOAL CONTRACT — ${phase}`,
     `Goal ID: ${goal?.goal_id || 'UNKNOWN'}`,
@@ -178,21 +182,25 @@ export function buildGoalTaskPrompt(goal, phase = 'EXECUTE') {
     `Success conditions: ${success.join(' | ') || 'Use canonical department objective and evidence standard.'}`,
     `Required evidence: ${goal?.required_evidence_level || 'CANONICAL_REQUIRED_EVIDENCE'}`,
     `Hard boundaries: ${boundaries.join(' | ') || 'Existing constitutional, credential, cost, compliance and evidence boundaries.'}`,
-    'Operating rule: the target is fixed; HOW is delegated. Choose the highest-impact valid next action yourself, execute it inside existing authority, and change the plan if the previous route is weak or blocked.',
+    'Brain rule: decompose work into a concrete deliverable with authority, evidence, exit criteria, and next handoff. Department role is capability guidance, not a reason to reject a valid cross-department technical support task.',
+    fiveWhysMode
+      ? 'BRAIN FIVE-WHYS MODE: do not repeat the previous action. Start from the verified symptom, build an evidence-backed causal chain, label unsupported causes HYPOTHESIS, identify the best supported controllable root cause, and return the corrective next action. If the verified chain ends at a Founder-only boundary, state the exact Founder action required; otherwise continue without Founder approval.'
+      : 'Operating rule: the target is fixed; HOW is delegated. Choose the highest-impact valid next action yourself, execute it inside existing authority, and change the plan if the previous route is weak or blocked.',
     'Commercial priority rule: when verified revenue is zero and executable offers/actions exist, prioritize the closest policy-valid revenue/conversion action. Planning, readiness documents, or pillar rotation must not displace an executable higher-impact commercial action unless they remove a verified blocker.',
     'Do not wait for routine Founder approval. Founder is required only for credential/account identity administration, a hard-boundary/goal change, or objective impossibility after governed recovery.',
     'Return fresh evidence. Do not report task completion as goal achievement unless the Goal Contract success conditions are actually verified.',
-    'Return strict_supervision with status, goal_id, outcome_progress, error_or_blocker, next_action, evidence, requires_follow_up. Include final_outcome only when final outcome evidence exists.',
+    'Return strict_supervision with status, goal_id, outcome_progress, error_or_blocker, root_cause, solution, next_action, evidence, requires_follow_up. Include final_outcome only when final outcome evidence exists.',
   ].join('\n');
 }
 
 export function recommendNextDepartment(goal, assessment, currentTarget) {
   const allowed = new Set(Array.isArray(goal?.allowed_departments) ? goal.allowed_departments : []);
-  const text = [assessment?.status, assessment?.nextAction, assessment?.hasBlocker ? 'BLOCKER' : '', assessment?.outcomeProgress]
+  const text = [assessment?.status, assessment?.nextAction, assessment?.rootCause, assessment?.solution, assessment?.hasBlocker ? 'BLOCKER' : '', assessment?.outcomeProgress]
     .filter(Boolean).join(' ').toUpperCase();
-  if (allowed.has('tony_stark') && /TONY|TECHNICAL|RUNTIME|WORKFLOW|CODE|CONFIG|DEPLOY|BRIDGE|BUG|SYSTEM FAILURE|INTEGRATION FAILURE/.test(text)) return 'tony_stark';
-  if (allowed.has('aura3') && /AURA3|AURA 3|CONTENT CREATIVE|DESIGN ASSET/.test(text)) return 'aura3';
-  if (allowed.has('rio') && /RIO|AFFILIATE|REVENUE|TRAFFIC|CONVERSION|NICHE|OFFER|COMMISSION/.test(text)) return 'rio';
+  if (allowed.has('tony_stark') && departmentCapabilityFit('tony_stark', text)) return 'tony_stark';
+  if (allowed.has('aura3') && departmentCapabilityFit('aura3', text)) return 'aura3';
+  if (allowed.has('rio') && departmentCapabilityFit('rio', text)) return 'rio';
+  if (allowed.has('hulk') && departmentCapabilityFit('hulk', text)) return 'hulk';
   return currentTarget || goal?.primary_department || null;
 }
 
@@ -216,7 +224,31 @@ export function buildGoalRuntimeState(previous, selection, outcome, checkedAt = 
     ? [selection?.target, assessment.status, assessment.nextAction].filter(Boolean).join('|').slice(0, 240)
     : null;
   const nextDepartment = achieved ? null : recommendNextDepartment(goal, assessment, selection?.target);
-  const evidence = unique([...(oldGoal.evidence || []), ...(assessment.evidence || [])]).slice(-50);
+  const oldEvidence = Array.isArray(oldGoal.evidence) ? oldGoal.evidence : [];
+  const assessmentEvidence = Array.isArray(assessment.evidence) ? assessment.evidence : [];
+  const hasNewEvidence = assessmentEvidence.some(item => !oldEvidence.includes(item));
+  const sameFailureCount = failureFingerprint && failureFingerprint === oldGoal.failure_fingerprint
+    ? (Number(oldGoal.same_failure_count) || 1) + 1
+    : (failureFingerprint ? 1 : 0);
+  const sameRecommendationCount = assessment.nextAction && assessment.nextAction === oldGoal.last_next_action
+    ? (Number(oldGoal.same_recommendation_count) || 1) + 1
+    : (assessment.nextAction ? 1 : 0);
+  const brainReview = reviewOutcome({
+    expected: oldGoal.last_next_action || null,
+    actual: assessment.nextAction || null,
+    previousAction: oldGoal.last_status || null,
+    sameActionCount: Math.max(sameFailureCount, sameRecommendationCount),
+    hasNewEvidence,
+  });
+  const fiveWhysRequired = !achieved && !founderBlocked && shouldRunFiveWhys({
+    rootCauseKnown: Boolean(assessment.rootCause),
+    repeatedFailureCount: sameFailureCount,
+    sameRecommendationCount,
+    hasNewEvidence,
+    departmentExplainsFailure: assessment.hasBlocker ? Boolean(assessment.rootCause || assessment.outcomeProgress) : true,
+    confidence: assessment.hasBlocker && !assessment.rootCause ? 'LOW' : 'MEDIUM',
+  });
+  const evidence = unique([...oldEvidence, ...assessmentEvidence]).slice(-50);
 
   return {
     ...previous,
@@ -231,6 +263,10 @@ export function buildGoalRuntimeState(previous, selection, outcome, checkedAt = 
         attempts: (Number(oldGoal.attempts) || 0) + 1,
         last_target: selection?.target || null,
         recommended_department: nextDepartment,
+        brain_required_mode: fiveWhysRequired ? 'FIVE_WHYS_BEFORE_NEXT_DISPATCH' : 'NORMAL_EXECUTION',
+        brain_review: brainReview,
+        same_failure_count: sameFailureCount,
+        same_recommendation_count: sameRecommendationCount,
         last_status: assessment.status || 'UNKNOWN',
         last_next_action: assessment.nextAction || null,
         last_attempt_at_utc: checkedAt,
@@ -464,7 +500,10 @@ export async function runAutonomousCycle(controller, env) {
     };
   }
 
-  let outcome = await superviseGoal(selection, env, 'EXECUTE');
+  const initialPhase = selection.runtimeGoal?.brain_required_mode === 'FIVE_WHYS_BEFORE_NEXT_DISPATCH'
+    ? 'FIVE_WHYS_DIAGNOSIS'
+    : 'EXECUTE';
+  let outcome = await superviseGoal(selection, env, initialPhase);
   state = buildGoalRuntimeState(state, selection, outcome);
 
   if (
@@ -477,7 +516,10 @@ export async function runAutonomousCycle(controller, env) {
     const nextTarget = chooseGoalDepartment(selection.goal, nextRuntimeGoal, available);
     if (nextTarget) {
       selection = { ...selection, runtimeGoal: nextRuntimeGoal, target: nextTarget };
-      const followUp = await superviseGoal(selection, env, 'REPLAN_EXECUTE');
+      const followUpPhase = nextRuntimeGoal.brain_required_mode === 'FIVE_WHYS_BEFORE_NEXT_DISPATCH'
+        ? 'FIVE_WHYS_DIAGNOSIS'
+        : 'REPLAN_EXECUTE';
+      const followUp = await superviseGoal(selection, env, followUpPhase);
       state = buildGoalRuntimeState(state, selection, followUp);
       outcome = { ...followUp, previousTaskId: outcome.taskId, automaticReplan: true };
     }
@@ -524,7 +566,7 @@ async function loadCanonicalRevenue(env) {
 
 async function superviseGoal(selection, env, phase = 'EXECUTE') {
   const target = selection.target;
-  const prompt = buildGoalTaskPrompt(selection.goal, phase);
+  const prompt = buildGoalTaskPrompt(selection.goal, phase, selection.runtimeGoal || {});
   let dispatch;
   let received;
   let verification;
