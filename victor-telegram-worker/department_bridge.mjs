@@ -149,7 +149,7 @@ export function shouldContactRio(text, entity) {
     && /\b(task|implement|build|create|modify|upgrade|audit|inspect|solve|kaam|assign|bhejo)\b/.test(value);
   if (explicitTonyAssignment) return false;
   if (entity?.entity_id !== 'rio') return false;
-  return /status|report|check|pucho|pooch|baat|connect|bridge|communication|certif|supervision|round.?trip|progress|objective|govern|priority|next|plan|agenda|activat|start|resume|kaam par|self.?mode|approval/.test(value);
+  return /status|report|check|pucho|pooch|batao|baat|connect|bridge|communication|certif|supervision|round.?trip|progress|objective|govern|priority|next|plan|agenda|activat|start|shuru|resume|kaam par|self.?mode|approval|post|ready|publish|published|design|creative|kitne|banaya|banana/.test(value);
 }
 
 export async function dispatchRioTask(env, text, metadata = {}) {
@@ -187,7 +187,7 @@ export function verifyRioResult(result, expectedTaskId) {
   const strict = result?.strict_supervision || {};
   const checks = {
     task_id: result?.task_id === expectedTaskId, sender: result?.sender === 'rio', recipient: result?.recipient === 'victor',
-    message_type: result?.message_type === 'TASK_RESULT', no_public_action: result?.public_action_performed === false,
+    message_type: result?.message_type === 'TASK_RESULT', public_action_authorized: result?.public_action_performed === false || (result?.task_type === 'GOAL_EXECUTE' && result?.governed_business_cycle_performed === true && result?.external_action_authorized === true),
     no_objective_change: result?.objective_changed === false, no_credential_transfer: result?.credential_transfer_performed === false,
     revert_to_victor: strict?.revert_to_victor === true, objective_alignment: Boolean(strict?.objective_alignment),
     status: Boolean(strict?.status), solution: Boolean(strict?.solution), next_action: Boolean(strict?.next_action),
@@ -198,7 +198,24 @@ export function verifyRioResult(result, expectedTaskId) {
 
 export function formatRioResultForFounder(result) {
   const strict = result?.strict_supervision || {};
-  return ['RIO se fresh revert aa gaya.', `Status: ${strict.status || result?.execution_status || 'UNKNOWN'}`, `Objective alignment: ${strict.objective_alignment || 'UNKNOWN'}`, `Error/Blocker: ${strict.error_or_blocker || 'none reported'}`, `Solution: ${strict.solution || 'NOT_PROVIDED'}`, `Next action: ${strict.next_action || 'NOT_PROVIDED'}`, `Evidence: ${Array.isArray(strict.evidence) ? strict.evidence.join(', ') : 'NOT_PROVIDED'}`].join('\n');
+  const content = strict?.outcome_progress?.content || result?.snapshot?.content || null;
+  const lines = [
+    'RIO se fresh verified revert aa gaya.',
+    `Status: ${strict.status || result?.execution_status || 'UNKNOWN'}`,
+    `Objective alignment: ${strict.objective_alignment || 'UNKNOWN'}`,
+  ];
+  if (content) {
+    lines.push(`Ready-to-post promos: ${Number(content.ready_to_post_count) || 0}${Array.isArray(content.ready_to_post_ids) && content.ready_to_post_ids.length ? ` (${content.ready_to_post_ids.join(', ')})` : ''}`);
+    lines.push(`Actually published posts: ${Number(content.actually_published_count) || 0}`);
+    if (content.new_design_started_verified === true) lines.push('New-design creative: verified started');
+    else if (content.new_design_started_verified === false) lines.push('New-design creative: verified not started');
+    else lines.push('New-design creative: fresh verified evidence unavailable; no absolute claim.');
+  }
+  lines.push(`Error/Blocker: ${strict.error_or_blocker || 'none reported'}`);
+  lines.push(`Solution: ${strict.solution || 'NOT_PROVIDED'}`);
+  lines.push(`Next action: ${strict.next_action || 'NOT_PROVIDED'}`);
+  lines.push(`Evidence: ${Array.isArray(strict.evidence) ? strict.evidence.join(', ') : 'NOT_PROVIDED'}`);
+  return lines.join('\n');
 }
 
 
