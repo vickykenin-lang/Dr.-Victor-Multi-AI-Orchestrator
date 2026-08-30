@@ -5,19 +5,15 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 89,
+      "attempts": 91,
       "last_target": "tony_stark",
       "recommended_department": "tony_stark",
       "last_status": "READ_ONLY_AUDIT_COMPLETED",
       "last_next_action": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
-      "last_attempt_at_utc": "2026-08-30T17:31:07.818Z",
-      "last_verified_progress_at_utc": "2026-08-30T17:31:07.818Z",
+      "last_attempt_at_utc": "2026-08-30T17:46:00.895Z",
+      "last_verified_progress_at_utc": "2026-08-30T17:46:00.895Z",
       "goal_achieved_at_utc": null,
       "evidence": [
-        "integration/results/audits/victor-tony-1788103838065-goal-auto.json",
-        "integration/results/tasks/victor-tony-1788104714515-goal-auto.json",
-        "integration/results/audits/victor-tony-1788104714515-goal-auto.json",
-        "integration/results/tasks/victor-tony-1788104737890-goal-auto.json",
         "integration/results/audits/victor-tony-1788104737890-goal-auto.json",
         "integration/results/tasks/victor-tony-1788105614995-goal-auto.json",
         "OBJECTIVE.md",
@@ -63,7 +59,11 @@
         "integration/results/tasks/victor-tony-1788111014853-goal-auto.json",
         "integration/results/audits/victor-tony-1788111014853-goal-auto.json",
         "integration/results/tasks/victor-tony-1788111039664-goal-auto.json",
-        "integration/results/audits/victor-tony-1788111039664-goal-auto.json"
+        "integration/results/audits/victor-tony-1788111039664-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788111914520-goal-auto.json",
+        "integration/results/audits/victor-tony-1788111914520-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788111938056-goal-auto.json",
+        "integration/results/audits/victor-tony-1788111938056-goal-auto.json"
       ],
       "failure_fingerprint": null,
       "brain_required_mode": "FIVE_WHYS_BEFORE_NEXT_DISPATCH",
@@ -77,7 +77,7 @@
         "required_next_mode": "FIVE_WHYS_BEFORE_NEXT_DISPATCH"
       },
       "same_failure_count": 0,
-      "same_recommendation_count": 9
+      "same_recommendation_count": 11
     }
   },
   "note": "Runtime state records progress and routing. It does not redefine the Goal Contract."
