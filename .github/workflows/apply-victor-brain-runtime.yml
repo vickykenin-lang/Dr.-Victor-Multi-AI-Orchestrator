@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/apply_victor_brain_runtime.py'
+      - 'scripts/apply_telegram_brain_gateway.py'
       - 'brain/**'
       - '.github/workflows/apply-victor-brain-runtime.yml'
   workflow_dispatch:
@@ -24,20 +25,23 @@ jobs:
         with:
           node-version: '22'
       - name: Apply deterministic brain integration
-        run: python scripts/apply_victor_brain_runtime.py
+        run: |
+          python scripts/apply_victor_brain_runtime.py
+          python scripts/apply_telegram_brain_gateway.py
       - name: Run brain and autonomy tests
-        run: node --test brain/runtime.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
+        run: node --test brain/runtime.test.mjs brain/telegram_gateway.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
       - name: Syntax checks
         run: |
           node --check brain/runtime.mjs
+          node --check brain/telegram_gateway.mjs
           node --check victor-telegram-worker/autonomy_runtime.mjs
           node --check victor-telegram-worker/worker.js
       - name: Persist integration if changed
         run: |
           git config user.name "victor-governed-runtime"
           git config user.email "actions@users.noreply.github.com"
-          git add victor-telegram-worker/autonomy_runtime.mjs
+          git add victor-telegram-worker/autonomy_runtime.mjs victor-telegram-worker/worker.js
           git diff --cached --quiet && exit 0
-          git commit -m "brain: integrate cognitive loop with autonomous runtime"
+          git commit -m "brain: route Telegram executive commands through cognitive gateway"
           git pull --rebase --autostash
           git push
