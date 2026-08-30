@@ -82,7 +82,8 @@ jobs:
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: |
           if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
-            echo "DRIVE_SA=EMPTY — skip Drive upload. Add GOOGLE_SERVICE_ACCOUNT_JSON on hub."
+            echo "DRIVE_SA=EMPTY — skip Drive upload."
             exit 0
           fi
+          python3 -m pip install -q google-auth
           python3 vision/scripts/upload_stills_drive.py
