@@ -20,10 +20,12 @@ jobs:
       - name: Show env (safe)
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_VICTOR_VISION_KEY: ${{ secrets.NVIDIA_VICTOR_VISION_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "repo=$GITHUB_REPOSITORY"
           if [ -n "$NVIDIA_API_KEY" ]; then echo "NVIDIA_API_KEY=SET"; else echo "NVIDIA_API_KEY=EMPTY"; fi
+          if [ -n "$NVIDIA_VICTOR_VISION_KEY" ]; then echo "NVIDIA_VICTOR_VISION_KEY=SET"; else echo "NVIDIA_VICTOR_VISION_KEY=EMPTY"; fi
           if [ -n "$GEMINI_API_KEY" ]; then echo "GEMINI_API_KEY=SET"; else echo "GEMINI_API_KEY=EMPTY"; fi
 
       - name: Generate stills (Gemini primary)
@@ -35,11 +37,17 @@ jobs:
         run: python3 vision/scripts/auto_generate_stills.py
 
       - name: Generate stills (NVIDIA fallback)
-        if: steps.gemini.outcome != 'success'
+        if: always()
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_VICTOR_VISION_KEY: ${{ secrets.NVIDIA_VICTOR_VISION_KEY }}
           ONLY_IDS: ${{ inputs.only_ids }}
-        run: python3 vision/scripts/auto_generate_stills_nvidia.py
+        run: |
+          if ls vision/episodes/EP001_Last_Delivery/stills/*.png >/dev/null 2>&1; then
+            echo "PNG already present; skip NVIDIA"
+            exit 0
+          fi
+          python3 vision/scripts/auto_generate_stills_nvidia.py
 
       - name: Upload stills + log
         if: always()

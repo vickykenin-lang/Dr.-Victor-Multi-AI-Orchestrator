@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """VISION EP001 stills via NVIDIA FLUX (ai.api.nvidia.com).
 
-Env: NVIDIA_API_KEY
+Env: NVIDIA_API_KEY or NVIDIA_VICTOR_VISION_KEY
      ONLY_IDS=A1 (optional)
 """
 from __future__ import annotations
@@ -18,7 +18,6 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 OUT = os.path.join(ROOT, "episodes", "EP001_Last_Delivery", "stills")
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# Hosted NVIDIA genai endpoints to try (first success wins)
 ENDPOINTS = [
     "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell",
     "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev",
@@ -38,8 +37,7 @@ PROMPTS = {
 }
 
 
-def extract_b64(data: dict) -> bytes | None:
-    # Common NVIDIA / FLUX response shapes
+def extract_b64(data: dict):
     if isinstance(data.get("image"), str):
         return base64.b64decode(data["image"])
     arts = data.get("artifacts") or data.get("data") or []
@@ -50,7 +48,6 @@ def extract_b64(data: dict) -> bytes | None:
             for k in ("base64", "b64_json", "image"):
                 if a.get(k):
                     return base64.b64decode(a[k])
-    # nested
     for k, v in data.items():
         if k in ("base64", "b64_json") and isinstance(v, str):
             return base64.b64decode(v)
@@ -91,11 +88,15 @@ def nvidia_generate(api_key: str, prompt: str) -> bytes:
 
 
 def main() -> int:
-    key = (os.environ.get("NVIDIA_API_KEY") or "").strip()
+    key = (
+        os.environ.get("NVIDIA_API_KEY")
+        or os.environ.get("NVIDIA_VICTOR_VISION_KEY")
+        or ""
+    ).strip()
     if not key:
-        print("ERROR: NVIDIA_API_KEY missing")
+        print("ERROR: NVIDIA key missing (NVIDIA_API_KEY or NVIDIA_VICTOR_VISION_KEY)")
         return 1
-    print("NVIDIA key length:", len(key))
+    print("NVIDIA key length:", len(key), "(value not printed)")
 
     only = os.environ.get("ONLY_IDS", "A1").strip()
     ids = [x.strip() for x in only.split(",") if x.strip()] or ["A1"]
