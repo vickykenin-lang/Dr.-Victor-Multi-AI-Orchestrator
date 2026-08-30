@@ -47,7 +47,9 @@ export function shouldRunFiveWhys({
 } = {}) {
   if (!rootCauseKnown && normalize(confidence) === 'LOW') return true;
   if (Number(repeatedFailureCount) >= 2) return true;
-  if (Number(sameRecommendationCount) >= 2 && hasNewEvidence === false) return true;
+  // A semantically identical recommendation is itself evidence of a stalled
+  // executive loop. New task/audit artifact paths must not reset this guard.
+  if (Number(sameRecommendationCount) >= 2) return true;
   if (departmentExplainsFailure === false) return true;
   return false;
 }
@@ -145,14 +147,19 @@ export function buildTaskContract({ objective, department, deliverable, authorit
 
 export function reviewOutcome({ expected, actual, previousAction = null, sameActionCount = 0, hasNewEvidence = true } = {}) {
   const matched = JSON.stringify(expected ?? null) === JSON.stringify(actual ?? null);
-  const repeatLoop = Number(sameActionCount) >= 2 && hasNewEvidence === false;
+  // If the same executive recommendation repeats, a newly-created result file
+  // is not material progress. Treat the repeated meaning as the stronger signal.
+  const semanticRepeat = Number(sameActionCount) >= 2 && matched;
+  const repeatLoop = semanticRepeat || (Number(sameActionCount) >= 2 && hasNewEvidence === false);
   return {
     expected,
     actual,
     matched,
     previous_action: previousAction,
     repeat_loop_detected: repeatLoop,
-    learning_candidate: matched ? 'SUCCESS_PATTERN_CANDIDATE' : 'MISMATCH_OR_FAILURE_PATTERN_CANDIDATE',
+    learning_candidate: repeatLoop
+      ? 'REPEATED_MEANING_FAILURE_PATTERN'
+      : (matched ? 'SUCCESS_PATTERN_CANDIDATE' : 'MISMATCH_OR_FAILURE_PATTERN_CANDIDATE'),
     required_next_mode: repeatLoop ? 'FIVE_WHYS_BEFORE_NEXT_DISPATCH' : 'NORMAL_REPLAN',
   };
 }
