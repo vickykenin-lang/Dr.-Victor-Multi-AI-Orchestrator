@@ -1,0 +1,7 @@
+file '/home/runner/work/Dr.-Victor-Multi-AI-Orchestrator/Dr.-Victor-Multi-AI-Orchestrator/vision/episodes/EP001_Last_Delivery/clips/B1.mp4'
+file '/home/runner/work/Dr.-Victor-Multi-AI-Orchestrator/Dr.-Victor-Multi-AI-Orchestrator/vision/episodes/EP001_Last_Delivery/clips/B2.mp4'
+file '/home/runner/work/Dr.-Victor-Multi-AI-Orchestrator/Dr.-Victor-Multi-AI-Orchestrator/vision/episodes/EP001_Last_Delivery/clips/B3.mp4'
+file '/home/runner/work/Dr.-Victor-Multi-AI-Orchestrator/Dr.-Victor-Multi-AI-Orchestrator/vision/episodes/EP001_Last_Delivery/clips/B4.mp4'
+file '/home/runner/work/Dr.-Victor-Multi-AI-Orchestrator/Dr.-Victor-Multi-AI-Orchestrator/vision/episodes/EP001_Last_Delivery/clips/B5.mp4'
+file '/home/runner/work/Dr.-Victor-Multi-AI-Orchestrator/Dr.-Victor-Multi-AI-Orchestrator/vision/episodes/EP001_Last_Delivery/clips/B6.mp4'
+file '/home/runner/work/Dr.-Victor-Multi-AI-Orchestrator/Dr.-Victor-Multi-AI-Orchestrator/vision/episodes/EP001_Last_Delivery/clips/B7.mp4'
