@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       only_ids:
-        description: "e.g. A1"
+        description: "e.g. A1 or A2"
         required: false
         default: "A1"
 
@@ -21,16 +21,13 @@ jobs:
 
       - name: Show env (safe)
         env:
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_VICTOR_VISION_KEY: ${{ secrets.NVIDIA_VICTOR_VISION_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: |
-          echo "repo=$GITHUB_REPOSITORY"
-          if [ -n "$NVIDIA_API_KEY" ]; then echo "NVIDIA_API_KEY=SET"; else echo "NVIDIA_API_KEY=EMPTY"; fi
-          if [ -n "$NVIDIA_VICTOR_VISION_KEY" ]; then echo "NVIDIA_VICTOR_VISION_KEY=SET"; else echo "NVIDIA_VICTOR_VISION_KEY=EMPTY"; fi
+          echo "repo=$GITHUB_REPOSITORY only_ids=${{ inputs.only_ids }}"
+          if [ -n "$NVIDIA_VICTOR_VISION_KEY" ] || [ -n "$NVIDIA_API_KEY" ]; then echo "NVIDIA=SET"; else echo "NVIDIA=EMPTY"; fi
           if [ -n "$GEMINI_API_KEY" ]; then echo "GEMINI_API_KEY=SET"; else echo "GEMINI_API_KEY=EMPTY"; fi
-          if [ -n "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then echo "DRIVE_SA=SET"; else echo "DRIVE_SA=EMPTY"; fi
 
       - name: Generate stills (Gemini primary)
         id: gemini
@@ -47,8 +44,16 @@ jobs:
           NVIDIA_VICTOR_VISION_KEY: ${{ secrets.NVIDIA_VICTOR_VISION_KEY }}
           ONLY_IDS: ${{ inputs.only_ids }}
         run: |
-          if ls vision/episodes/EP001_Last_Delivery/stills/*.png >/dev/null 2>&1; then
-            echo "PNG already present; skip NVIDIA"
+          missing=0
+          IFS=',' read -ra IDS <<< "${ONLY_IDS:-A1}"
+          for id in "${IDS[@]}"; do
+            id=$(echo "$id" | tr -d ' ')
+            if [ ! -f "vision/episodes/EP001_Last_Delivery/stills/${id}.png" ]; then
+              missing=1
+            fi
+          done
+          if [ "$missing" = "0" ]; then
+            echo "requested IDs already on disk; skip NVIDIA"
             exit 0
           fi
           python3 vision/scripts/auto_generate_stills_nvidia.py
@@ -70,20 +75,10 @@ jobs:
           if git diff --staged --quiet; then
             echo "nothing to commit"
           else
-            git commit -m "vision: EP001 stills"
+            git commit -m "vision: EP001 stills ${{ inputs.only_ids }}"
             git pull --rebase origin main || git pull --rebase --autostash origin main || true
             git push
           fi
 
-      - name: Upload to Google Drive 01_stills
-        if: always()
-        env:
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
-        run: |
-          if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
-            echo "DRIVE_SA=EMPTY — skip Drive upload."
-            exit 0
-          fi
-          python3 -m pip install -q google-auth
-          python3 vision/scripts/upload_stills_drive.py
+      - name: Drive skipped
+        run: echo "Google Drive OFF — stills stay on GitHub"
