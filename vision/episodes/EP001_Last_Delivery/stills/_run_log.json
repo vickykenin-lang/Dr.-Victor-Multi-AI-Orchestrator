@@ -1,11 +1,41 @@
 {
-  "updated": "2026-08-30T23:37:59.239200+05:30",
+  "updated": "2026-08-30T23:50:13.794488+05:30",
   "provider": "NVIDIA",
   "results": {
-    "A3": {
+    "B1": {
       "status": "ok",
-      "bytes": 79362,
-      "file": "stills/A3.png"
+      "bytes": 73508,
+      "file": "stills/B1.png"
+    },
+    "B2": {
+      "status": "ok",
+      "bytes": 37621,
+      "file": "stills/B2.png"
+    },
+    "B3": {
+      "status": "ok",
+      "bytes": 69726,
+      "file": "stills/B3.png"
+    },
+    "B4": {
+      "status": "ok",
+      "bytes": 71681,
+      "file": "stills/B4.png"
+    },
+    "B5": {
+      "status": "ok",
+      "bytes": 43695,
+      "file": "stills/B5.png"
+    },
+    "B6": {
+      "status": "ok",
+      "bytes": 104833,
+      "file": "stills/B6.png"
+    },
+    "B7": {
+      "status": "ok",
+      "bytes": 87856,
+      "file": "stills/B7.png"
     }
   }
 }
