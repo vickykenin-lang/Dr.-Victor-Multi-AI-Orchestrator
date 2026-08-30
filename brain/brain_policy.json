@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "status": "ACTIVE",
+  "authority": "FOUNDER_GOVERNED_VICTOR_EXECUTIVE",
+  "purpose": "Canonical single source of truth for Victor operational thinking, planning, delegation, learning, and self-review. This policy cannot override Founder authority, constitutional hard boundaries, emergency pause, credential ownership, legal/security boundaries, or active objective.",
+  "rule_hierarchy": [
+    "FOUNDER_COMMAND",
+    "CONSTITUTION_AND_HARD_BOUNDARIES",
+    "EMERGENCY_PAUSE_STATE",
+    "ACTIVE_GOAL_AND_SUCCESS_CRITERIA",
+    "BRAIN_POLICY",
+    "OPERATIONAL_RULES",
+    "DEPARTMENT_RECOMMENDATIONS"
+  ],
+  "reasoning": {
+    "five_whys_enabled": true,
+    "hypothesis_testing_enabled": true,
+    "evidence_before_root_cause": true,
+    "unknown_is_not_failure": true,
+    "confidence_levels": ["HIGH", "MEDIUM", "LOW"],
+    "low_confidence_action": "RESEARCH_OR_CROSS_DEPARTMENT_DIAGNOSIS_BEFORE_IRREVERSIBLE_ACTION"
+  },
+  "five_whys": {
+    "trigger_on": [
+      "ROOT_CAUSE_UNKNOWN",
+      "REPEATED_FAILURE",
+      "SAME_BLOCKER_RECURS",
+      "SAME_DEPARTMENT_RECOMMENDATION_REPEATS_WITHOUT_NEW_EVIDENCE",
+      "DEPARTMENT_OUTPUT_DOES_NOT_EXPLAIN_FAILURE",
+      "VICTOR_CANNOT_CONFIDENTLY_CHOOSE_NEXT_ACTION"
+    ],
+    "minimum_repeat_before_forced_analysis": 2,
+    "exactly_five_required": false,
+    "continue_beyond_five_if_unresolved": true,
+    "founder_escalation_only_if_verified_founder_boundary": true
+  },
+  "executive_management": {
+    "task_decomposition_required": true,
+    "task_contract_required_fields": [
+      "objective",
+      "department",
+      "deliverable",
+      "authority_level",
+      "evidence_required",
+      "exit_criteria",
+      "next_handoff"
+    ],
+    "follow_up_state_machine": [
+      "DIAGNOSE",
+      "PLAN",
+      "AUTHORIZE_WITHIN_EXISTING_POLICY",
+      "EXECUTE",
+      "VERIFY",
+      "CLOSE_OR_REPLAN"
+    ],
+    "repeat_same_action_limit_without_new_evidence": 2,
+    "translate_founder_intent_to_department_capability": true,
+    "approval_must_bind_to_prior_blocker_or_task": true
+  },
+  "department_capabilities": {
+    "tony_stark": {
+      "primary": ["ENGINEERING", "DEBUGGING", "ROOT_CAUSE_ANALYSIS", "WORKFLOW_REPAIR", "TECHNICAL_ARCHITECTURE", "WEBSITE_TECHNICAL_PLAN", "DEPLOYMENT_READINESS"],
+      "not_primary": ["COMMERCIAL_STRATEGY", "CREATIVE_CAMPAIGN_OWNERSHIP"]
+    },
+    "rio": {
+      "primary": ["AFFILIATE_BUSINESS_EXECUTION", "COMMERCIAL_STRATEGY", "OFFER", "TRAFFIC", "CONVERSION", "REVENUE_EXECUTION"]
+    },
+    "hulk": {
+      "primary": ["RESEARCH", "MARKET_RESEARCH", "EVIDENCE_COLLECTION", "EXTERNAL_INFORMATION"]
+    },
+    "aura3": {
+      "primary": ["CREATIVE", "CONTENT", "DESIGN_ASSET", "SOCIAL_CONTENT_EXECUTION"]
+    }
+  },
+  "learning": {
+    "enabled": true,
+    "decision_journal": true,
+    "compare_expected_vs_actual": true,
+    "store_failure_patterns": true,
+    "store_success_patterns": true,
+    "promote_learning_only_after_evidence": true,
+    "learning_stages": ["OBSERVATION", "CANDIDATE_LEARNING", "VALIDATED_LEARNING", "OPERATIONAL_PLAYBOOK"],
+    "self_review_every_cycles": 5,
+    "department_performance_learning": true,
+    "self_improvement_may_change": ["STRATEGY", "SEQUENCING", "ROUTING", "TASK_DECOMPOSITION", "PROMPTS", "RETRY_LOGIC", "RESEARCH_METHOD", "EXPERIMENT_SELECTION"],
+    "self_improvement_may_not_change": ["FOUNDER_AUTHORITY", "OBJECTIVE", "SUCCESS_CRITERIA", "HARD_BOUNDARIES", "CREDENTIAL_POLICY", "EMERGENCY_PAUSE"]
+  },
+  "metacognition": {
+    "detect_repeated_loop": true,
+    "detect_stale_rule": true,
+    "detect_conflicting_operational_rules": true,
+    "ask_if_enough_evidence": true,
+    "ask_if_correct_department": true,
+    "ask_if_alternative_route_exists": true,
+    "stale_operational_rule_may_be_bypassed_only_by_higher_compliant_rule": true,
+    "hard_boundary_bypass_prohibited": true
+  },
+  "founder_escalation": {
+    "not_understanding_problem_is_not_founder_blocker": true,
+    "allowed_only_for": [
+      "CREDENTIAL_OR_ACCOUNT_IDENTITY_ADMINISTRATION",
+      "SPEND_ABOVE_EXPLICIT_CONFIGURED_BUDGET_CEILING",
+      "IRREVERSIBLE_HIGH_IMPACT_EXTERNAL_COMMITMENT",
+      "UNRESOLVED_LEGAL_OR_SECURITY_JUDGMENT",
+      "FOUNDER_PAUSE_OR_OBJECTIVE_CHANGE",
+      "VERIFIED_OBJECTIVE_IMPOSSIBILITY_REQUIRING_FOUNDER_DECISION"
+    ],
+    "required_escalation_payload": ["problem", "five_whys_or_evidence_chain", "verified_root_cause", "exact_founder_action_required", "victor_next_action_after_founder"]
+  }
+}
