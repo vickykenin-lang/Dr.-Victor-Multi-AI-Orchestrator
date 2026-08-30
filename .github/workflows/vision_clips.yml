@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       only_ids:
-        description: "e.g. B1 or B1,B2"
+        description: "e.g. B1,B2,B3,B4,B5,B6,B7"
         required: false
-        default: "B1"
+        default: "B1,B2,B3,B4,B5,B6,B7"
 
 permissions:
   contents: write
@@ -14,7 +14,7 @@ permissions:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,24 +30,30 @@ jobs:
           ONLY_IDS: ${{ inputs.only_ids }}
         run: python3 vision/scripts/auto_generate_clips.py
 
+      - name: Assemble animatic master
+        if: always()
+        run: python3 vision/scripts/assemble_animatic.py
+
       - name: Upload clip artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ep001-clips
-          path: vision/episodes/EP001_Last_Delivery/clips/
+          path: |
+            vision/episodes/EP001_Last_Delivery/clips/
+            vision/episodes/EP001_Last_Delivery/masters/
           if-no-files-found: warn
 
-      - name: Commit clips
+      - name: Commit clips + master
         if: always()
         run: |
           git config user.name vision-bot
           git config user.email vision-bot@users.noreply.github.com
-          git add vision/episodes/EP001_Last_Delivery/clips/ || true
+          git add vision/episodes/EP001_Last_Delivery/clips/ vision/episodes/EP001_Last_Delivery/masters/ || true
           if git diff --staged --quiet; then
             echo nothing to commit
           else
-            git commit -m "vision: EP001 clips ${{ inputs.only_ids }}"
+            git commit -m "vision: EP001 clips+animatic ${{ inputs.only_ids }}"
             git pull --rebase origin main || git pull --rebase --autostash origin main || true
             git push
           fi

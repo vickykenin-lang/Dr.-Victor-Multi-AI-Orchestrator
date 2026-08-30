@@ -1,10 +1,9 @@
 {
   "department": "VISION",
-  "updated": "2026-08-30T23:49+05:30",
-  "mode": "auto_batch",
-  "storage": "github_stills",
-  "google_drive": "off",
-  "done": ["A1", "A2", "A3"],
-  "running": ["B1", "B2", "B3", "B4", "B5", "B6", "B7"],
-  "next_after_batch": "Founder review stills folder then clips"
+  "updated": "2026-08-31T00:55+05:30",
+  "mode": "auto_remaining",
+  "stills": "A1-A3 B1-B7 done",
+  "running": "clips B1-B7 + silent animatic assemble",
+  "not_wired": ["character_voice", "youtube_upload"],
+  "note": "animatic is NOT the 30-min movie"
 }
