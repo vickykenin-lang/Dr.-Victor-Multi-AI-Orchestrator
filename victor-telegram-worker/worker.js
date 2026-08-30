@@ -36,7 +36,7 @@ import {
 } from './department_bridge.mjs';
 
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
-import { parseEmergencyCommand, applyEmergencyCommand } from './emergency_pause_runtime.mjs';
+import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
@@ -232,6 +232,12 @@ export default {
 
       processingStage = 'DEPARTMENT_ROUTING';
       if (!memoryDirective && shouldContactRio(text, entity)) {
+        const rioPause = await isExecutionPaused(env, 'rio');
+        if (rioPause.paused) {
+          const reason = rioPause.global_pause_active ? 'SYSTEM PAUSE active hai.' : 'RIO department PAUSED hai; Victor aur baaki departments running reh sakte hain.';
+          await sendTelegramMessage(env, chatId, `RIO dispatch refused: ${reason}`, message.message_id);
+          return json({ ok: true, rio_bridge: 'PAUSED', pause: rioPause });
+        }
         if (!rioBridgeConfigured(env)) {
           await sendTelegramMessage(env, chatId, 'RIO governed bridge code ready hai, lekin GITHUB_ORCHESTRATION_TOKEN configured nahi hai. Token ke bina fresh round-trip verify nahi hoga.', message.message_id);
           return json({ ok: true, rio_bridge: 'PENDING_CONFIGURATION' });
@@ -254,6 +260,12 @@ export default {
       }
 
       if (!memoryDirective && shouldContactTony(text, entity)) {
+        const tonyPause = await isExecutionPaused(env, 'tony_stark');
+        if (tonyPause.paused) {
+          const reason = tonyPause.global_pause_active ? 'SYSTEM PAUSE active hai.' : 'Tony Stark department PAUSED hai; Victor aur baaki departments running reh sakte hain.';
+          await sendTelegramMessage(env, chatId, `Tony Stark dispatch refused: ${reason}`, message.message_id);
+          return json({ ok: true, tony_bridge: 'PAUSED', pause: tonyPause });
+        }
         if (!tonyBridgeConfigured(env)) {
           await sendTelegramMessage(
             env,
@@ -290,6 +302,12 @@ export default {
       }
 
       if (!memoryDirective && shouldContactAura3(text, entity)) {
+        const aura3Pause = await isExecutionPaused(env, 'aura3');
+        if (aura3Pause.paused) {
+          const reason = aura3Pause.global_pause_active ? 'SYSTEM PAUSE active hai.' : 'AURA3 department PAUSED hai; Victor aur baaki departments running reh sakte hain.';
+          await sendTelegramMessage(env, chatId, `AURA3 dispatch refused: ${reason}`, message.message_id);
+          return json({ ok: true, aura3_bridge: 'PAUSED', pause: aura3Pause });
+        }
         if (!aura3BridgeConfigured(env)) {
           await sendTelegramMessage(
             env,

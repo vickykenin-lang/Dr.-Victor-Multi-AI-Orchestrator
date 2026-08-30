@@ -361,12 +361,16 @@ export async function persistAutonomyEvidence(env, controller, result) {
   return updateRepoJson(env, AUTONOMY_STATE_PATH, next, `Record Victor goal-driven cycle: ${result.status}`);
 }
 
-function availableDepartments(env) {
-  const out = [];
-  if (rioBridgeConfigured(env)) out.push('rio');
-  if (tonyBridgeConfigured(env)) out.push('tony_stark');
-  if (aura3BridgeConfigured(env)) out.push('aura3');
-  return out;
+async function availableDepartments(env) {
+  const configured = [];
+  if (rioBridgeConfigured(env)) configured.push('rio');
+  if (tonyBridgeConfigured(env)) configured.push('tony_stark');
+  if (aura3BridgeConfigured(env)) configured.push('aura3');
+  const checks = await Promise.all(configured.map(async department => ({
+    department,
+    pause: await isExecutionPaused(env, department),
+  })));
+  return checks.filter(item => item.pause.paused !== true).map(item => item.department);
 }
 
 async function loadGoalRegistry(env) {
@@ -420,9 +424,9 @@ export async function runAutonomousCycle(controller, env) {
 
   const registry = await loadGoalRegistry(env);
   let state = await loadGoalRuntimeState(env);
-  let selection = selectAutonomyGoal(registry, state, availableDepartments(env), controller.scheduledTime);
+  const available = await availableDepartments(env);
+  let selection = selectAutonomyGoal(registry, state, available, controller.scheduledTime);
   if (!selection) {
-    const available = availableDepartments(env);
     const activeGoals = (registry.goals || []).filter(goal => normalizedState(goal.status) === 'ACTIVE');
     const activeGoalIds = activeGoals.map(goal => goal.goal_id);
     const candidate_diagnostics = (registry.goals || []).map(goal => {
@@ -470,7 +474,7 @@ export async function runAutonomousCycle(controller, env) {
     !outcome.assessment.goalAchieved
   ) {
     const nextRuntimeGoal = state.goals?.[selection.goal.goal_id] || {};
-    const nextTarget = chooseGoalDepartment(selection.goal, nextRuntimeGoal, availableDepartments(env));
+    const nextTarget = chooseGoalDepartment(selection.goal, nextRuntimeGoal, available);
     if (nextTarget) {
       selection = { ...selection, runtimeGoal: nextRuntimeGoal, target: nextTarget };
       const followUp = await superviseGoal(selection, env, 'REPLAN_EXECUTE');
