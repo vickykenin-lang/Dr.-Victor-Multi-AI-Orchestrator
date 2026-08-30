@@ -1,0 +1,11 @@
+{
+  "updated": "2026-08-30T22:20:10.747226+05:30",
+  "provider": "NVIDIA",
+  "results": {
+    "A1": {
+      "status": "ok",
+      "bytes": 78924,
+      "file": "stills/A1.png"
+    }
+  }
+}
