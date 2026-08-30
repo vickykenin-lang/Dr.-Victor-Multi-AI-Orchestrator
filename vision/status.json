@@ -1,35 +1,16 @@
 {
   "department": "VISION",
-  "updated": "2026-08-30T01:07+05:30",
-  "overall": "production",
-  "phase": "EP001_stills",
-  "omniroute": "off_deferred",
+  "updated": "2026-08-30T23:26+05:30",
   "storage": {
-    "working": "google_drive",
+    "working": "github_stills",
     "publish": "youtube",
-    "folder_url": "https://drive.google.com/drive/folders/1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U",
-    "folder_id": "1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U",
-    "visibility": "private",
-    "layout": ["01_stills", "02_clips", "03_audio", "04_edit", "05_masters", "06_qc"],
-    "founder_folders": "done",
-    "auto_upload": false
+    "google_drive": "off_quota_block"
   },
   "current_episode": "EP001_Last_Delivery",
   "episode_status": {
-    "topic": "approved_C",
-    "characters": "done",
-    "script": "founder_ok",
-    "shot_list": "done",
-    "storage": "drive_bound",
-    "stills": "retrying_after_founder_done",
-    "stills_qc": "pending_stills",
-    "video": "after_stills",
-    "youtube": "pending_channel"
+    "stills_A1": "generated_founder_advance",
+    "stills_A2": "dispatching",
+    "video": "after_stills"
   },
-  "next": [
-    "System rerun vision_stills.yml only_ids=A1",
-    "If 429: founder Gemini billing or NVIDIA_API_KEY",
-    "Place A1 in Drive 01_stills",
-    "Founder visual OK / redo"
-  ]
+  "next": ["A2 generate", "Founder A2 OK/redo", "A3"]
 }
