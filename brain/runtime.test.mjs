@@ -23,6 +23,10 @@ test('repeat without new evidence forces Five Whys', () => {
   assert.equal(shouldRunFiveWhys({ sameRecommendationCount: 2, hasNewEvidence: false }), true);
 });
 
+test('same semantic recommendation forces Five Whys even when a fresh artifact exists', () => {
+  assert.equal(shouldRunFiveWhys({ sameRecommendationCount: 2, hasNewEvidence: true }), true);
+});
+
 test('Five Whys escalates only when verified root cause is Founder boundary', () => {
   const technical = evaluateFiveWhys({
     why_chain: [{ cause: 'stale workflow test', status: 'VERIFIED' }],
@@ -74,6 +78,18 @@ test('task contract requires concrete delegation fields', () => {
 test('same action repeated without evidence is detected as executive loop', () => {
   const review = reviewOutcome({ expected: 'repair plan', actual: 'same audit', sameActionCount: 2, hasNewEvidence: false });
   assert.equal(review.repeat_loop_detected, true);
+  assert.equal(review.required_next_mode, 'FIVE_WHYS_BEFORE_NEXT_DISPATCH');
+});
+
+test('same semantic recommendation with fresh artifact is still an executive loop', () => {
+  const review = reviewOutcome({
+    expected: 'VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN',
+    actual: 'VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN',
+    sameActionCount: 3,
+    hasNewEvidence: true,
+  });
+  assert.equal(review.repeat_loop_detected, true);
+  assert.equal(review.learning_candidate, 'REPEATED_MEANING_FAILURE_PATTERN');
   assert.equal(review.required_next_mode, 'FIVE_WHYS_BEFORE_NEXT_DISPATCH');
 });
 
