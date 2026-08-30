@@ -5,19 +5,15 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 63,
+      "attempts": 65,
       "last_target": "tony_stark",
       "recommended_department": "tony_stark",
       "last_status": "READ_ONLY_AUDIT_COMPLETED",
       "last_next_action": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
-      "last_attempt_at_utc": "2026-08-30T14:16:00.686Z",
-      "last_verified_progress_at_utc": "2026-08-30T14:16:00.686Z",
+      "last_attempt_at_utc": "2026-08-30T14:31:06.487Z",
+      "last_verified_progress_at_utc": "2026-08-30T14:31:06.487Z",
       "goal_achieved_at_utc": null,
       "evidence": [
-        "integration/results/victor_tasks/victor-rio-1788030985511-goal-auto.json",
-        "integration/results/victor_tasks/victor-rio-1788031823570-goal-auto.json",
-        "site/content/policies/cta-under-sink-storage-rack-buying-guide-2026-08-30.md",
-        "integration/results/victor_tasks/victor-rio-1788031885302-goal-auto.json",
         "data/autonomy_audit.jsonl",
         "integration/results/victor_tasks/victor-rio-1788032723512-goal-auto.json",
         "integration/results/victor_tasks/victor-rio-1788032785202-goal-auto.json",
@@ -63,7 +59,11 @@
         "integration/results/tasks/victor-tony-1788099314348-goal-auto.json",
         "integration/results/audits/victor-tony-1788099314348-goal-auto.json",
         "integration/results/tasks/victor-tony-1788099337304-goal-auto.json",
-        "integration/results/audits/victor-tony-1788099337304-goal-auto.json"
+        "integration/results/audits/victor-tony-1788099337304-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788100214499-goal-auto.json",
+        "integration/results/audits/victor-tony-1788100214499-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788100243105-goal-auto.json",
+        "integration/results/audits/victor-tony-1788100243105-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
