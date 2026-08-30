@@ -5,12 +5,12 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "EXECUTION_UNVERIFIED",
-      "attempts": 48,
+      "attempts": 49,
       "last_target": "tony_stark",
       "recommended_department": "tony_stark",
       "last_status": "UNKNOWN",
       "last_next_action": "NOT_PROVIDED",
-      "last_attempt_at_utc": "2026-08-30T11:18:27.692Z",
+      "last_attempt_at_utc": "2026-08-30T11:33:27.884Z",
       "last_verified_progress_at_utc": "2026-08-29T21:02:23.469Z",
       "goal_achieved_at_utc": null,
       "evidence": [
