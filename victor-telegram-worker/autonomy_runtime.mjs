@@ -368,17 +368,23 @@ async function readRepoJson(env, path, fallback = {}) {
   throw new Error(`CANONICAL_STATE_READ_FAILED_${path.replace(/[^A-Za-z0-9]+/g, '_').toUpperCase()}_${lastError}`);
 }
 
-async function updateRepoJson(env, path, next, message) {
+async function updateRepoJson(env, path, nextOrBuilder, message) {
   const tokens = [...new Set([env.GITHUB_ORCHESTRATION_TOKEN, env.GITHUB_MEMORY_TOKEN].filter(Boolean))];
   if (!tokens.length) throw new Error('GOAL_STATE_TOKEN_NOT_CONFIGURED');
   const api = `https://api.github.com/repos/${VICTOR_REPO}/contents/${path}`;
   let lastError = 'UNKNOWN';
   for (const token of tokens) {
-    const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json', 'User-Agent': 'Dr-Victor-Goal-Runtime/2.0' };
+    const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json', 'User-Agent': 'Dr-Victor-Goal-Runtime/2.2' };
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       const currentResponse = await fetch(`${api}?ref=main&t=${Date.now()}`, { headers, cache: 'no-store' });
       if (!currentResponse.ok) { lastError = `READ_HTTP_${currentResponse.status}`; if ([401, 403].includes(currentResponse.status)) break; continue; }
       const currentFile = await currentResponse.json();
+      let current = {};
+      try { current = JSON.parse(decodeURIComponent(escape(atob(currentFile.content || '')))); } catch (_) { current = {}; }
+      // Rebuild from the freshest repository document on every retry. This is
+      // critical: a new SHA with an old precomputed body would silently erase a
+      // concurrent cycle's state even though the retry itself succeeds.
+      const next = typeof nextOrBuilder === 'function' ? nextOrBuilder(current) : nextOrBuilder;
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(next, null, 2) + '\n')));
       const updateResponse = await fetch(api, { method: 'PUT', headers, body: JSON.stringify({ message, content: encoded, sha: currentFile.sha, branch: 'main' }) });
       if (updateResponse.ok) return next;
@@ -392,9 +398,12 @@ async function updateRepoJson(env, path, next, message) {
 }
 
 export async function persistAutonomyEvidence(env, controller, result) {
-  const previous = await readRepoJson(env, AUTONOMY_STATE_PATH, {});
-  const next = buildAutonomyEvidence(previous, result, controller);
-  return updateRepoJson(env, AUTONOMY_STATE_PATH, next, `Record Victor goal-driven cycle: ${result.status}`);
+  return updateRepoJson(
+    env,
+    AUTONOMY_STATE_PATH,
+    current => buildAutonomyEvidence(current || {}, result, controller),
+    `Record Victor goal-driven cycle: ${result.status}`,
+  );
 }
 
 async function availableDepartments(env) {
@@ -422,7 +431,20 @@ async function loadGoalRuntimeState(env) {
 }
 
 async function persistGoalRuntimeState(env, nextState, goalId) {
-  return updateRepoJson(env, GOAL_RUNTIME_STATE_PATH, nextState, `Record Victor goal progress: ${goalId}`);
+  return updateRepoJson(
+    env,
+    GOAL_RUNTIME_STATE_PATH,
+    current => ({
+      ...(current || {}),
+      ...nextState,
+      goals: {
+        ...((current || {}).goals || {}),
+        ...((nextState || {}).goals || {}),
+        [goalId]: nextState?.goals?.[goalId] || current?.goals?.[goalId] || {},
+      },
+    }),
+    `Record Victor goal progress: ${goalId}`,
+  );
 }
 
 export async function runAutonomousCycle(controller, env) {
