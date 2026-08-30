@@ -37,6 +37,7 @@ import {
 
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
+import { classifyTelegramBrainIntent, buildCrossDepartmentSupportPrompt } from '../brain/telegram_gateway.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
@@ -123,6 +124,7 @@ export default {
         autonomy_supervision_interval_minutes: 15,
         autonomy_evidence_persistence: 'GITHUB_CANONICAL_STATE_V1',
         autonomy_reporting: 'ESCALATIONS_VERIFIED_SUCCESS_AND_DAILY_SUMMARY',
+        telegram_brain_gateway: 'BRAIN_FIRST_FOR_EXECUTIVE_AND_CROSS_DEPARTMENT_COMMANDS_V1',
         victor_report_card_target: '10/10',
         victor_report_card_basis: 'VERIFIED_DEPARTMENT_FINAL_OUTCOMES_ONLY',
         direct_consequential_department_execution: false,
@@ -229,6 +231,67 @@ export default {
       }
 
       const entity = resolveFounderEntityQuery(text);
+      const brainIntent = classifyTelegramBrainIntent(text, {
+        entity,
+        replyText: message?.reply_to_message?.text || '',
+      });
+
+      if (!memoryDirective && brainIntent.mode === 'EXECUTIVE_GOAL_REVIEW') {
+        processingStage = 'BRAIN_EXECUTIVE_GOAL_REVIEW';
+        const brainController = { cron: '*/15 * * * *', scheduledTime: Date.now() };
+        let brainResult;
+        try {
+          brainResult = await runAutonomousCycle(brainController, env);
+          await persistAutonomyEvidence(env, brainController, brainResult);
+        } catch (brainError) {
+          console.error('Victor Brain Telegram cycle failed:', brainError?.message || 'unknown');
+          await sendTelegramMessage(env, chatId, 'Victor Brain cycle execute nahi hua. Main direct department keyword-routing par silently fallback nahi karunga; runtime evidence check required hai.', message.message_id);
+          return json({ ok: false, brain_gateway: 'FAILED' }, 503);
+        }
+        const brainPhase = brainResult?.result?.phase || brainResult?.result?.assessment?.phase || 'EXECUTIVE_REVIEW';
+        const brainTaskId = brainResult?.result?.taskId || null;
+        const lines = [
+          'Victor Brain executive cycle completed.',
+          `Status: ${brainResult.status}`,
+          `Goal: ${brainResult.goalId || 'none'}`,
+          `Route: ${brainResult.target || 'none'}`,
+          `Mode: ${brainPhase}`,
+          brainTaskId ? `Task ID: ${brainTaskId}` : null,
+        ].filter(Boolean);
+        await sendTelegramMessage(env, chatId, lines.join('\n'), message.message_id);
+        return json({ ok: true, brain_gateway: 'EXECUTED', result: brainResult });
+      }
+
+      if (!memoryDirective && brainIntent.mode === 'CROSS_DEPARTMENT_SUPPORT') {
+        processingStage = 'BRAIN_CROSS_DEPARTMENT_SUPPORT';
+        const plan = brainIntent.plan || {};
+        if (plan.department !== 'tony_stark') {
+          await sendTelegramMessage(env, chatId, 'Brain ne cross-department task identify kiya, lekin requested support department ka direct governed bridge available nahi hai. Unsafe fallback nahi kiya gaya.', message.message_id);
+          return json({ ok: true, brain_gateway: 'UNSUPPORTED_SUPPORT_DEPARTMENT', department: plan.department || null });
+        }
+        const tonyPause = await isExecutionPaused(env, 'tony_stark');
+        if (tonyPause.paused) {
+          const reason = tonyPause.global_pause_active ? 'SYSTEM PAUSE active hai.' : 'Tony Stark department PAUSED hai.';
+          await sendTelegramMessage(env, chatId, `Brain task dispatch refused: ${reason}`, message.message_id);
+          return json({ ok: true, brain_gateway: 'PAUSED', pause: tonyPause });
+        }
+        if (!tonyBridgeConfigured(env)) {
+          await sendTelegramMessage(env, chatId, 'Brain ne Tony-compatible support task banaya, lekin Tony governed bridge configured nahi hai.', message.message_id);
+          return json({ ok: true, brain_gateway: 'PENDING_CONFIGURATION' });
+        }
+        const taskPrompt = buildCrossDepartmentSupportPrompt(plan, text);
+        let dispatch;
+        try {
+          dispatch = await dispatchTonyTask(env, taskPrompt, { messageId: message.message_id });
+        } catch (bridgeError) {
+          console.error('Brain Tony support dispatch failed:', bridgeError?.message || 'unknown');
+          await sendTelegramMessage(env, chatId, 'Brain ne task decompose kiya, lekin Tony dispatch fail hua. Connection success claim nahi kiya jayega.', message.message_id);
+          return json({ ok: true, brain_gateway: 'DISPATCH_FAILED' });
+        }
+        await sendTelegramMessage(env, chatId, `Victor Brain ne Founder instruction ko Tony-compatible RIO support task me convert karke dispatch kiya. Task ID: ${dispatch.taskId}.`, message.message_id);
+        ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
+        return json({ ok: true, brain_gateway: 'CROSS_DEPARTMENT_DISPATCHED', task_id: dispatch.taskId });
+      }
 
       processingStage = 'DEPARTMENT_ROUTING';
       if (!memoryDirective && shouldContactRio(text, entity)) {

@@ -500,7 +500,12 @@ export async function runAutonomousCycle(controller, env) {
     };
   }
 
-  const initialPhase = selection.runtimeGoal?.brain_required_mode === 'FIVE_WHYS_BEFORE_NEXT_DISPATCH'
+  const initialPhase = (
+    selection.runtimeGoal?.brain_required_mode === 'FIVE_WHYS_BEFORE_NEXT_DISPATCH'
+    || Number(selection.runtimeGoal?.same_recommendation_count) >= 2
+    || Number(selection.runtimeGoal?.same_failure_count) >= 2
+    || selection.runtimeGoal?.brain_review?.repeat_loop_detected === true
+  )
     ? 'FIVE_WHYS_DIAGNOSIS'
     : 'EXECUTE';
   let outcome = await superviseGoal(selection, env, initialPhase);
