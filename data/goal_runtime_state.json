@@ -5,19 +5,15 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 91,
+      "attempts": 93,
       "last_target": "tony_stark",
       "recommended_department": "tony_stark",
       "last_status": "READ_ONLY_AUDIT_COMPLETED",
       "last_next_action": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
-      "last_attempt_at_utc": "2026-08-30T17:46:00.895Z",
-      "last_verified_progress_at_utc": "2026-08-30T17:46:00.895Z",
+      "last_attempt_at_utc": "2026-08-30T17:51:36.227Z",
+      "last_verified_progress_at_utc": "2026-08-30T17:51:36.227Z",
       "goal_achieved_at_utc": null,
       "evidence": [
-        "integration/results/audits/victor-tony-1788104737890-goal-auto.json",
-        "integration/results/tasks/victor-tony-1788105614995-goal-auto.json",
-        "OBJECTIVE.md",
-        "SOUL.md",
         "integration/results/audits/victor-tony-1788105614995-goal-auto.json",
         "integration/results/tasks/victor-tony-1788105637813-goal-auto.json",
         "config/authority.json",
@@ -63,7 +59,11 @@
         "integration/results/tasks/victor-tony-1788111914520-goal-auto.json",
         "integration/results/audits/victor-tony-1788111914520-goal-auto.json",
         "integration/results/tasks/victor-tony-1788111938056-goal-auto.json",
-        "integration/results/audits/victor-tony-1788111938056-goal-auto.json"
+        "integration/results/audits/victor-tony-1788111938056-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788112251683-goal-auto.json",
+        "integration/results/audits/victor-tony-1788112251683-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788112274184-goal-auto.json",
+        "integration/results/audits/victor-tony-1788112274184-goal-auto.json"
       ],
       "failure_fingerprint": null,
       "brain_required_mode": "FIVE_WHYS_BEFORE_NEXT_DISPATCH",
@@ -77,7 +77,7 @@
         "required_next_mode": "FIVE_WHYS_BEFORE_NEXT_DISPATCH"
       },
       "same_failure_count": 0,
-      "same_recommendation_count": 11
+      "same_recommendation_count": 13
     }
   },
   "note": "Runtime state records progress and routing. It does not redefine the Goal Contract."
