@@ -1,11 +1,11 @@
 {
-  "updated": "2026-08-30T23:27:38.040317+05:30",
+  "updated": "2026-08-30T23:37:59.239200+05:30",
   "provider": "NVIDIA",
   "results": {
-    "A2": {
+    "A3": {
       "status": "ok",
-      "bytes": 74715,
-      "file": "stills/A2.png"
+      "bytes": 79362,
+      "file": "stills/A3.png"
     }
   }
 }
