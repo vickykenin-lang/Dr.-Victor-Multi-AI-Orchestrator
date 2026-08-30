@@ -1,0 +1,43 @@
+name: Apply Victor Brain Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply_victor_brain_runtime.py'
+      - 'brain/**'
+      - '.github/workflows/apply-victor-brain-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply deterministic brain integration
+        run: python scripts/apply_victor_brain_runtime.py
+      - name: Run brain and autonomy tests
+        run: node --test brain/runtime.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
+      - name: Syntax checks
+        run: |
+          node --check brain/runtime.mjs
+          node --check victor-telegram-worker/autonomy_runtime.mjs
+          node --check victor-telegram-worker/worker.js
+      - name: Persist integration if changed
+        run: |
+          git config user.name "victor-governed-runtime"
+          git config user.email "actions@users.noreply.github.com"
+          git add victor-telegram-worker/autonomy_runtime.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m "brain: integrate cognitive loop with autonomous runtime"
+          git pull --rebase --autostash
+          git push
