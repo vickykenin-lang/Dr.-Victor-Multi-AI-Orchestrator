@@ -4,10 +4,19 @@ PATH = Path('victor-telegram-worker/autonomy_runtime.mjs')
 text = PATH.read_text(encoding='utf-8')
 original = text
 
+ALREADY_APPLIED_MARKERS = {
+    'initial_phase': "const initialPhase = (",
+    'followup_phase': "const followUpPhase = nextRuntimeGoal.brain_required_mode",
+    'supervise_prompt': "buildGoalTaskPrompt(selection.goal, phase, selection.runtimeGoal || {})",
+}
+
 
 def replace_once(old: str, new: str, label: str):
     global text
     if new in text:
+        return
+    marker = ALREADY_APPLIED_MARKERS.get(label)
+    if marker and marker in text:
         return
     if old not in text:
         raise SystemExit(f'PATCH_ANCHOR_NOT_FOUND:{label}')
