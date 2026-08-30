@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Deterministic integration patch for pause-aware Victor department routing.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -117,7 +118,6 @@ for old, new, error in routing_specs:
     w = w.replace(old, new, 1)
 worker.write_text(w, encoding='utf-8')
 
-# Deterministic source assertions: department routing must be pause-aware while global handling remains intact.
 a2 = autonomy.read_text(encoding='utf-8')
 w2 = worker.read_text(encoding='utf-8')
 assert "await isExecutionPaused(env, department)" in a2
