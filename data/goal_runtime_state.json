@@ -5,19 +5,15 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 73,
+      "attempts": 75,
       "last_target": "tony_stark",
       "recommended_department": "tony_stark",
       "last_status": "READ_ONLY_AUDIT_COMPLETED",
       "last_next_action": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
-      "last_attempt_at_utc": "2026-08-30T15:31:06.443Z",
-      "last_verified_progress_at_utc": "2026-08-30T15:31:06.443Z",
+      "last_attempt_at_utc": "2026-08-30T15:46:01.060Z",
+      "last_verified_progress_at_utc": "2026-08-30T15:46:01.060Z",
       "goal_achieved_at_utc": null,
       "evidence": [
-        "integration/results/victor_tasks/victor-rio-1788037281451-goal-auto.json",
-        "integration/results/tasks/victor-tony-1788097514859-goal-auto.json",
-        "OBJECTIVE.md",
-        "SOUL.md",
         "config/authority.json",
         "state/current_state.json",
         "integration/victor_contract.json",
@@ -63,7 +59,11 @@
         "integration/results/tasks/victor-tony-1788103815116-goal-auto.json",
         "integration/results/audits/victor-tony-1788103815116-goal-auto.json",
         "integration/results/tasks/victor-tony-1788103838065-goal-auto.json",
-        "integration/results/audits/victor-tony-1788103838065-goal-auto.json"
+        "integration/results/audits/victor-tony-1788103838065-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788104714515-goal-auto.json",
+        "integration/results/audits/victor-tony-1788104714515-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788104737890-goal-auto.json",
+        "integration/results/audits/victor-tony-1788104737890-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
