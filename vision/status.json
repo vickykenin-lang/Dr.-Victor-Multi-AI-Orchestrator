@@ -1,16 +1,10 @@
 {
   "department": "VISION",
-  "updated": "2026-08-30T23:26+05:30",
-  "storage": {
-    "working": "github_stills",
-    "publish": "youtube",
-    "google_drive": "off_quota_block"
-  },
-  "current_episode": "EP001_Last_Delivery",
-  "episode_status": {
-    "stills_A1": "generated_founder_advance",
-    "stills_A2": "dispatching",
-    "video": "after_stills"
-  },
-  "next": ["A2 generate", "Founder A2 OK/redo", "A3"]
+  "updated": "2026-08-30T23:49+05:30",
+  "mode": "auto_batch",
+  "storage": "github_stills",
+  "google_drive": "off",
+  "done": ["A1", "A2", "A3"],
+  "running": ["B1", "B2", "B3", "B4", "B5", "B6", "B7"],
+  "next_after_batch": "Founder review stills folder then clips"
 }
