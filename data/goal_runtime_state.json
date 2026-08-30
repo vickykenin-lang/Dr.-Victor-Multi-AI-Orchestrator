@@ -5,24 +5,15 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 75,
+      "attempts": 77,
       "last_target": "tony_stark",
       "recommended_department": "tony_stark",
       "last_status": "READ_ONLY_AUDIT_COMPLETED",
       "last_next_action": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
-      "last_attempt_at_utc": "2026-08-30T15:46:01.060Z",
-      "last_verified_progress_at_utc": "2026-08-30T15:46:01.060Z",
+      "last_attempt_at_utc": "2026-08-30T16:01:01.087Z",
+      "last_verified_progress_at_utc": "2026-08-30T16:01:01.087Z",
       "goal_achieved_at_utc": null,
       "evidence": [
-        "config/authority.json",
-        "state/current_state.json",
-        "integration/victor_contract.json",
-        "integration/results/audits/victor-tony-1788097514859-goal-auto.json",
-        "README.md",
-        ".github/workflows/affiliate-attribution.yml",
-        ".github/workflows/apply-emergency-pause-guard.yml",
-        ".github/workflows/apply-telemetry-guard.yml",
-        ".github/workflows/deploy-pages.yml",
         ".github/workflows/rio.yml",
         ".github/workflows/telemetry-control-room.yml",
         ".github/workflows/victor-rio-transport.yml",
@@ -63,7 +54,16 @@
         "integration/results/tasks/victor-tony-1788104714515-goal-auto.json",
         "integration/results/audits/victor-tony-1788104714515-goal-auto.json",
         "integration/results/tasks/victor-tony-1788104737890-goal-auto.json",
-        "integration/results/audits/victor-tony-1788104737890-goal-auto.json"
+        "integration/results/audits/victor-tony-1788104737890-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788105614995-goal-auto.json",
+        "OBJECTIVE.md",
+        "SOUL.md",
+        "integration/results/audits/victor-tony-1788105614995-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788105637813-goal-auto.json",
+        "config/authority.json",
+        "state/current_state.json",
+        "integration/victor_contract.json",
+        "integration/results/audits/victor-tony-1788105637813-goal-auto.json"
       ],
       "failure_fingerprint": null
     }
