@@ -10,7 +10,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-DEFAULT_FOLDER = "1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U"
+# Locked Founder folder: Vision / EP001_Last_Delivery
+LOCKED_FOLDER = "1aGyG0KCS_4q9aaGIFDO615R-47JUOE5U"
 STILLS = os.path.join(os.path.dirname(__file__), "..", "episodes", "EP001_Last_Delivery", "stills")
 DRIVE_FILES = "https://www.googleapis.com/drive/v3/files"
 DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
@@ -18,15 +19,16 @@ DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
 
 def normalize_folder_id(raw: str) -> str:
     raw = (raw or "").strip().strip('"').strip("'")
-    if not raw:
-        return DEFAULT_FOLDER
     m = re.search(r"/folders/([A-Za-z0-9_-]+)", raw)
     if m:
-        return m.group(1)
+        raw = m.group(1)
     m = re.search(r"[?&]id=([A-Za-z0-9_-]+)", raw)
     if m:
-        return m.group(1)
-    return raw.split()[0]
+        raw = m.group(1)
+    raw = raw.split()[0] if raw else ""
+    if re.fullmatch(r"[A-Za-z0-9_-]{20,}", raw):
+        return raw
+    return LOCKED_FOLDER
 
 
 def load_sa() -> dict:
@@ -56,8 +58,8 @@ def drive_json(req: urllib.request.Request):
         with urllib.request.urlopen(req, timeout=60) as resp:
             return json.load(resp)
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")[:500]
-        raise RuntimeError(f"HTTP {e.code} {req.full_url[:180]} :: {body}") from e
+        body = e.read().decode("utf-8", errors="replace")[:700]
+        raise RuntimeError(f"HTTP {e.code} {req.get_method()} :: {body}") from e
 
 
 def find_or_create_child(token: str, parent: str, name: str) -> str:
@@ -118,9 +120,11 @@ def upload_png(token: str, folder_id: str, path: str) -> str:
 
 def main() -> int:
     sa = load_sa()
-    root = normalize_folder_id(os.environ.get("GOOGLE_DRIVE_FOLDER_ID", DEFAULT_FOLDER))
+    # Prefer locked EP001 folder. Secret URL/junk falls back.
+    env_id = normalize_folder_id(os.environ.get("GOOGLE_DRIVE_FOLDER_ID", ""))
+    root = LOCKED_FOLDER
     print("SA email:", sa.get("client_email", "?"))
-    print("folder_id:", root)
+    print("using_folder:", root, "env_normalized:", env_id)
     token = jwt_bearer(sa)
     stills_id = find_or_create_child(token, root, "01_stills")
     print("Drive 01_stills id", stills_id)
