@@ -1,7 +1,7 @@
 {
   "continue": true,
-  "gap_sec": 480,
-  "stage": "picture",
-  "reason": "advanced to sound",
-  "updated": "2026-08-31T23:35:39.204274+05:30"
+  "gap_sec": 90,
+  "stage": "sound",
+  "reason": "advanced to assembly",
+  "updated": "2026-08-31T23:37:00.714057+05:30"
 }
