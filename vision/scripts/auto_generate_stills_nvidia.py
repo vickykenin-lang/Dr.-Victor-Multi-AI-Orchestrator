@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""VISION EP001 stills via NVIDIA FLUX (ai.api.nvidia.com).
-
-Env: NVIDIA_API_KEY or NVIDIA_VICTOR_VISION_KEY
-     ONLY_IDS=A1 (optional)
-"""
+"""VISION EP001 stills via NVIDIA FLUX (ai.api.nvidia.com)."""
 from __future__ import annotations
 
 import base64
@@ -23,17 +19,23 @@ ENDPOINTS = [
     "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev",
 ]
 
+RAHUL = (
+    "SAME locked hero: Indian man age 24, thin, short black hair, light stubble, "
+    "tired gentle eyes, BLUE collared delivery jacket (not hoodie, not cap, not helmet), "
+    "black backpack delivery bag, photorealistic cinematic 35mm, natural skin, no text no watermark no logo"
+)
+
 PROMPTS = {
-    "A1": "Photorealistic character reference, Indian man age 24, thin build, tired gentle eyes, short black hair, light stubble, blue delivery jacket, black shoulder delivery bag, waist-up, studio light, cinematic, natural skin, 35mm, no text no watermark",
+    "A1": "Photorealistic character reference, Indian man age 24, thin build, tired gentle eyes, short black hair, light stubble, blue collared delivery jacket, black shoulder delivery bag, waist-up, studio light, cinematic, natural skin, 35mm, no text no watermark",
     "A2": "Photorealistic character reference, Indian woman age 58, kind worried face, simple cotton saree muted colour, grey-black hair in bun, waist-up, soft indoor light, cinematic, natural skin, no text no watermark",
     "A3": "Photorealistic character reference, Indian man age 32, calm polite slightly threatening face, smart casual shirt, neat hair, waist-up, neutral light, cinematic, natural skin, no text no watermark",
-    "B1": "Cinematic night, Indian delivery man 24 blue jacket black bag on motorcycle city road neon bokeh, photorealistic 35mm, no text",
-    "B2": "Close-up brown cardboard delivery box red tape FRAGILE on delivery bag night light, photorealistic, no brand logo no watermark",
-    "B3": "Night Indian apartment society gate, young delivery man blue jacket brown box, 32 year man car window offering money calm smile, cinematic tension, no text",
-    "B4": "Indian apartment corridor, 58 woman saree opening door, young delivery man blue jacket brown box outside, warm vs cool light, cinematic, no text",
-    "B5": "Indian middle-class living room night, brown box red tape on table, blurred family photo wall, quiet mood, cinematic, no text",
-    "B6": "Narrow back lane night, delivery man blue jacket brown box under street light phone in hand conflicted, cinematic, no text",
-    "B7": "Early morning, same delivery man blue jacket on motorcycle quieter road calmer face, hopeful, cinematic 35mm, no text",
+    "B1": f"Night Indian city road, {RAHUL}, riding motorcycle, bag on back, neon bokeh, rear three-quarter, no helmet",
+    "B2": "Extreme close-up brown cardboard box with red packing tape printed FRAGILE in clear English only, night, photorealistic, no brand, no misspelling, no watermark",
+    "B3": f"Night Indian apartment society gate, {RAHUL} standing with brown FRAGILE box, 32 year Indian man in shirt at car window offering cash, tense, no cap no hoodie",
+    "B4": f"Indian apartment corridor night, 58 woman simple saree at open door, {RAHUL} outside holding brown box, warm indoor vs cool hall",
+    "B5": "Indian middle-class living room night, brown box red FRAGILE tape on table, blurred family photo on wall, quiet, cinematic, no text overlay",
+    "B6": f"Narrow Indian residential back lane night, wet concrete, {RAHUL} holding brown box and phone, street lamp, Mumbai chawl feel, not Europe",
+    "B7": f"Early morning Indian city road, {RAHUL} on motorcycle no helmet, black bag on back, hopeful tired face, same jacket as night shots, no logo text",
 }
 
 
@@ -94,38 +96,31 @@ def main() -> int:
         or ""
     ).strip()
     if not key:
-        print("ERROR: NVIDIA key missing (NVIDIA_API_KEY or NVIDIA_VICTOR_VISION_KEY)")
+        print("ERROR: NVIDIA key missing")
         return 1
-    print("NVIDIA key length:", len(key), "(value not printed)")
-
     only = os.environ.get("ONLY_IDS", "A1").strip()
     ids = [x.strip() for x in only.split(",") if x.strip()] or ["A1"]
-
     os.makedirs(OUT, exist_ok=True)
     log = {"updated": datetime.now(IST).isoformat(), "provider": "NVIDIA", "results": {}}
-
     any_ok = False
     for pid in ids:
         prompt = PROMPTS.get(pid)
         if not prompt:
             continue
         try:
-            print(f"{pid}: NVIDIA FLUX...")
+            print(f"{pid}: NVIDIA FLUX overwrite...")
             img = nvidia_generate(key, prompt)
             path = os.path.join(OUT, f"{pid}.png")
             with open(path, "wb") as f:
                 f.write(img)
-            log["results"][pid] = {"status": "ok", "bytes": len(img), "file": f"stills/{pid}.png"}
+            log["results"][pid] = {"status": "ok", "bytes": len(img)}
             print(f"{pid}: OK {len(img)} bytes")
             any_ok = True
         except Exception as e:
             log["results"][pid] = {"status": "failed", "error": str(e)[:600]}
             print(f"{pid}: FAIL {e}")
-
     with open(os.path.join(OUT, "_run_log.json"), "w", encoding="utf-8") as f:
         json.dump(log, f, indent=2)
-
-    print("DONE any_ok=", any_ok)
     return 0 if any_ok else 1
 
 

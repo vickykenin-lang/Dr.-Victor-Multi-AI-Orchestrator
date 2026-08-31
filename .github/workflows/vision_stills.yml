@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       only_ids:
-        description: "e.g. A1 or A2"
+        description: "e.g. B3,B7"
         required: false
         default: "A1"
 
@@ -25,38 +25,23 @@ jobs:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          echo "repo=$GITHUB_REPOSITORY only_ids=${{ inputs.only_ids }}"
-          if [ -n "$NVIDIA_VICTOR_VISION_KEY" ] || [ -n "$NVIDIA_API_KEY" ]; then echo "NVIDIA=SET"; else echo "NVIDIA=EMPTY"; fi
-          if [ -n "$GEMINI_API_KEY" ]; then echo "GEMINI_API_KEY=SET"; else echo "GEMINI_API_KEY=EMPTY"; fi
+          echo "only_ids=${{ inputs.only_ids }}"
+          if [ -n "$NVIDIA_VICTOR_VISION_KEY" ] || [ -n "$NVIDIA_API_KEY" ]; then echo NVIDIA=SET; else echo NVIDIA=EMPTY; fi
 
       - name: Generate stills (Gemini primary)
-        id: gemini
         continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ONLY_IDS: ${{ inputs.only_ids }}
         run: python3 vision/scripts/auto_generate_stills.py
 
-      - name: Generate stills (NVIDIA fallback)
+      - name: Generate stills (NVIDIA overwrite requested IDs)
         if: always()
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_VICTOR_VISION_KEY: ${{ secrets.NVIDIA_VICTOR_VISION_KEY }}
           ONLY_IDS: ${{ inputs.only_ids }}
-        run: |
-          missing=0
-          IFS=',' read -ra IDS <<< "${ONLY_IDS:-A1}"
-          for id in "${IDS[@]}"; do
-            id=$(echo "$id" | tr -d ' ')
-            if [ ! -f "vision/episodes/EP001_Last_Delivery/stills/${id}.png" ]; then
-              missing=1
-            fi
-          done
-          if [ "$missing" = "0" ]; then
-            echo "requested IDs already on disk; skip NVIDIA"
-            exit 0
-          fi
-          python3 vision/scripts/auto_generate_stills_nvidia.py
+        run: python3 vision/scripts/auto_generate_stills_nvidia.py
 
       - name: Upload stills + log
         if: always()
@@ -72,13 +57,8 @@ jobs:
           git config user.name vision-bot
           git config user.email vision-bot@users.noreply.github.com
           git add vision/episodes/EP001_Last_Delivery/stills/ || true
-          if git diff --staged --quiet; then
-            echo "nothing to commit"
-          else
-            git commit -m "vision: EP001 stills ${{ inputs.only_ids }}"
+          if git diff --staged --quiet; then echo nothing; else
+            git commit -m "vision: stills redo ${{ inputs.only_ids }}"
             git pull --rebase origin main || git pull --rebase --autostash origin main || true
             git push
           fi
-
-      - name: Drive skipped
-        run: echo "Google Drive OFF — stills stay on GitHub"
