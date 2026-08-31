@@ -1,0 +1,131 @@
+from pathlib import Path
+
+p = Path('victor-telegram-worker/worker.js')
+s = p.read_text(encoding='utf-8')
+
+s = s.replace("import { classifyTelegramBrainIntent, buildCrossDepartmentSupportPrompt } from '../brain/telegram_gateway.mjs';\n", '')
+
+start = s.find("      const entity = resolveFounderEntityQuery(text);\n      const brainIntent = classifyTelegramBrainIntent")
+end = s.find("      let reply;\n", start)
+if start < 0 or end < 0:
+    raise SystemExit('ROUTER_BLOCK_NOT_FOUND')
+
+new_block = r'''      processingStage = 'REQUEST_PLANNING';
+      const plan = await planFounderRequest(env, text, message?.reply_to_message?.text || '');
+
+      if (!memoryDirective && plan.mode === 'EXECUTIVE_GOAL') {
+        processingStage = 'EXECUTIVE_EXECUTION';
+        const controller = { cron: 'founder-command', scheduledTime: Date.now() };
+        const result = await runAutonomousCycle(controller, env);
+        await persistAutonomyEvidence(env, controller, result);
+        const assessment = result?.result?.assessment || {};
+        const summary = [
+          assessment.rootCause ? `Root cause: ${assessment.rootCause}` : null,
+          assessment.solution ? `Decision: ${assessment.solution}` : null,
+          assessment.nextAction ? `Next: ${assessment.nextAction}` : null,
+          result?.result?.taskId ? `Task: ${result.result.taskId}` : null,
+        ].filter(Boolean).join('\n');
+        await sendTelegramMessage(env, chatId, summary || `Victor ne objective par executive cycle chala diya. Status: ${result.status}.`, message.message_id);
+        return json({ ok: true, mode: plan.mode, result });
+      }
+
+      if (!memoryDirective && (plan.mode === 'DEPARTMENT_STATUS' || plan.mode === 'DEPARTMENT_ACTION')) {
+        processingStage = 'DEPARTMENT_EXECUTION';
+        const target = plan.target;
+
+        if (target === 'rio') {
+          const pause = await isExecutionPaused(env, 'rio');
+          if (pause.paused) {
+            await sendTelegramMessage(env, chatId, 'RIO paused hai; task dispatch nahi kiya.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, paused: true });
+          }
+          if (!rioBridgeConfigured(env)) {
+            await sendTelegramMessage(env, chatId, 'RIO bridge configured nahi hai.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, configured: false });
+          }
+          const dispatch = await dispatchRioTask(env, text, { messageId: message.message_id });
+          await sendTelegramMessage(env, chatId, `RIO ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
+          ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
+          return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
+        }
+
+        if (target === 'tony_stark') {
+          const pause = await isExecutionPaused(env, 'tony_stark');
+          if (pause.paused) {
+            await sendTelegramMessage(env, chatId, 'Tony paused hai; task dispatch nahi kiya.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, paused: true });
+          }
+          if (!tonyBridgeConfigured(env)) {
+            await sendTelegramMessage(env, chatId, 'Tony bridge configured nahi hai.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, configured: false });
+          }
+          const dispatch = await dispatchTonyTask(env, text, { messageId: message.message_id });
+          await sendTelegramMessage(env, chatId, `Tony ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
+          ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
+          return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
+        }
+
+        if (target === 'aura3') {
+          const pause = await isExecutionPaused(env, 'aura3');
+          if (pause.paused) {
+            await sendTelegramMessage(env, chatId, 'AURA3 paused hai; task dispatch nahi kiya.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, paused: true });
+          }
+          if (!aura3BridgeConfigured(env)) {
+            await sendTelegramMessage(env, chatId, 'AURA3 bridge configured nahi hai.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, configured: false });
+          }
+          const dispatch = await dispatchAura3Task(env, text, { messageId: message.message_id });
+          await sendTelegramMessage(env, chatId, `AURA3 ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
+          ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
+          return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
+        }
+      }
+
+'''
+s = s[:start] + new_block + s[end:]
+
+helper_anchor = "async function callVictorCore(env, userMessage, requestFacts) {"
+helper = r'''async function planFounderRequest(env, text, replyContext = '') {
+  const system = `
+You are Victor's request planner. Understand the Founder's intent like a normal AI.
+Return ONLY one JSON object, no prose.
+
+Modes:
+- CHAT: normal conversation, story, explanation, brainstorming, general question.
+- DEPARTMENT_STATUS: asks current/fresh/status/result/facts about RIO, Tony Stark or AURA3.
+- DEPARTMENT_ACTION: asks to fix, run, start, stop, recover, build, change, execute or otherwise act on RIO, Tony Stark or AURA3.
+- EXECUTIVE_GOAL: organization-level objective/strategy/root-cause/replanning request that Victor should manage across departments.
+
+Targets: rio, tony_stark, aura3, or null.
+Rules:
+- A department name inside an explanation does NOT make it an action.
+- "Tell me what departments do" is CHAT.
+- "AURA3 system thik karo" is DEPARTMENT_ACTION target aura3.
+- "RIO ne kitne posts publish kiye" is DEPARTMENT_STATUS target rio.
+- "Tony ko RIO website me help karne bolo" is DEPARTMENT_ACTION target tony_stark.
+- Casual conversation stays CHAT even though Victor is an orchestrator.
+
+Schema: {"mode":"CHAT|DEPARTMENT_STATUS|DEPARTMENT_ACTION|EXECUTIVE_GOAL","target":"rio|tony_stark|aura3|null","reason":"short"}
+`;
+  const content = await askModel(env, system, `${replyContext ? `Previous message: ${replyContext}\n` : ''}Founder: ${text}`);
+  const cleaned = content.replace(/```json|```/gi, '').trim();
+  let parsed;
+  try { parsed = JSON.parse(cleaned); } catch (_) { parsed = null; }
+  const allowedModes = new Set(['CHAT', 'DEPARTMENT_STATUS', 'DEPARTMENT_ACTION', 'EXECUTIVE_GOAL']);
+  const allowedTargets = new Set(['rio', 'tony_stark', 'aura3', null]);
+  if (!parsed || !allowedModes.has(parsed.mode) || !allowedTargets.has(parsed.target ?? null)) {
+    const entity = resolveFounderEntityQuery(text);
+    const target = ['rio', 'tony_stark', 'aura3'].includes(entity?.entity_id) ? entity.entity_id : null;
+    return { mode: target ? 'DEPARTMENT_STATUS' : 'CHAT', target, reason: 'planner_fallback' };
+  }
+  return { mode: parsed.mode, target: parsed.target ?? null, reason: String(parsed.reason || '').slice(0, 160) };
+}
+
+'''
+if helper_anchor not in s:
+    raise SystemExit('HELPER_ANCHOR_NOT_FOUND')
+s = s.replace(helper_anchor, helper + helper_anchor, 1)
+
+p.write_text(s, encoding='utf-8')
+print('VICTOR_CORE_SIMPLIFIED')
