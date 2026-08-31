@@ -20,22 +20,22 @@ ENDPOINTS = [
 ]
 
 RAHUL = (
-    "SAME locked hero: Indian man age 24, thin, short black hair, light stubble, "
-    "tired gentle eyes, BLUE collared delivery jacket (not hoodie, not cap, not helmet), "
-    "black backpack delivery bag, photorealistic cinematic 35mm, natural skin, no text no watermark no logo"
+    "locked hero Indian man 24 thin short styled black hair full beard tired eyes, "
+    "blue zip-up collared delivery jacket over grey tee, black backpack straps, "
+    "NO hoodie NO cap NO helmet NO logo text on clothes"
 )
 
 PROMPTS = {
-    "A1": "Photorealistic character reference, Indian man age 24, thin build, tired gentle eyes, short black hair, light stubble, blue collared delivery jacket, black shoulder delivery bag, waist-up, studio light, cinematic, natural skin, 35mm, no text no watermark",
+    "A1": "Photorealistic character reference, Indian man age 24, thin build, tired gentle eyes, short black hair, full beard, blue zip delivery jacket, black backpack straps, waist-up, studio light, cinematic, natural skin, 35mm, no text no watermark",
     "A2": "Photorealistic character reference, Indian woman age 58, kind worried face, simple cotton saree muted colour, grey-black hair in bun, waist-up, soft indoor light, cinematic, natural skin, no text no watermark",
     "A3": "Photorealistic character reference, Indian man age 32, calm polite slightly threatening face, smart casual shirt, neat hair, waist-up, neutral light, cinematic, natural skin, no text no watermark",
-    "B1": f"Night Indian city road, {RAHUL}, riding motorcycle, bag on back, neon bokeh, rear three-quarter, no helmet",
-    "B2": "Extreme close-up brown cardboard box with red packing tape printed FRAGILE in clear English only, night, photorealistic, no brand, no misspelling, no watermark",
-    "B3": f"Night Indian apartment society gate, {RAHUL} standing with brown FRAGILE box, 32 year Indian man in shirt at car window offering cash, tense, no cap no hoodie",
+    "B1": f"Night Indian city road, {RAHUL}, riding motorcycle bag on back neon bokeh rear three-quarter",
+    "B2": "Macro photo of a closed brown cardboard carton, one strip of red packing tape across the lid, the tape printed with the single English word FRAGILE correctly spelled F-R-A-G-I-L-E, no other words, no Only, no FRAGIIE, sharp focus, dark background, photorealistic, no watermark",
+    "B3": f"Wide night shot Indian apartment society gate, TWO people: (1) {RAHUL} standing outside holding a brown cardboard box in both hands, (2) a 32 year Indian man in a shirt sitting inside a parked car window holding out cash toward him, car clearly visible, cinematic, no logos",
     "B4": f"Indian apartment corridor night, 58 woman simple saree at open door, {RAHUL} outside holding brown box, warm indoor vs cool hall",
-    "B5": "Indian middle-class living room night, brown box red FRAGILE tape on table, blurred family photo on wall, quiet, cinematic, no text overlay",
-    "B6": f"Narrow Indian residential back lane night, wet concrete, {RAHUL} holding brown box and phone, street lamp, Mumbai chawl feel, not Europe",
-    "B7": f"Early morning Indian city road, {RAHUL} on motorcycle no helmet, black bag on back, hopeful tired face, same jacket as night shots, no logo text",
+    "B5": "Indian middle-class living room night, brown cardboard box on table with red tape, blurred family photo on wall, quiet, cinematic, no overlay text",
+    "B6": f"Narrow Indian chawl back lane night wet concrete, {RAHUL} holding brown box in one hand and phone in the other, street lamp, jacket is zip collar NOT hoodie, Mumbai residential, cinematic",
+    "B7": f"Early morning Indian city road, {RAHUL} SITTING ON a motorcycle riding toward camera, both hands on handlebars, headlight on, black backpack on, hopeful tired face, trees and traffic behind, NOT walking, NOT standing, cinematic",
 }
 
 
@@ -59,8 +59,8 @@ def extract_b64(data: dict):
 def nvidia_generate(api_key: str, prompt: str) -> bytes:
     last = ""
     bodies = [
-        {"prompt": prompt, "cfg_scale": 5, "mode": "base", "seed": 42, "steps": 20, "width": 768, "height": 1024},
-        {"prompt": prompt, "seed": 42, "steps": 4, "width": 768, "height": 1024},
+        {"prompt": prompt, "cfg_scale": 5, "mode": "base", "seed": 77, "steps": 20, "width": 768, "height": 1024},
+        {"prompt": prompt, "seed": 77, "steps": 4, "width": 768, "height": 1024},
         {"prompt": prompt},
     ]
     for url in ENDPOINTS:
