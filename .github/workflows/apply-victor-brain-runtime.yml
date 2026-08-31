@@ -8,7 +8,6 @@ on:
       - 'scripts/apply_telegram_brain_gateway.py'
       - 'scripts/apply_victor_rio_bridge_fixes.py'
       - 'scripts/fix_autonomy_state_concurrency.py'
-      - 'scripts/simplify_victor_conversation.py'
       - 'brain/**'
       - '.github/workflows/apply-victor-brain-runtime.yml'
   workflow_dispatch:
@@ -27,13 +26,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply runtime integration
+      - name: Apply deterministic brain integration
         run: |
           python scripts/apply_victor_brain_runtime.py
           python scripts/apply_telegram_brain_gateway.py
           python scripts/apply_victor_rio_bridge_fixes.py
           python scripts/fix_autonomy_state_concurrency.py
-          python scripts/simplify_victor_conversation.py
       - name: Run brain and autonomy tests
         run: node --test brain/runtime.test.mjs brain/telegram_gateway.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
       - name: Syntax checks
@@ -49,6 +47,6 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add victor-telegram-worker/autonomy_runtime.mjs victor-telegram-worker/worker.js victor-telegram-worker/department_bridge.mjs
           git diff --cached --quiet && exit 0
-          git commit -m "runtime: simplify Victor into conversation-first AI"
+          git commit -m "brain: integrate Telegram, RIO routing and conflict-safe state persistence"
           git pull --rebase --autostash
           git push
