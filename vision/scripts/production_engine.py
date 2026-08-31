@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Vision Production House Engine. Process only. No story, no cast."""
+"""Vision Production House Engine. Process only. Auto + per-stage gap."""
 from __future__ import annotations
 
 import json
@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 
 IST = timezone(timedelta(hours=5, minutes=30))
 ROOT = os.path.join(os.path.dirname(__file__), "..", "engine", "jobs")
+GAPS_PATH = os.path.join(os.path.dirname(__file__), "..", "engine", "gaps.json")
 STAGES = [
     "inbox",
     "intake",
@@ -40,16 +41,17 @@ def job_dir(job_id: str) -> str:
     return os.path.join(ROOT, job_id)
 
 
-def load_state(path: str) -> dict:
+def load_json(path: str, default):
+    if not os.path.isfile(path):
+        return default
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
-def save_state(path: str, state: dict) -> None:
-    state["updated"] = now()
+def save_json(path: str, data) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2)
+        json.dump(data, f, indent=2)
         f.write("\n")
 
 
@@ -59,8 +61,26 @@ def write(path: str, text: str) -> None:
         f.write(text if text.endswith("\n") else text + "\n")
 
 
-def qc_write(jd: str, stage: str, payload: dict) -> None:
-    write(os.path.join(jd, "qc", f"{stage}.json"), json.dumps(payload, indent=2))
+def gaps() -> dict:
+    return load_json(GAPS_PATH, {"default_sec": 480})
+
+
+def gap_for(stage: str) -> int:
+    g = gaps()
+    return int(g.get(stage, g.get("default_sec", 480)))
+
+
+def signal(job_id: str, cont: bool, stage: str, reason: str) -> None:
+    save_json(
+        os.path.join(job_dir(job_id), "run_signal.json"),
+        {
+            "continue": bool(cont),
+            "gap_sec": gap_for(stage) if cont else 0,
+            "stage": stage,
+            "reason": reason,
+            "updated": now(),
+        },
+    )
 
 
 def create_job(job_id: str, topic: str, length: str, language: str, platform: str) -> int:
@@ -80,7 +100,7 @@ def create_job(job_id: str, topic: str, length: str, language: str, platform: st
             ]
         ),
     )
-    save_state(
+    save_json(
         os.path.join(jd, "state.json"),
         {
             "job_id": job_id,
@@ -88,8 +108,10 @@ def create_job(job_id: str, topic: str, length: str, language: str, platform: st
             "owner_gates": {"topic_ok": False, "look_ok": False, "master_ok": False},
             "retries": {},
             "last_director": None,
+            "updated": now(),
         },
     )
+    signal(job_id, False, "inbox", "waiting Topic OK")
     print("created", job_id, "stage=inbox")
     return 0
 
@@ -99,9 +121,12 @@ def set_gate(job_id: str, gate: str) -> int:
     if not os.path.isfile(path):
         print("missing job", job_id)
         return 1
-    state = load_state(path)
+    state = load_json(path, {})
     state.setdefault("owner_gates", {})[gate] = True
-    save_state(path, state)
+    state["updated"] = now()
+    save_json(path, state)
+    # after owner gate, auto may continue
+    signal(job_id, True, state.get("stage", "inbox"), f"gate {gate} set")
     print("gate", gate, "true")
     return 0
 
@@ -134,29 +159,31 @@ def run_stage(job_id: str) -> int:
     if not os.path.isfile(state_path):
         print("missing job", job_id)
         return 1
-    state = load_state(state_path)
+    state = load_json(state_path, {})
     stage = state.get("stage", "inbox")
-    print("job", job_id, "stage", stage)
     gates = state.setdefault("owner_gates", {})
-
-    if stage == "inbox":
-        if not gates.get("topic_ok"):
-            print("STOP: need Topic OK")
-            state["last_director"] = {"pass": False, "reason": "inbox waits Topic OK"}
-            save_state(state_path, state)
-            return 0
-        state["stage"] = "intake"
-        save_state(state_path, state)
-        stage = "intake"
+    print("job", job_id, "stage", stage)
 
     if stage == "done":
+        signal(job_id, False, "done", "complete")
         print("already done")
         return 0
 
+    if stage == "inbox":
+        if not gates.get("topic_ok"):
+            signal(job_id, False, "inbox", "waiting Topic OK")
+            state["last_director"] = {"pass": False, "reason": "inbox waits Topic OK"}
+            state["updated"] = now()
+            save_json(state_path, state)
+            return 0
+        state["stage"] = "intake"
+        stage = "intake"
+
     if stage == "delivery" and not gates.get("master_ok"):
-        print("STOP: need Master OK")
+        signal(job_id, False, "delivery", "waiting Master OK")
         state["last_director"] = {"pass": False, "reason": "delivery waits Master OK"}
-        save_state(state_path, state)
+        state["updated"] = now()
+        save_json(state_path, state)
         return 0
 
     templates = {
@@ -178,29 +205,40 @@ def run_stage(job_id: str) -> int:
             write(path, body)
 
     verdict = director(stage, jd)
-    qc_write(jd, stage, {"stage": stage, "checked_at": now(), **verdict})
+    write(os.path.join(jd, "qc", f"{stage}.json"), json.dumps({"stage": stage, "checked_at": now(), **verdict}, indent=2))
     state["last_director"] = verdict
     retries = state.setdefault("retries", {})
     print("director", verdict)
 
     if verdict.get("pass"):
         if stage == "look_lock" and not gates.get("look_ok"):
+            signal(job_id, False, "look_lock", "waiting Look OK")
+            state["updated"] = now()
+            save_json(state_path, state)
             print("STOP: waiting Look OK")
-            save_state(state_path, state)
             return 0
         nxt = NEXT.get(stage)
         if nxt:
             state["stage"] = nxt
             retries[stage] = 0
             print("advance to", nxt)
-        save_state(state_path, state)
+            cont = nxt != "done"
+            # do not auto into delivery without master_ok; run_stage will stop there
+            signal(job_id, cont, stage, f"advanced to {nxt}")
+        else:
+            signal(job_id, False, stage, "no next")
+        state["updated"] = now()
+        save_json(state_path, state)
         return 0
 
     retries[stage] = int(retries.get(stage, 0)) + 1
-    save_state(state_path, state)
+    state["updated"] = now()
+    save_json(state_path, state)
     if retries[stage] >= 2:
+        signal(job_id, False, stage, "director failed twice")
         print("STOP: director failed twice at", stage)
         return 1
+    signal(job_id, True, stage, "director fail retry")
     print("retry allowed at", stage)
     return 0
 
@@ -222,7 +260,7 @@ def main() -> int:
         )
     if action in GATE_MAP:
         return set_gate(job_id, GATE_MAP[action])
-    if action == "run_stage":
+    if action in ("run_stage", "auto"):
         return run_stage(job_id)
     print("unknown action", action)
     return 1
