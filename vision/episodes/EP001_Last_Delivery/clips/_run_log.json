@@ -1,14 +1,13 @@
 {
-  "updated": "2026-08-31T12:32:55.841578+05:30",
-  "j2v_key": true,
+  "updated": "2026-08-31T12:54:08.012183+05:30",
+  "mode": "i2v_only",
   "gemini_key": true,
   "results": {
     "B1": {
-      "status": "ok",
-      "provider": "json2video",
-      "bytes": 89859,
+      "status": "failed",
+      "provider": "none",
       "action_prompt": "4-second continuous cinematic night action shot. Same locked hero Rahul, with exact face, outfit, bag and motorcycle continuity. Rahul rides naturally toward and then past the camera on a wet Indian city road glowing with neon signs, headlights and colorful reflections. The motorcycle stays in continuous forward motion; both wheels visibly rotate with realistic motion blur, suspension movement and slight water spray. Rahul briefly glances at a phone securely mounted near the handlebar, then looks back at the road. His mouth moves subtly as if speaking to his mother through an earphone. His bag and clothes shift naturally with speed, wind and road vibration. Camera smoothly tracks from a three-quarter rear angle into a dynamic side profile as he passes. Strong background parallax, moving traffic and changing wet-road reflections create real speed. Photorealistic cinematic lighting. No freeze, static frames, sliding bike, frozen wheels, face drift, morphing, cuts or sudden camera jumps.",
-      "error": null
+      "error": "HTTP 429 veo-3.1-lite-generate-preview {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      "
     }
   }
 }
