@@ -1,0 +1,12 @@
+{
+  "default_sec": 480,
+  "intake": 300,
+  "development": 480,
+  "screenplay": 480,
+  "look_lock": 480,
+  "keyframes": 480,
+  "picture": 600,
+  "sound": 480,
+  "assembly": 480,
+  "delivery": 300
+}
