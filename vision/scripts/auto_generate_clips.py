@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EP001 clips: JSON2Video -> Veo -> NVIDIA -> ffmpeg."""
+"""EP001 clips: JSON2Video -> Veo -> ffmpeg. Prompts from prompt_manager."""
 from __future__ import annotations
 
 import base64
@@ -13,6 +13,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
 
+from prompt_manager import video_prompt
+
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 STILLS = os.path.join(ROOT, "episodes", "EP001_Last_Delivery", "stills")
 CLIPS = os.path.join(ROOT, "episodes", "EP001_Last_Delivery", "clips")
@@ -24,15 +26,6 @@ RAW_STILL = (
 J2V = "https://api.json2video.com/v2/movies"
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
 VEO_MODELS = ["veo-3.1-generate-preview", "veo-3.1-fast-generate-preview", "veo-3.1-lite-generate-preview"]
-PROMPTS = {
-    "B1": "Cinematic slow push-in night motorcycle delivery",
-    "B2": "Slow push FRAGILE box",
-    "B3": "Night gate delivery and car",
-    "B4": "Door corridor delivery",
-    "B5": "Living room box",
-    "B6": "Back lane night",
-    "B7": "Morning motorcycle",
-}
 
 
 def j2v_key() -> str:
@@ -51,10 +44,6 @@ def gemini_key() -> str:
             print("using", name, "len", len(val))
             return val
     return ""
-
-
-def nvidia_key() -> str:
-    return (os.environ.get("NVIDIA_API_KEY") or os.environ.get("NVIDIA_VICTOR_VISION_KEY") or "").strip()
 
 
 def http_json(method: str, url: str, headers: dict, body=None, timeout=180):
@@ -94,25 +83,13 @@ def json2video_clip(api_key: str, pid: str) -> bytes:
     body = {
         "resolution": "instagram-story",
         "quality": "high",
-        "scenes": [{
-            "duration": 5,
-            "elements": [{
-                "type": "image",
-                "src": src,
-                "duration": 5,
-            }],
-        }],
+        "scenes": [{"duration": 5, "elements": [{"type": "image", "src": src, "duration": 5}]}],
     }
     headers = {"Content-Type": "application/json", "x-api-key": api_key}
-    print("JSON2Video POST", pid)
-    try:
-        created = http_json("POST", J2V, headers, body, timeout=60)
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"J2V HTTP {e.code} {e.read().decode('utf-8', errors='replace')[:400]}")
+    created = http_json("POST", J2V, headers, body, timeout=60)
     project = created.get("project") or (created.get("movie") or {}).get("project")
     if not project:
         raise RuntimeError(f"J2V no project: {json.dumps(created)[:400]}")
-    print("JSON2Video project", project)
     deadline = time.time() + 300
     last = created
     while time.time() < deadline:
@@ -121,7 +98,6 @@ def json2video_clip(api_key: str, pid: str) -> bytes:
         last = st
         movie = st.get("movie") or st
         status = (movie.get("status") if isinstance(movie, dict) else None) or st.get("status")
-        print("JSON2Video status", status)
         if status in ("error", "failed", "timeout"):
             raise RuntimeError(f"J2V {status}: {json.dumps(st)[:500]}")
         if status in ("done", "success", "finished", "complete", "completed"):
@@ -200,12 +176,7 @@ def main() -> int:
     os.makedirs(CLIPS, exist_ok=True)
     jkey = j2v_key()
     gkey = gemini_key()
-    log = {
-        "updated": datetime.now(IST).isoformat(),
-        "j2v_key": bool(jkey),
-        "gemini_key": bool(gkey),
-        "results": {},
-    }
+    log = {"updated": datetime.now(IST).isoformat(), "j2v_key": bool(jkey), "gemini_key": bool(gkey), "results": {}}
     any_ok = False
     for pid in ids:
         still = os.path.join(STILLS, f"{pid}.png")
@@ -213,11 +184,12 @@ def main() -> int:
         if not os.path.isfile(still):
             log["results"][pid] = {"status": "no_still"}
             continue
+        action = video_prompt(pid)
+        print(pid, "ACTION_PROMPT:", action[:240])
         used = None
         err = None
         if jkey:
             try:
-                print(pid, "JSON2Video...")
                 vid = json2video_clip(jkey, pid)
                 with open(out, "wb") as f:
                     f.write(vid)
@@ -227,7 +199,7 @@ def main() -> int:
                 print(pid, "J2V fail", err)
         if used is None and gkey:
             try:
-                vid = veo_i2v(gkey, PROMPTS.get(pid, PROMPTS["B1"]), still)
+                vid = veo_i2v(gkey, action, still)
                 with open(out, "wb") as f:
                     f.write(vid)
                 used = "gemini_veo"
@@ -240,6 +212,7 @@ def main() -> int:
             "status": "ok",
             "provider": used,
             "bytes": os.path.getsize(out),
+            "action_prompt": action,
             "error": err,
         }
         print(pid, "OK", used, os.path.getsize(out))
