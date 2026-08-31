@@ -1,18 +1,19 @@
 {
   "job_id": "JOB001",
-  "stage": "development",
+  "stage": "screenplay",
   "owner_gates": {
     "topic_ok": true,
     "look_ok": false,
     "master_ok": false
   },
   "retries": {
-    "intake": 0
+    "intake": 0,
+    "development": 0
   },
   "last_director": {
     "pass": true,
-    "reason": "intake artifacts present",
+    "reason": "development artifacts present",
     "must_fix": []
   },
-  "updated": "2026-08-31T23:28:17.028553+05:30"
+  "updated": "2026-08-31T23:29:28.576550+05:30"
 }
