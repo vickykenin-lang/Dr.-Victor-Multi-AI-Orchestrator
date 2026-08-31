@@ -1,0 +1,7 @@
+{
+  "stage": "picture",
+  "checked_at": "2026-08-31T23:35:39.204095+05:30",
+  "pass": true,
+  "reason": "picture artifacts present",
+  "must_fix": []
+}
