@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""EP001 clips: NVIDIA I2V primary, ffmpeg motion-still fallback.
-
-Env: NVIDIA_API_KEY or NVIDIA_VICTOR_VISION_KEY
-     ONLY_IDS=B1
-"""
+"""EP001 clips: Gemini Veo I2V primary, NVIDIA I2V secondary, ffmpeg last."""
 from __future__ import annotations
 
 import base64
@@ -11,7 +7,9 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
 
@@ -19,93 +17,162 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 STILLS = os.path.join(ROOT, "episodes", "EP001_Last_Delivery", "stills")
 CLIPS = os.path.join(ROOT, "episodes", "EP001_Last_Delivery", "clips")
 IST = timezone(timedelta(hours=5, minutes=30))
-
-ENDPOINTS = [
+GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
+VEO_MODELS = [
+    "veo-3.1-fast-generate-preview",
+    "veo-3.1-generate-preview",
+    "veo-3.1-lite-generate-preview",
+]
+NVIDIA_ENDPOINTS = [
     "https://ai.api.nvidia.com/v1/genai/nvidia/cosmos3-nano",
     "https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano",
 ]
-
 PROMPTS = {
-    "B1": "Cinematic slow push-in, Indian delivery man 24 blue jacket black bag riding motorcycle on night city road, neon bokeh, photorealistic, gentle camera motion, no text",
-    "B2": "Close-up brown cardboard box red FRAGILE tape on delivery bag, slight handheld night light, photorealistic, no logo",
-    "B3": "Night apartment society gate, young delivery man blue jacket brown box, man at car window offering money, tense slow motion, cinematic",
-    "B4": "Apartment corridor, 58 woman in saree opening door, delivery man blue jacket brown box outside, warm indoor vs cool hall light, slow dolly",
-    "B5": "Indian living room night, brown box red tape on table, quiet still camera, cinematic",
-    "B6": "Narrow back lane night, delivery man blue jacket brown box under street light looking at phone, conflicted, slow push",
-    "B7": "Early morning, same delivery man blue jacket on motorcycle quieter road, hopeful, soft camera follow",
+    "B1": "Cinematic slow push-in, Indian delivery man blue jacket black bag riding motorcycle night city road, gentle camera motion, photorealistic, no text",
+    "B2": "Slow push on brown cardboard box red FRAGILE tape, night light, photorealistic, no extra text",
+    "B3": "Night apartment gate, delivery man blue jacket holding box beside a parked car, slight handheld, cinematic",
+    "B4": "Corridor, woman in saree at open door, delivery man with box, slow dolly, cinematic",
+    "B5": "Quiet living room, box on table, still camera, cinematic",
+    "B6": "Narrow Indian lane night, delivery man with box and phone, slow push, cinematic",
+    "B7": "Morning, same man riding motorcycle toward camera, soft follow, cinematic",
 }
 
 
+def gemini_key() -> str:
+    return (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+
+
 def nvidia_key() -> str:
-    return (
-        os.environ.get("NVIDIA_API_KEY")
-        or os.environ.get("NVIDIA_VICTOR_VISION_KEY")
-        or ""
-    ).strip()
+    return (os.environ.get("NVIDIA_API_KEY") or os.environ.get("NVIDIA_VICTOR_VISION_KEY") or "").strip()
 
 
-def extract_video(data: dict):
-    for k in ("b64_video", "video", "mp4"):
-        v = data.get(k)
-        if isinstance(v, str) and len(v) > 100:
-            raw = v.split(",", 1)[-1] if v.startswith("data:") else v
-            try:
-                return base64.b64decode(raw)
-            except Exception:
-                pass
-    arts = data.get("artifacts") or data.get("data") or []
-    if isinstance(arts, list):
-        for a in arts:
-            if not isinstance(a, dict):
-                continue
-            for k in ("base64", "b64_video", "video"):
-                if a.get(k):
-                    try:
-                        return base64.b64decode(a[k])
-                    except Exception:
-                        pass
+def http_json(method: str, url: str, headers: dict, body=None, timeout=180):
+    data = None if body is None else json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.load(resp)
+
+
+def find_video_uri(obj):
+    if isinstance(obj, dict):
+        vid = obj.get("video") or {}
+        if isinstance(vid, dict) and vid.get("uri"):
+            return vid["uri"]
+        if obj.get("uri") and str(obj.get("uri")).startswith("http"):
+            return obj["uri"]
+        for v in obj.values():
+            found = find_video_uri(v)
+            if found:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = find_video_uri(v)
+            if found:
+                return found
     return None
+
+
+def download_url(url: str, headers: dict) -> bytes:
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    with urllib.request.urlopen(req, timeout=180) as resp:
+        return resp.read()
+
+
+def veo_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
+    with open(png_path, "rb") as f:
+        img_b64 = base64.b64encode(f.read()).decode("ascii")
+    body = {
+        "instances": [{
+            "prompt": prompt,
+            "image": {"inlineData": {"mimeType": "image/png", "data": img_b64}},
+        }],
+        "parameters": {
+            "aspectRatio": "9:16",
+            "resolution": "720p",
+            "durationSeconds": 4,
+            "numberOfVideos": 1,
+        },
+    }
+    headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
+    last = "no veo attempt"
+    for model in VEO_MODELS:
+        url = f"{GEMINI_BASE}/models/{model}:predictLongRunning"
+        try:
+            print("Veo start", model)
+            op = http_json("POST", url, headers, body, timeout=120)
+        except urllib.error.HTTPError as e:
+            last = f"HTTP {e.code} {model} {e.read().decode('utf-8', errors='replace')[:400]}"
+            print(last)
+            continue
+        except Exception as e:
+            last = f"{model} {e}"
+            print(last)
+            continue
+        name = op.get("name")
+        if not name:
+            last = f"no operation name {model}: {json.dumps(op)[:300]}"
+            continue
+        deadline = time.time() + 420
+        while time.time() < deadline:
+            time.sleep(12)
+            try:
+                st = http_json(
+                    "GET",
+                    f"{GEMINI_BASE}/{name}",
+                    {"x-goog-api-key": api_key},
+                    timeout=60,
+                )
+            except urllib.error.HTTPError as e:
+                last = f"poll HTTP {e.code} {e.read().decode('utf-8', errors='replace')[:300]}"
+                continue
+            if st.get("error"):
+                last = f"veo error {model}: {json.dumps(st['error'])[:400]}"
+                print(last)
+                break
+            if not st.get("done"):
+                print("Veo polling", model)
+                continue
+            uri = find_video_uri(st)
+            if not uri:
+                last = f"done but no uri {model}: {json.dumps(st)[:400]}"
+                break
+            vid = download_url(uri, {"x-goog-api-key": api_key})
+            if vid and len(vid) > 1000:
+                return vid
+            last = f"empty download {model}"
+            break
+        else:
+            last = f"timeout {model}"
+    raise RuntimeError(last)
 
 
 def nvidia_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
     with open(png_path, "rb") as f:
         img_b64 = base64.b64encode(f.read()).decode("ascii")
-    bodies = [
-        {
-            "prompt": prompt,
-            "image": f"data:image/png;base64,{img_b64}",
-            "seed": 42,
-            "resolution": "480_16_9",
-            "num_output_frames": 49,
-            "fps": 16.0,
-        },
-        {"prompt": prompt, "image": img_b64, "seed": 42},
-        {"prompt": prompt, "seed": 42, "resolution": "480_16_9"},
-    ]
-    last = "no attempt"
-    for url in ENDPOINTS:
-        for body in bodies:
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(body).encode("utf-8"),
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "Authorization": f"Bearer {api_key}",
-                },
-                method="POST",
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=240) as resp:
-                    data = json.load(resp)
-                vid = extract_video(data)
-                if vid:
-                    return vid
-                last = f"no_video {url}: {json.dumps(data)[:300]}"
-            except urllib.error.HTTPError as e:
-                last = f"HTTP {e.code} {url} {e.read().decode('utf-8', errors='replace')[:300]}"
-            except Exception as e:
-                last = f"{url} {e}"
+    last = "nvidia none"
+    body = {"prompt": prompt, "image": f"data:image/png;base64,{img_b64}", "seed": 42}
+    for url in NVIDIA_ENDPOINTS:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.load(resp)
+            raw = data.get("b64_video")
+            if raw:
+                return base64.b64decode(raw.split(",", 1)[-1] if raw.startswith("data:") else raw)
+            last = f"no_video {url}"
+        except urllib.error.HTTPError as e:
+            last = f"HTTP {e.code} {url}"
+        except Exception as e:
+            last = str(e)
     raise RuntimeError(last)
 
 
@@ -123,11 +190,13 @@ def main() -> int:
     only = os.environ.get("ONLY_IDS", "B1").strip()
     ids = [x.strip() for x in only.split(",") if x.strip()] or ["B1"]
     os.makedirs(CLIPS, exist_ok=True)
-    key = nvidia_key()
+    gkey = gemini_key()
+    nkey = nvidia_key()
     log = {
         "updated": datetime.now(IST).isoformat(),
+        "gemini_key": bool(gkey),
+        "nvidia_key": bool(nkey),
         "results": {},
-        "nvidia_key": bool(key),
     }
     any_ok = False
     for pid in ids:
@@ -139,32 +208,41 @@ def main() -> int:
             continue
         used = None
         err = None
-        if key:
+        prompt = PROMPTS.get(pid, PROMPTS["B1"])
+        if gkey:
+            try:
+                print(pid, "Gemini Veo I2V...")
+                vid = veo_i2v(gkey, prompt, still)
+                with open(out, "wb") as f:
+                    f.write(vid)
+                used = "gemini_veo"
+            except Exception as e:
+                err = str(e)[:500]
+                print(pid, "Veo fail", err)
+        if used is None and nkey:
             try:
                 print(pid, "NVIDIA I2V...")
-                vid = nvidia_i2v(key, PROMPTS.get(pid, PROMPTS["B1"]), still)
+                vid = nvidia_i2v(nkey, prompt, still)
                 with open(out, "wb") as f:
                     f.write(vid)
                 used = "nvidia_i2v"
             except Exception as e:
-                err = str(e)[:500]
-                print(pid, "NVIDIA fail", err)
+                err = ((err + " | ") if err else "") + str(e)[:300]
+                print(pid, "NVIDIA fail", e)
         if used is None:
-            print(pid, "ffmpeg motion-still fallback")
+            print(pid, "ffmpeg fallback")
             ffmpeg_motion(still, out)
             used = "ffmpeg_motion_still"
-        size = os.path.getsize(out)
         log["results"][pid] = {
             "status": "ok",
             "provider": used,
-            "bytes": size,
-            "nvidia_error": err,
+            "bytes": os.path.getsize(out),
+            "error": err,
         }
-        print(pid, "OK", used, size)
+        print(pid, "OK", used, os.path.getsize(out))
         any_ok = True
     with open(os.path.join(CLIPS, "_run_log.json"), "w", encoding="utf-8") as f:
         json.dump(log, f, indent=2)
-    print("DONE any_ok", any_ok)
     return 0 if any_ok else 1
 
 

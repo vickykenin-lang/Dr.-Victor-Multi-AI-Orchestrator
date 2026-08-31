@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       only_ids:
-        description: "e.g. B1,B2,B3,B4,B5,B6,B7"
+        description: "Start with B1 to test Veo"
         required: false
-        default: "B1,B2,B3,B4,B5,B6,B7"
+        default: "B1"
 
 permissions:
   contents: write
@@ -25,6 +25,7 @@ jobs:
 
       - name: Generate clips
         env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_VICTOR_VISION_KEY: ${{ secrets.NVIDIA_VICTOR_VISION_KEY }}
           ONLY_IDS: ${{ inputs.only_ids }}
@@ -50,10 +51,8 @@ jobs:
           git config user.name vision-bot
           git config user.email vision-bot@users.noreply.github.com
           git add vision/episodes/EP001_Last_Delivery/clips/ vision/episodes/EP001_Last_Delivery/masters/ || true
-          if git diff --staged --quiet; then
-            echo nothing to commit
-          else
-            git commit -m "vision: EP001 clips+animatic ${{ inputs.only_ids }}"
+          if git diff --staged --quiet; then echo nothing; else
+            git commit -m "vision: EP001 clips ${{ inputs.only_ids }}"
             git pull --rebase origin main || git pull --rebase --autostash origin main || true
             git push
           fi
