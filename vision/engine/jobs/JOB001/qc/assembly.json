@@ -1,0 +1,7 @@
+{
+  "stage": "assembly",
+  "checked_at": "2026-08-31T23:38:05.408015+05:30",
+  "pass": true,
+  "reason": "assembly artifacts present",
+  "must_fix": []
+}
