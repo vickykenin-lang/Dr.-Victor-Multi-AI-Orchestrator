@@ -1,5 +1,6 @@
 {
-  "updated": "2026-08-31T11:52:38.473035+05:30",
+  "updated": "2026-08-31T12:05:52.302199+05:30",
+  "j2v_key": true,
   "gemini_key": true,
   "nvidia_key": true,
   "results": {
@@ -7,7 +8,7 @@
       "status": "ok",
       "provider": "ffmpeg_motion_still",
       "bytes": 239337,
-      "error": "HTTP 429 veo-3.1-lite-generate-preview {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n       | HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano"
+      "error": "J2V error: {\"success\": true, \"movie\": {\"success\": false, \"status\": \"error\", \"message\": \"Property 'zoom' is not an integer in movie/scenes[0]/elements[0]\", \"project\": \"w9MvGKIms6fraz4Y\", \"url\": null, \"thumbnail\": null, \"ass\": false, \"created_at\": \"2026-08-31T06:35:53.234Z\", \"ended_at\": \"2026-08-31T06:35:54.332Z\", \"deleted_at\": null, \"json\": \"{\\\"resolution\\\":\\\"instagram-story\\\",\\\"quality\\\":\\\"high\\\",\\\"scenes\\\": | HTTP 429 veo-3.1-lite-generate-preview {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage | nvidia skipped cosmos 404"
     }
   }
 }
