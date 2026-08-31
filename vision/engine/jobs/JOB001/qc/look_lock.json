@@ -1,0 +1,7 @@
+{
+  "stage": "look_lock",
+  "checked_at": "2026-08-31T23:33:58.801974+05:30",
+  "pass": true,
+  "reason": "look_lock artifacts present",
+  "must_fix": []
+}
