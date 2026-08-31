@@ -1,7 +1,8 @@
 const MEMORY_STOP = new Set(['the','a','an','is','are','to','of','and','or','in','on','for','me','my','ka','ki','ke','ko','hai','he','kya','aur','se','ye','vo','main','mujhe','this','that','it']);
 const LOCK_PATTERNS = [
-  /\b(lock|locked|final|permanent|remember|save|store|record)\b/i,
-  /\b(yaad\s+rakh|yaad\s+rakho|save\s+kar|store\s+kar|lock\s+kar|record\s+kar|record\s+karo)\b/i,
+  /\b(remember|save|store)\s+(this|it|this\s+decision|this\s+rule|this\s+instruction)\b/i,
+  /\b(yaad\s+rakh(?:o)?|save\s+kar(?:o)?|store\s+kar(?:o)?|lock\s+kar(?:o)?|record\s+kar(?:o)?)\b/i,
+  /\b(lock|record)\s+(this|it|this\s+decision|this\s+rule|this\s+instruction)\b/i,
 ];
 
 export function memoryTokens(text) {
