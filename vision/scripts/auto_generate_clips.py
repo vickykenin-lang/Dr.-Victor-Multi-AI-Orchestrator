@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EP001 I2V: Sora 2 first (still + prompt), then Veo."""
+"""EP001 I2V: Sora 2 first. Default YouTube 16:9 1280x720, not Reels."""
 from __future__ import annotations
 
 import json
@@ -21,6 +21,9 @@ IST = timezone(timedelta(hours=5, minutes=30))
 OPENAI = "https://api.openai.com/v1"
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
 VEO_MODELS = ["veo-3.1-generate-preview", "veo-3.1-fast-generate-preview", "veo-3.1-lite-generate-preview"]
+SORA_W = 1280
+SORA_H = 720
+SORA_SIZE = f"{SORA_W}x{SORA_H}"
 
 
 def sora_key() -> str:
@@ -60,14 +63,14 @@ def resize_still(png_path: str, w: int, h: int) -> str:
 
 
 def sora_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
-    sized = resize_still(png_path, 720, 1280)
+    sized = resize_still(png_path, SORA_W, SORA_H)
     cmd = [
         "curl", "-sS", "-X", "POST", f"{OPENAI}/videos",
         "-H", f"Authorization: Bearer {api_key}",
         "-F", "model=sora-2",
         "-F", f"prompt={prompt}",
         "-F", "seconds=4",
-        "-F", "size=720x1280",
+        "-F", f"size={SORA_SIZE}",
         "-F", f"input_reference=@{sized};type=image/png",
     ]
     raw = subprocess.check_output(cmd, timeout=120)
@@ -77,7 +80,7 @@ def sora_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
     vid = created.get("id")
     if not vid:
         raise RuntimeError(f"sora no id: {raw[:400]!r}")
-    print("Sora job", vid, created.get("status"))
+    print("Sora job", vid, created.get("status"), SORA_SIZE)
     headers = {"Authorization": f"Bearer {api_key}"}
     deadline = time.time() + 600
     last = created
@@ -132,7 +135,7 @@ def veo_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
             "prompt": prompt,
             "image": {"bytesBase64Encoded": img_b64, "mimeType": "image/png"},
         }],
-        "parameters": {"aspectRatio": "9:16"},
+        "parameters": {"aspectRatio": "16:9"},
     }
     last = "no veo"
     for model in VEO_MODELS:
@@ -170,6 +173,7 @@ def main() -> int:
     log = {
         "updated": datetime.now(IST).isoformat(),
         "mode": "i2v",
+        "size": SORA_SIZE,
         "sora_key": bool(skey),
         "gemini_key": bool(gkey),
         "results": {},
@@ -182,12 +186,12 @@ def main() -> int:
             log["results"][pid] = {"status": "no_still"}
             continue
         action = video_prompt(pid)
-        print(pid, "PROMPT_CHARS", len(action))
+        print(pid, "PROMPT_CHARS", len(action), "SIZE", SORA_SIZE)
         used = None
         err = None
         if skey:
             try:
-                print(pid, "Sora 2 I2V...")
+                print(pid, "Sora 2 I2V 16:9...")
                 vid = sora_i2v(skey, action, still)
                 with open(out, "wb") as f:
                     f.write(vid)
@@ -197,14 +201,12 @@ def main() -> int:
                 print(pid, "Sora fail", err)
         if used is None and gkey:
             try:
-                print(pid, "Veo I2V...")
                 vid = veo_i2v(gkey, action, still)
                 with open(out, "wb") as f:
                     f.write(vid)
                 used = "gemini_veo_i2v"
             except Exception as e:
                 err = ((err + " | ") if err else "") + str(e)[:300]
-                print(pid, "Veo fail", err)
         if used is None:
             log["results"][pid] = {
                 "status": "failed",
@@ -217,6 +219,7 @@ def main() -> int:
             "status": "ok",
             "provider": used,
             "bytes": os.path.getsize(out),
+            "size": SORA_SIZE,
             "action_prompt": action,
             "error": err,
         }
