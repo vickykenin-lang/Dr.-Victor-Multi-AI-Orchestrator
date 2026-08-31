@@ -1,0 +1,81 @@
+name: Diagnose AURA3 Dispatch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-aura3-dispatch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Add precise AURA3 dispatch diagnosis
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('victor-telegram-worker/worker.js')
+          s=p.read_text(encoding='utf-8')
+          old="""          } catch (error) {\n            console.error('AURA3 dispatch failed:', safeErrorMessage(error));\n            await sendTelegramMessage(env, chatId, 'AURA3 ko task dispatch nahi hua. Victor ne failure record kiya hai; duplicate retry nahi karega.', message.message_id);\n            return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });\n          }"""
+          new="""          } catch (error) {\n            console.error('AURA3 dispatch failed:', safeErrorMessage(error));\n            const diagnosis = await diagnoseAura3DispatchFailure(env, error);\n            await sendTelegramMessage(env, chatId, diagnosis.message, message.message_id);\n            return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED', diagnosis: diagnosis.code });\n          }"""
+          if old not in s: raise SystemExit('AURA3_CATCH_ANCHOR_NOT_FOUND')
+          s=s.replace(old,new,1)
+          anchor='function sanitizeRuntimeError(error) {'
+          helper=r'''async function diagnoseAura3DispatchFailure(env, error) {
+  const raw = safeErrorMessage(error);
+  const http = Number((raw.match(/AURA3 dispatch HTTP\s+(\d{3})/i) || [])[1] || 0);
+  const token = env.GITHUB_ORCHESTRATION_TOKEN;
+  if (!token) return { code: 'TOKEN_MISSING', message: 'AURA3 dispatch blocked: orchestration token runtime me available nahi hai.' };
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'Dr-Victor-AURA3-Diagnosis/1.0',
+  };
+  try {
+    const [repoRes, wfRes] = await Promise.all([
+      fetch('https://api.github.com/repos/vickykenin-lang/aura-3.0', { headers }),
+      fetch('https://api.github.com/repos/vickykenin-lang/aura-3.0/actions/workflows/victor-aura3-transport.yml', { headers }),
+    ]);
+    if (!repoRes.ok) {
+      return { code: `REPO_ACCESS_${repoRes.status}`, message: `AURA3 dispatch blocked: existing orchestration token ko aura-3.0 repository access nahi mil raha (HTTP ${repoRes.status}). Token ke repository access me aura-3.0 include karna hoga.` };
+    }
+    if (!wfRes.ok) {
+      return { code: `WORKFLOW_ACCESS_${wfRes.status}`, message: `AURA3 dispatch blocked: repository readable hai, lekin AURA3 Actions workflow access fail hai (HTTP ${wfRes.status}). Existing token ki Actions permission verify/update karni hogi.` };
+    }
+    if (http === 403) return { code: 'ACTIONS_WRITE_403', message: 'AURA3 repository aur workflow readable hain, lekin workflow dispatch write permission denied hai (HTTP 403). Existing orchestration token me AURA3 ke liye Actions: Read and write enable karna hoga.' };
+    if (http === 404) return { code: 'DISPATCH_404', message: 'AURA3 repository/workflow read ho rahe hain, lekin dispatch endpoint 404 de raha hai. Token repository selection ya Actions scope inconsistent hai.' };
+    if (http === 422) return { code: 'DISPATCH_422', message: 'AURA3 workflow mila, lekin dispatch payload/ref reject hua (HTTP 422). Victor task schema/ref ko repair karna hoga.' };
+    if (http === 401) return { code: 'TOKEN_401', message: 'AURA3 dispatch authentication reject hui (HTTP 401). Existing orchestration token invalid/expired ho sakta hai.' };
+    return { code: http ? `DISPATCH_HTTP_${http}` : 'DISPATCH_UNKNOWN', message: `AURA3 dispatch fail hua${http ? ` (HTTP ${http})` : ''}. Repository aur workflow read path available hai; dispatch permission/runtime error ko further inspect karna hoga.` };
+  } catch (_) {
+    return { code: http ? `DISPATCH_HTTP_${http}` : 'DIAG_FAILED', message: `AURA3 dispatch fail hua${http ? ` (HTTP ${http})` : ''}. Permission diagnosis bhi complete nahi hua.` };
+  }
+}
+
+'''
+          if anchor not in s: raise SystemExit('HELPER_ANCHOR_NOT_FOUND')
+          s=s.replace(anchor,helper+anchor,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Syntax check
+        run: node --check victor-telegram-worker/worker.js
+      - name: Commit and cleanup
+        run: |
+          rm -f .github/workflows/diagnose-aura3-dispatch.yml
+          git config user.name "victor-aura3-diagnosis"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "runtime: diagnose AURA3 dispatch permission failures"
+          git pull --rebase --autostash origin main
+          git push origin HEAD:main
