@@ -291,7 +291,14 @@ export default {
             await sendTelegramMessage(env, chatId, 'RIO bridge configured nahi hai.', message.message_id);
             return json({ ok: true, mode: plan.mode, target, configured: false });
           }
-          const dispatch = await dispatchRioTask(env, text, { messageId: message.message_id });
+          let dispatch;
+          try {
+            dispatch = await dispatchRioTask(env, text, { messageId: message.message_id });
+          } catch (error) {
+            console.error('RIO dispatch failed:', safeErrorMessage(error));
+            await sendTelegramMessage(env, chatId, 'RIO ko task dispatch nahi hua. Victor ne failure record kiya hai; duplicate retry nahi karega.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
+          }
           await sendTelegramMessage(env, chatId, `RIO ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
           ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
@@ -307,7 +314,14 @@ export default {
             await sendTelegramMessage(env, chatId, 'Tony bridge configured nahi hai.', message.message_id);
             return json({ ok: true, mode: plan.mode, target, configured: false });
           }
-          const dispatch = await dispatchTonyTask(env, text, { messageId: message.message_id });
+          let dispatch;
+          try {
+            dispatch = await dispatchTonyTask(env, text, { messageId: message.message_id });
+          } catch (error) {
+            console.error('Tony dispatch failed:', safeErrorMessage(error));
+            await sendTelegramMessage(env, chatId, 'Tony ko task dispatch nahi hua. Victor ne failure record kiya hai; duplicate retry nahi karega.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
+          }
           await sendTelegramMessage(env, chatId, `Tony ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
           ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
@@ -323,7 +337,14 @@ export default {
             await sendTelegramMessage(env, chatId, 'AURA3 bridge configured nahi hai.', message.message_id);
             return json({ ok: true, mode: plan.mode, target, configured: false });
           }
-          const dispatch = await dispatchAura3Task(env, text, { messageId: message.message_id });
+          let dispatch;
+          try {
+            dispatch = await dispatchAura3Task(env, text, { messageId: message.message_id });
+          } catch (error) {
+            console.error('AURA3 dispatch failed:', safeErrorMessage(error));
+            await sendTelegramMessage(env, chatId, 'AURA3 ko task dispatch nahi hua. Victor ne failure record kiya hai; duplicate retry nahi karega.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
+          }
           await sendTelegramMessage(env, chatId, `AURA3 ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
           ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
@@ -371,7 +392,7 @@ export default {
       try {
         await sendTelegramMessage(env, chatId, diagnostic.founderMessage(traceId), message.message_id);
       } catch (_) {}
-      return json({ ok: false, error: diagnostic.category, trace_id: traceId }, 500);
+      return json({ ok: false, error: diagnostic.category, trace_id: traceId, acknowledged: true }, 200);
     }
   },
 };
@@ -737,7 +758,7 @@ export function classifyProcessingError(error, stage = 'UNKNOWN') {
 
   if (!knownCode && stage === 'TELEGRAM_DELIVERY') category = 'TELEGRAM_DELIVERY_FAILED';
   else if (!knownCode && stage === 'MEMORY_WRITE') category = 'MEMORY_PROCESSING_FAILED';
-  else if (!knownCode && stage === 'DEPARTMENT_ROUTING') category = 'DEPARTMENT_ROUTING_FAILED';
+  else if (!knownCode && ['DEPARTMENT_ROUTING', 'DEPARTMENT_EXECUTION'].includes(stage)) category = 'DEPARTMENT_ROUTING_FAILED';
 
   const messages = {
     AI_CREDENTIAL_MISSING: 'Victor ki AI credential configuration missing hai.',
