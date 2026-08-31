@@ -4,18 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "create_job or run_stage"
+        description: "create_job | run_stage | topic_ok | look_ok | master_ok"
         required: true
-        default: "run_stage"
+        default: "create_job"
       job_id:
-        description: "Job folder name, e.g. JOB001"
+        description: "JOB001"
         required: true
       topic:
-        description: "Only for create_job"
+        description: "create_job only"
         required: false
         default: ""
       length:
-        description: "Target length, e.g. 10min"
         required: false
         default: "10min"
       language:
@@ -36,7 +35,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Run production engine
         env:
           ENGINE_ACTION: ${{ inputs.action }}
@@ -46,7 +44,6 @@ jobs:
           LANGUAGE: ${{ inputs.language }}
           PLATFORM: ${{ inputs.platform }}
         run: python3 vision/scripts/production_engine.py
-
       - name: Commit job state
         if: always()
         run: |
