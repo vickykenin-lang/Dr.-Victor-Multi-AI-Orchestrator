@@ -1,0 +1,3 @@
+# Shot plan
+
+shots: pending

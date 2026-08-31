@@ -1,6 +1,6 @@
 {
   "job_id": "JOB001",
-  "stage": "screenplay",
+  "stage": "look_lock",
   "owner_gates": {
     "topic_ok": true,
     "look_ok": false,
@@ -8,12 +8,13 @@
   },
   "retries": {
     "intake": 0,
-    "development": 0
+    "development": 0,
+    "screenplay": 0
   },
   "last_director": {
     "pass": true,
-    "reason": "development artifacts present",
+    "reason": "screenplay artifacts present",
     "must_fix": []
   },
-  "updated": "2026-08-31T23:29:28.576550+05:30"
+  "updated": "2026-08-31T23:30:40.025778+05:30"
 }
