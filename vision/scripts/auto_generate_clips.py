@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EP001 clips: Gemini Veo I2V primary (GEMINI_VIO_API_KEY), NVIDIA, ffmpeg."""
+"""EP001 clips: JSON2Video -> Veo -> NVIDIA -> ffmpeg."""
 from __future__ import annotations
 
 import base64
@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
 
@@ -16,25 +17,35 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 STILLS = os.path.join(ROOT, "episodes", "EP001_Last_Delivery", "stills")
 CLIPS = os.path.join(ROOT, "episodes", "EP001_Last_Delivery", "clips")
 IST = timezone(timedelta(hours=5, minutes=30))
+RAW_STILL = (
+    "https://raw.githubusercontent.com/vickykenin-lang/Dr.-Victor-Multi-AI-Orchestrator/"
+    "main/vision/episodes/EP001_Last_Delivery/stills/{pid}.png"
+)
+J2V = "https://api.json2video.com/v2/movies"
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
-VEO_MODELS = [
-    "veo-3.1-generate-preview",
-    "veo-3.1-fast-generate-preview",
-    "veo-3.1-lite-generate-preview",
-]
+VEO_MODELS = ["veo-3.1-generate-preview", "veo-3.1-fast-generate-preview", "veo-3.1-lite-generate-preview"]
 NVIDIA_ENDPOINTS = [
     "https://ai.api.nvidia.com/v1/genai/nvidia/cosmos3-nano",
     "https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano",
 ]
 PROMPTS = {
-    "B1": "Cinematic slow push-in, Indian delivery man blue jacket black bag riding motorcycle night city road, gentle camera motion, photorealistic, no text",
-    "B2": "Slow push on brown cardboard box red FRAGILE tape, night light, photorealistic, no extra text",
-    "B3": "Night apartment gate, delivery man blue jacket holding box beside a parked car, slight handheld, cinematic",
-    "B4": "Corridor, woman in saree at open door, delivery man with box, slow dolly, cinematic",
-    "B5": "Quiet living room, box on table, still camera, cinematic",
-    "B6": "Narrow Indian lane night, delivery man with box and phone, slow push, cinematic",
-    "B7": "Morning, same man riding motorcycle toward camera, soft follow, cinematic",
+    "B1": "Cinematic slow push-in, Indian delivery man blue jacket black bag riding motorcycle night city road",
+    "B2": "Slow push on brown cardboard box red FRAGILE tape",
+    "B3": "Night apartment gate, delivery man with box beside parked car",
+    "B4": "Corridor, woman in saree at door, delivery man with box",
+    "B5": "Quiet living room, box on table",
+    "B6": "Narrow Indian lane night, delivery man with box and phone",
+    "B7": "Morning, man riding motorcycle toward camera",
 }
+
+
+def j2v_key() -> str:
+    for name in ("JASON2VIDEO_API_KEY", "JSON2VIDEO_API_KEY"):
+        val = (os.environ.get(name) or "").strip()
+        if val:
+            print("using", name, "len", len(val))
+            return val
+    return ""
 
 
 def gemini_key() -> str:
@@ -55,9 +66,82 @@ def http_json(method: str, url: str, headers: dict, body=None, timeout=180):
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         raw = resp.read()
-        if not raw:
-            return {}
-        return json.loads(raw.decode("utf-8"))
+        return json.loads(raw.decode("utf-8")) if raw else {}
+
+
+def find_url(obj):
+    if isinstance(obj, dict):
+        for k in ("url", "movieUrl", "result", "videoUrl", "download_url"):
+            v = obj.get(k)
+            if isinstance(v, str) and v.startswith("http") and (".mp4" in v or "json2video" in v or "video" in v):
+                return v
+        for v in obj.values():
+            found = find_url(v)
+            if found:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = find_url(v)
+            if found:
+                return found
+    return None
+
+
+def download_url(url: str, headers=None) -> bytes:
+    req = urllib.request.Request(url, headers=headers or {}, method="GET")
+    with urllib.request.urlopen(req, timeout=180) as resp:
+        return resp.read()
+
+
+def json2video_clip(api_key: str, pid: str) -> bytes:
+    src = RAW_STILL.format(pid=pid)
+    body = {
+        "resolution": "instagram-story",
+        "quality": "high",
+        "scenes": [{
+            "duration": 5,
+            "elements": [{
+                "type": "image",
+                "src": src,
+                "duration": 5,
+                "zoom": 1.12,
+            }],
+        }],
+    }
+    headers = {"Content-Type": "application/json", "x-api-key": api_key}
+    print("JSON2Video POST", pid, src)
+    try:
+        created = http_json("POST", J2V, headers, body, timeout=60)
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"J2V HTTP {e.code} {e.read().decode('utf-8', errors='replace')[:400]}")
+    project = created.get("project") or created.get("id") or (created.get("movie") or {}).get("project")
+    if not project:
+        raise RuntimeError(f"J2V no project: {json.dumps(created)[:400]}")
+    print("JSON2Video project", project)
+    deadline = time.time() + 300
+    last = created
+    while time.time() < deadline:
+        time.sleep(5)
+        try:
+            st = http_json("GET", f"{J2V}?project={urllib.parse.quote(str(project))}", {"x-api-key": api_key}, timeout=60)
+        except urllib.error.HTTPError as e:
+            last = {"poll_error": e.read().decode("utf-8", errors="replace")[:300]}
+            continue
+        last = st
+        movie = st.get("movie") or st
+        status = (movie.get("status") if isinstance(movie, dict) else None) or st.get("status")
+        print("JSON2Video status", status)
+        if status in ("error", "failed", "timeout"):
+            raise RuntimeError(f"J2V {status}: {json.dumps(st)[:400]}")
+        if status in ("done", "success", "finished", "complete", "completed"):
+            url = find_url(st)
+            if not url:
+                raise RuntimeError(f"J2V done no url: {json.dumps(st)[:500]}")
+            vid = download_url(url)
+            if not vid or len(vid) < 1000:
+                raise RuntimeError("J2V empty mp4")
+            return vid
+    raise RuntimeError(f"J2V timeout: {json.dumps(last)[:400]}")
 
 
 def find_video_uri(obj):
@@ -79,103 +163,44 @@ def find_video_uri(obj):
     return None
 
 
-def download_url(url: str, headers: dict) -> bytes:
-    req = urllib.request.Request(url, headers=headers, method="GET")
-    with urllib.request.urlopen(req, timeout=180) as resp:
-        return resp.read()
-
-
-def veo_bodies(prompt: str, img_b64: str):
-    img_a = {"bytesBase64Encoded": img_b64, "mimeType": "image/png"}
-    img_b = {"inlineData": {"mimeType": "image/png", "data": img_b64}}
-    return [
-        {"instances": [{"prompt": prompt, "image": img_a}], "parameters": {"aspectRatio": "9:16", "resolution": "720p"}},
-        {"instances": [{"prompt": prompt, "image": img_a}]},
-        {"instances": [{"prompt": prompt, "image": img_b}], "parameters": {"aspectRatio": "9:16"}},
-        {"instances": [{"prompt": prompt}]},
-    ]
-
-
 def veo_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
     with open(png_path, "rb") as f:
         img_b64 = base64.b64encode(f.read()).decode("ascii")
     headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
-    last = "no veo attempt"
+    img = {"bytesBase64Encoded": img_b64, "mimeType": "image/png"}
+    body = {"instances": [{"prompt": prompt, "image": img}], "parameters": {"aspectRatio": "9:16"}}
+    last = "no veo"
     for model in VEO_MODELS:
         url = f"{GEMINI_BASE}/models/{model}:predictLongRunning"
-        for body in veo_bodies(prompt, img_b64):
-            try:
-                print("Veo start", model)
-                op = http_json("POST", url, headers, body, timeout=120)
-            except urllib.error.HTTPError as e:
-                last = f"HTTP {e.code} {model} {e.read().decode('utf-8', errors='replace')[:350]}"
-                print(last)
-                continue
-            except Exception as e:
-                last = f"{model} {e}"
-                print(last)
-                continue
-            name = op.get("name")
-            if not name:
-                last = f"no op name {model}: {json.dumps(op)[:300]}"
-                continue
-            deadline = time.time() + 420
-            while time.time() < deadline:
-                time.sleep(12)
-                try:
-                    st = http_json("GET", f"{GEMINI_BASE}/{name}", {"x-goog-api-key": api_key}, timeout=60)
-                except urllib.error.HTTPError as e:
-                    last = f"poll HTTP {e.code} {e.read().decode('utf-8', errors='replace')[:300]}"
-                    continue
-                if st.get("error"):
-                    last = f"veo error {model}: {json.dumps(st['error'])[:400]}"
-                    print(last)
-                    break
-                if not st.get("done"):
-                    print("Veo polling", model)
-                    continue
-                uri = find_video_uri(st)
-                if not uri:
-                    last = f"done no uri {model}: {json.dumps(st)[:400]}"
-                    break
-                vid = download_url(uri, {"x-goog-api-key": api_key})
-                if vid and len(vid) > 1000:
-                    return vid
-                last = f"empty download {model}"
+        try:
+            op = http_json("POST", url, headers, body, timeout=60)
+        except urllib.error.HTTPError as e:
+            last = f"HTTP {e.code} {model} {e.read().decode('utf-8', errors='replace')[:250]}"
+            print(last)
+            continue
+        name = op.get("name")
+        if not name:
+            last = f"no op {model}"
+            continue
+        deadline = time.time() + 300
+        while time.time() < deadline:
+            time.sleep(12)
+            st = http_json("GET", f"{GEMINI_BASE}/{name}", {"x-goog-api-key": api_key}, timeout=60)
+            if st.get("error"):
+                last = json.dumps(st["error"])[:300]
                 break
-            else:
-                last = f"timeout {model}"
+            if not st.get("done"):
+                continue
+            uri = find_video_uri(st)
+            if uri:
+                return download_url(uri, {"x-goog-api-key": api_key})
+            last = "done no uri"
+            break
     raise RuntimeError(last)
 
 
 def nvidia_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
-    with open(png_path, "rb") as f:
-        img_b64 = base64.b64encode(f.read()).decode("ascii")
-    last = "nvidia none"
-    body = {"prompt": prompt, "image": f"data:image/png;base64,{img_b64}", "seed": 42}
-    for url in NVIDIA_ENDPOINTS:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(body).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "Authorization": f"Bearer {api_key}",
-            },
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = json.load(resp)
-            raw = data.get("b64_video")
-            if raw:
-                return base64.b64decode(raw.split(",", 1)[-1] if raw.startswith("data:") else raw)
-            last = f"no_video {url}"
-        except urllib.error.HTTPError as e:
-            last = f"HTTP {e.code} {url}"
-        except Exception as e:
-            last = str(e)
-    raise RuntimeError(last)
+    raise RuntimeError("nvidia skipped cosmos 404")
 
 
 def ffmpeg_motion(png_path: str, out_path: str) -> None:
@@ -192,10 +217,12 @@ def main() -> int:
     only = os.environ.get("ONLY_IDS", "B1").strip()
     ids = [x.strip() for x in only.split(",") if x.strip()] or ["B1"]
     os.makedirs(CLIPS, exist_ok=True)
+    jkey = j2v_key()
     gkey = gemini_key()
     nkey = nvidia_key()
     log = {
         "updated": datetime.now(IST).isoformat(),
+        "j2v_key": bool(jkey),
         "gemini_key": bool(gkey),
         "nvidia_key": bool(nkey),
         "results": {},
@@ -210,16 +237,26 @@ def main() -> int:
         used = None
         err = None
         prompt = PROMPTS.get(pid, PROMPTS["B1"])
-        if gkey:
+        if jkey:
             try:
-                print(pid, "Gemini Veo I2V...")
+                print(pid, "JSON2Video...")
+                vid = json2video_clip(jkey, pid)
+                with open(out, "wb") as f:
+                    f.write(vid)
+                used = "json2video"
+            except Exception as e:
+                err = str(e)[:500]
+                print(pid, "J2V fail", err)
+        if used is None and gkey:
+            try:
+                print(pid, "Veo...")
                 vid = veo_i2v(gkey, prompt, still)
                 with open(out, "wb") as f:
                     f.write(vid)
                 used = "gemini_veo"
             except Exception as e:
-                err = str(e)[:600]
-                print(pid, "Veo fail", err)
+                err = ((err + " | ") if err else "") + str(e)[:300]
+                print(pid, "Veo fail", e)
         if used is None and nkey:
             try:
                 vid = nvidia_i2v(nkey, prompt, still)
@@ -227,7 +264,7 @@ def main() -> int:
                     f.write(vid)
                 used = "nvidia_i2v"
             except Exception as e:
-                err = ((err + " | ") if err else "") + str(e)[:200]
+                err = ((err + " | ") if err else "") + str(e)[:150]
         if used is None:
             ffmpeg_motion(still, out)
             used = "ffmpeg_motion_still"
