@@ -1,0 +1,7 @@
+{
+  "stage": "keyframes",
+  "checked_at": "2026-08-31T23:34:55.282593+05:30",
+  "pass": true,
+  "reason": "keyframes artifacts present",
+  "must_fix": []
+}
