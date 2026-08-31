@@ -1,22 +1,22 @@
 {
-  "updated": "2026-08-31T08:26:35.313786+05:30",
+  "updated": "2026-08-31T11:00:24.169580+05:30",
   "provider": "NVIDIA",
   "results": {
     "B2": {
       "status": "ok",
-      "bytes": 51822
+      "bytes": 49453
     },
     "B3": {
       "status": "ok",
-      "bytes": 67143
+      "bytes": 72649
     },
     "B6": {
       "status": "ok",
-      "bytes": 82215
+      "bytes": 84947
     },
     "B7": {
       "status": "ok",
-      "bytes": 80587
+      "bytes": 92888
     }
   }
 }
