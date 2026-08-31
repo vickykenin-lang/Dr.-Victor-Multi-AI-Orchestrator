@@ -37,7 +37,6 @@ import {
 
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
-import { classifyTelegramBrainIntent, buildCrossDepartmentSupportPrompt } from '../brain/telegram_gateway.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
@@ -259,193 +258,76 @@ export default {
         }
       }
 
-      const entity = resolveFounderEntityQuery(text);
-      const brainIntent = classifyTelegramBrainIntent(text, {
-        entity,
-        replyText: message?.reply_to_message?.text || '',
-      });
+      processingStage = 'REQUEST_PLANNING';
+      const plan = await planFounderRequest(env, text, message?.reply_to_message?.text || '');
 
-      if (!memoryDirective && brainIntent.mode === 'EXECUTIVE_GOAL_REVIEW') {
-        processingStage = 'BRAIN_EXECUTIVE_GOAL_REVIEW';
-        const brainController = { cron: '*/15 * * * *', scheduledTime: Date.now() };
-        let brainResult;
-        try {
-          brainResult = await runAutonomousCycle(brainController, env);
-          await persistAutonomyEvidence(env, brainController, brainResult);
-        } catch (brainError) {
-          console.error('Victor Brain Telegram cycle failed:', brainError?.message || 'unknown');
-          await sendTelegramMessage(env, chatId, 'Victor Brain cycle execute nahi hua. Main direct department keyword-routing par silently fallback nahi karunga; runtime evidence check required hai.', message.message_id);
-          return json({ ok: false, brain_gateway: 'FAILED' }, 503);
-        }
-        const brainPhase = brainResult?.result?.phase || brainResult?.result?.assessment?.phase || 'EXECUTIVE_REVIEW';
-        const brainTaskId = brainResult?.result?.taskId || null;
-        const assessment = brainResult?.result?.assessment || {};
-        const rootCause = assessment.rootCause || null;
-        const solution = assessment.solution || null;
-        const nextAction = assessment.nextAction || null;
-        const evidenceCount = Array.isArray(assessment.evidence) ? assessment.evidence.length : 0;
-        const goalOutcome = assessment.goalAchieved === true
-          ? 'ACHIEVED_VERIFIED'
-          : (brainResult.status === 'GOAL_PROGRESS_VERIFIED' ? 'IN_PROGRESS' : 'NOT_VERIFIED');
-        const lines = [
-          'Victor Brain executive result',
-          `Status: ${brainResult.status}`,
-          `Goal: ${brainResult.goalId || 'none'}`,
-          `Goal outcome: ${goalOutcome}`,
-          `Route: ${brainResult.target || 'none'}`,
-          `Mode: ${brainPhase}`,
-          rootCause ? `Root cause: ${rootCause}` : (brainPhase === 'FIVE_WHYS_DIAGNOSIS' ? 'Root cause: NOT_VERIFIED' : null),
-          solution ? `Decision/Solution: ${solution}` : null,
-          nextAction ? `Next action: ${nextAction}` : null,
-          `Evidence items: ${evidenceCount}`,
-          brainTaskId ? `Task ID: ${brainTaskId}` : null,
-        ].filter(Boolean);
-        await sendTelegramMessage(env, chatId, lines.join('\n'), message.message_id);
-        return json({ ok: true, brain_gateway: 'EXECUTED', result: brainResult });
+      if (!memoryDirective && plan.mode === 'EXECUTIVE_GOAL') {
+        processingStage = 'EXECUTIVE_EXECUTION';
+        const controller = { cron: 'founder-command', scheduledTime: Date.now() };
+        const result = await runAutonomousCycle(controller, env);
+        await persistAutonomyEvidence(env, controller, result);
+        const assessment = result?.result?.assessment || {};
+        const summary = [
+          assessment.rootCause ? `Root cause: ${assessment.rootCause}` : null,
+          assessment.solution ? `Decision: ${assessment.solution}` : null,
+          assessment.nextAction ? `Next: ${assessment.nextAction}` : null,
+          result?.result?.taskId ? `Task: ${result.result.taskId}` : null,
+        ].filter(Boolean).join('\n');
+        await sendTelegramMessage(env, chatId, summary || `Victor ne objective par executive cycle chala diya. Status: ${result.status}.`, message.message_id);
+        return json({ ok: true, mode: plan.mode, result });
       }
 
-      if (!memoryDirective && brainIntent.mode === 'CROSS_DEPARTMENT_SUPPORT') {
-        processingStage = 'BRAIN_CROSS_DEPARTMENT_SUPPORT';
-        const plan = brainIntent.plan || {};
-        if (plan.department !== 'tony_stark') {
-          await sendTelegramMessage(env, chatId, 'Brain ne cross-department task identify kiya, lekin requested support department ka direct governed bridge available nahi hai. Unsafe fallback nahi kiya gaya.', message.message_id);
-          return json({ ok: true, brain_gateway: 'UNSUPPORTED_SUPPORT_DEPARTMENT', department: plan.department || null });
-        }
-        const tonyPause = await isExecutionPaused(env, 'tony_stark');
-        if (tonyPause.paused) {
-          const reason = tonyPause.global_pause_active ? 'SYSTEM PAUSE active hai.' : 'Tony Stark department PAUSED hai.';
-          await sendTelegramMessage(env, chatId, `Brain task dispatch refused: ${reason}`, message.message_id);
-          return json({ ok: true, brain_gateway: 'PAUSED', pause: tonyPause });
-        }
-        if (!tonyBridgeConfigured(env)) {
-          await sendTelegramMessage(env, chatId, 'Brain ne Tony-compatible support task banaya, lekin Tony governed bridge configured nahi hai.', message.message_id);
-          return json({ ok: true, brain_gateway: 'PENDING_CONFIGURATION' });
-        }
-        const taskPrompt = buildCrossDepartmentSupportPrompt(plan, text);
-        let dispatch;
-        try {
-          dispatch = await dispatchTonyTask(env, taskPrompt, { messageId: message.message_id });
-        } catch (bridgeError) {
-          console.error('Brain Tony support dispatch failed:', bridgeError?.message || 'unknown');
-          await sendTelegramMessage(env, chatId, 'Brain ne task decompose kiya, lekin Tony dispatch fail hua. Connection success claim nahi kiya jayega.', message.message_id);
-          return json({ ok: true, brain_gateway: 'DISPATCH_FAILED' });
-        }
-        await sendTelegramMessage(env, chatId, `Victor Brain ne Founder instruction ko Tony-compatible RIO support task me convert karke dispatch kiya. Task ID: ${dispatch.taskId}.`, message.message_id);
-        ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
-        return json({ ok: true, brain_gateway: 'CROSS_DEPARTMENT_DISPATCHED', task_id: dispatch.taskId });
-      }
+      if (!memoryDirective && (plan.mode === 'DEPARTMENT_STATUS' || plan.mode === 'DEPARTMENT_ACTION')) {
+        processingStage = 'DEPARTMENT_EXECUTION';
+        const target = plan.target;
 
-      processingStage = 'DEPARTMENT_ROUTING';
-      if (!memoryDirective && shouldContactRio(text, entity)) {
-        const rioPause = await isExecutionPaused(env, 'rio');
-        if (rioPause.paused) {
-          const reason = rioPause.global_pause_active ? 'SYSTEM PAUSE active hai.' : 'RIO department PAUSED hai; Victor aur baaki departments running reh sakte hain.';
-          await sendTelegramMessage(env, chatId, `RIO dispatch refused: ${reason}`, message.message_id);
-          return json({ ok: true, rio_bridge: 'PAUSED', pause: rioPause });
-        }
-        if (!rioBridgeConfigured(env)) {
-          await sendTelegramMessage(env, chatId, 'RIO governed bridge code ready hai, lekin GITHUB_ORCHESTRATION_TOKEN configured nahi hai. Token ke bina fresh round-trip verify nahi hoga.', message.message_id);
-          return json({ ok: true, rio_bridge: 'PENDING_CONFIGURATION' });
-        }
-        let dispatch;
-        try {
-          dispatch = await dispatchRioTask(env, text, { messageId: message.message_id });
-        } catch (bridgeError) {
-          console.error('RIO dispatch failed:', bridgeError?.message || 'unknown');
-          await sendTelegramMessage(env, chatId, 'RIO ko governed task dispatch nahi hua. Orchestration token aur RIO Actions permission verify karni hogi. Main connection success claim nahi karunga.', message.message_id);
-          return json({ ok: true, rio_bridge: 'DISPATCH_FAILED' });
-        }
-        const rioActivationCommand = /\b(activat(?:e|ion)?|start|resume|self.?mode)\b|kaam par/i.test(text);
-        const rioDispatchMessage = rioActivationCommand
-          ? `Founder authority recognized. RIO ACTIVE_GOVERNED SELF_MODE mein hai. Fresh priority/execution verification bhej diya hai; Task ID: ${dispatch.taskId}.`
-          : `RIO ko direct ${dispatch.taskType} bhej diya hai. Task ID: ${dispatch.taskId}. Fresh revert verify hone tak connection certified nahi hai.`;
-        await sendTelegramMessage(env, chatId, rioDispatchMessage, message.message_id);
-        ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
-        return json({ ok: true, rio_bridge: dispatch.status, task_id: dispatch.taskId });
-      }
-
-      if (!memoryDirective && shouldContactTony(text, entity)) {
-        const tonyPause = await isExecutionPaused(env, 'tony_stark');
-        if (tonyPause.paused) {
-          const reason = tonyPause.global_pause_active ? 'SYSTEM PAUSE active hai.' : 'Tony Stark department PAUSED hai; Victor aur baaki departments running reh sakte hain.';
-          await sendTelegramMessage(env, chatId, `Tony Stark dispatch refused: ${reason}`, message.message_id);
-          return json({ ok: true, tony_bridge: 'PAUSED', pause: tonyPause });
-        }
-        if (!tonyBridgeConfigured(env)) {
-          await sendTelegramMessage(
-            env,
-            chatId,
-            'Tony Stark diagnostic bridge code ready hai, lekin runtime orchestration token configured nahi hai. GITHUB_ORCHESTRATION_TOKEN configure hote hi Victor fresh governed round-trip chala sakta hai.',
-            message.message_id,
-          );
-          return json({ ok: true, tony_bridge: 'PENDING_CONFIGURATION' });
+        if (target === 'rio') {
+          const pause = await isExecutionPaused(env, 'rio');
+          if (pause.paused) {
+            await sendTelegramMessage(env, chatId, 'RIO paused hai; task dispatch nahi kiya.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, paused: true });
+          }
+          if (!rioBridgeConfigured(env)) {
+            await sendTelegramMessage(env, chatId, 'RIO bridge configured nahi hai.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, configured: false });
+          }
+          const dispatch = await dispatchRioTask(env, text, { messageId: message.message_id });
+          await sendTelegramMessage(env, chatId, `RIO ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
+          ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
+          return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
         }
 
-        let dispatch;
-        try {
-          dispatch = await dispatchTonyTask(env, text, { messageId: message.message_id });
-        } catch (bridgeError) {
-          console.error('Tony dispatch failed:', bridgeError?.message || 'unknown');
-          await sendTelegramMessage(
-            env,
-            chatId,
-            'Tony Stark ko governed task dispatch nahi hua. Orchestration token/repository Actions permission verify karni hogi. Main communication success claim nahi karunga.',
-            message.message_id,
-          );
-          return json({ ok: true, tony_bridge: 'DISPATCH_FAILED' });
+        if (target === 'tony_stark') {
+          const pause = await isExecutionPaused(env, 'tony_stark');
+          if (pause.paused) {
+            await sendTelegramMessage(env, chatId, 'Tony paused hai; task dispatch nahi kiya.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, paused: true });
+          }
+          if (!tonyBridgeConfigured(env)) {
+            await sendTelegramMessage(env, chatId, 'Tony bridge configured nahi hai.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, configured: false });
+          }
+          const dispatch = await dispatchTonyTask(env, text, { messageId: message.message_id });
+          await sendTelegramMessage(env, chatId, `Tony ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
+          ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
+          return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
         }
 
-        await sendTelegramMessage(
-          env,
-          chatId,
-          `Tony Stark ko direct ${dispatch.taskType} bhej diya hai. Task ID: ${dispatch.taskId}. Victor fresh revert verify karega; tab tak connection certified nahi hai.`,
-          message.message_id,
-        );
-
-        ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
-        return json({ ok: true, tony_bridge: dispatch.status, task_id: dispatch.taskId });
-      }
-
-      if (!memoryDirective && shouldContactAura3(text, entity)) {
-        const aura3Pause = await isExecutionPaused(env, 'aura3');
-        if (aura3Pause.paused) {
-          const reason = aura3Pause.global_pause_active ? 'SYSTEM PAUSE active hai.' : 'AURA3 department PAUSED hai; Victor aur baaki departments running reh sakte hain.';
-          await sendTelegramMessage(env, chatId, `AURA3 dispatch refused: ${reason}`, message.message_id);
-          return json({ ok: true, aura3_bridge: 'PAUSED', pause: aura3Pause });
+        if (target === 'aura3') {
+          const pause = await isExecutionPaused(env, 'aura3');
+          if (pause.paused) {
+            await sendTelegramMessage(env, chatId, 'AURA3 paused hai; task dispatch nahi kiya.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, paused: true });
+          }
+          if (!aura3BridgeConfigured(env)) {
+            await sendTelegramMessage(env, chatId, 'AURA3 bridge configured nahi hai.', message.message_id);
+            return json({ ok: true, mode: plan.mode, target, configured: false });
+          }
+          const dispatch = await dispatchAura3Task(env, text, { messageId: message.message_id });
+          await sendTelegramMessage(env, chatId, `AURA3 ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
+          ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
+          return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
         }
-        if (!aura3BridgeConfigured(env)) {
-          await sendTelegramMessage(
-            env,
-            chatId,
-            'AURA3 diagnostic bridge code ready hai, lekin runtime orchestration token configured nahi hai. GITHUB_ORCHESTRATION_TOKEN configure hote hi main AURA3 ko direct governed task bhej kar uska fresh revert la sakta hoon.',
-            message.message_id,
-          );
-          return json({ ok: true, aura3_bridge: 'PENDING_CONFIGURATION' });
-        }
-
-        let dispatch;
-        try {
-          dispatch = await dispatchAura3Task(env, text, { messageId: message.message_id });
-        } catch (bridgeError) {
-          console.error('AURA3 dispatch failed:', bridgeError?.message || 'unknown');
-          await sendTelegramMessage(
-            env,
-            chatId,
-            'AURA3 ko governed task dispatch nahi hua. Orchestration token/repository Actions permission verify karni hogi. Main communication success claim nahi karunga.',
-            message.message_id,
-          );
-          return json({ ok: true, aura3_bridge: 'DISPATCH_FAILED' });
-        }
-
-        await sendTelegramMessage(
-          env,
-          chatId,
-          `AURA3 ko direct ${dispatch.taskType} bhej diya hai. Task ID: ${dispatch.taskId}. Main fresh revert ka wait kar raha hoon; result aate hi verify karke report karunga.`,
-          message.message_id,
-        );
-
-        ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
-        return json({ ok: true, aura3_bridge: dispatch.status, task_id: dispatch.taskId });
       }
 
       let reply;
@@ -617,6 +499,42 @@ async function loadVictorCore() {
   const response = new Response(JSON.stringify(payload), { headers: { 'Cache-Control': 'public, max-age=120' } });
   await cache.put(cacheKey, response.clone());
   return payload;
+}
+
+async function planFounderRequest(env, text, replyContext = '') {
+  const system = `
+You are Victor's request planner. Understand the Founder's intent like a normal AI.
+Return ONLY one JSON object, no prose.
+
+Modes:
+- CHAT: normal conversation, story, explanation, brainstorming, general question.
+- DEPARTMENT_STATUS: asks current/fresh/status/result/facts about RIO, Tony Stark or AURA3.
+- DEPARTMENT_ACTION: asks to fix, run, start, stop, recover, build, change, execute or otherwise act on RIO, Tony Stark or AURA3.
+- EXECUTIVE_GOAL: organization-level objective/strategy/root-cause/replanning request that Victor should manage across departments.
+
+Targets: rio, tony_stark, aura3, or null.
+Rules:
+- A department name inside an explanation does NOT make it an action.
+- "Tell me what departments do" is CHAT.
+- "AURA3 system thik karo" is DEPARTMENT_ACTION target aura3.
+- "RIO ne kitne posts publish kiye" is DEPARTMENT_STATUS target rio.
+- "Tony ko RIO website me help karne bolo" is DEPARTMENT_ACTION target tony_stark.
+- Casual conversation stays CHAT even though Victor is an orchestrator.
+
+Schema: {"mode":"CHAT|DEPARTMENT_STATUS|DEPARTMENT_ACTION|EXECUTIVE_GOAL","target":"rio|tony_stark|aura3|null","reason":"short"}
+`;
+  const content = await askModel(env, system, `${replyContext ? `Previous message: ${replyContext}\n` : ''}Founder: ${text}`);
+  const cleaned = content.replace(/```json|```/gi, '').trim();
+  let parsed;
+  try { parsed = JSON.parse(cleaned); } catch (_) { parsed = null; }
+  const allowedModes = new Set(['CHAT', 'DEPARTMENT_STATUS', 'DEPARTMENT_ACTION', 'EXECUTIVE_GOAL']);
+  const allowedTargets = new Set(['rio', 'tony_stark', 'aura3', null]);
+  if (!parsed || !allowedModes.has(parsed.mode) || !allowedTargets.has(parsed.target ?? null)) {
+    const entity = resolveFounderEntityQuery(text);
+    const target = ['rio', 'tony_stark', 'aura3'].includes(entity?.entity_id) ? entity.entity_id : null;
+    return { mode: target ? 'DEPARTMENT_STATUS' : 'CHAT', target, reason: 'planner_fallback' };
+  }
+  return { mode: parsed.mode, target: parsed.target ?? null, reason: String(parsed.reason || '').slice(0, 160) };
 }
 
 async function callVictorCore(env, userMessage, requestFacts) {
