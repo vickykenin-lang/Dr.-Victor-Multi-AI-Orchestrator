@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EP001 clips: Gemini Veo I2V primary, NVIDIA I2V secondary, ffmpeg last."""
+"""EP001 clips: Gemini Veo I2V primary (GEMINI_VIO_API_KEY), NVIDIA, ffmpeg."""
 from __future__ import annotations
 
 import base64
@@ -38,7 +38,12 @@ PROMPTS = {
 
 
 def gemini_key() -> str:
-    return (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+    for name in ("GEMINI_VIO_API_KEY", "GEMINI_VEO_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        val = (os.environ.get(name) or "").strip()
+        if val:
+            print("using", name, "len", len(val))
+            return val
+    return ""
 
 
 def nvidia_key() -> str:
@@ -100,7 +105,7 @@ def veo_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
         url = f"{GEMINI_BASE}/models/{model}:predictLongRunning"
         for body in veo_bodies(prompt, img_b64):
             try:
-                print("Veo start", model, list((body.get("instances") or [{}])[0].keys()))
+                print("Veo start", model)
                 op = http_json("POST", url, headers, body, timeout=120)
             except urllib.error.HTTPError as e:
                 last = f"HTTP {e.code} {model} {e.read().decode('utf-8', errors='replace')[:350]}"
