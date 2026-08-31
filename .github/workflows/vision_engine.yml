@@ -1,15 +1,18 @@
 name: Vision Production House Engine
 
 on:
+  schedule:
+    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       action:
-        description: "create_job | run_stage | auto | topic_ok | look_ok | master_ok"
-        required: true
-        default: "auto"
+        description: "create_job | run_stage | auto | scan_auto | topic_ok | look_ok | master_ok"
+        required: false
+        default: "scan_auto"
       job_id:
-        description: "JOB001"
-        required: true
+        description: "JOB001 or empty for scan_auto"
+        required: false
+        default: ""
       topic:
         required: false
         default: ""
@@ -38,7 +41,7 @@ jobs:
 
       - name: Run production engine
         env:
-          ENGINE_ACTION: ${{ inputs.action }}
+          ENGINE_ACTION: ${{ inputs.action || 'scan_auto' }}
           JOB_ID: ${{ inputs.job_id }}
           TOPIC: ${{ inputs.topic }}
           LENGTH: ${{ inputs.length }}
@@ -53,25 +56,32 @@ jobs:
           git config user.email vision-engine@users.noreply.github.com
           git add vision/engine/jobs/ || true
           if git diff --staged --quiet; then echo nothing; else
-            git commit -m "engine: ${{ inputs.action }} ${{ inputs.job_id }}"
+            git commit -m "engine: ${{ inputs.action || 'scan_auto' }} ${{ inputs.job_id }}"
             git pull --rebase origin main || git pull --rebase --autostash origin main || true
             git push
           fi
 
-      - name: Auto trigger next stage after gap
+      - name: Auto trigger next after gap
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          JOB_ID: ${{ inputs.job_id }}
         run: |
-          SIG="vision/engine/jobs/${JOB_ID}/run_signal.json"
-          if [ ! -f "$SIG" ]; then echo no signal; exit 0; fi
-          CONT=$(python3 -c "import json;print(json.load(open('$SIG')).get('continue', False))")
-          GAP=$(python3 -c "import json;print(int(json.load(open('$SIG')).get('gap_sec', 480)))")
-          REASON=$(python3 -c "import json;print(json.load(open('$SIG')).get('reason',''))")
-          echo continue=$CONT gap=$GAP reason=$REASON
-          if [ "$CONT" != "True" ]; then echo stop; exit 0; fi
-          echo "waiting ${GAP}s before next stage"
-          sleep "$GAP"
-          gh workflow run vision_engine.yml -r main -f action=auto -f job_id="$JOB_ID"
-          echo queued next auto run
+          python3 - <<'PY'
+          import json, os, subprocess, time, glob
+          paths = glob.glob("vision/engine/jobs/*/run_signal.json")
+          queued = set()
+          for p in paths:
+              sig = json.load(open(p))
+              if not sig.get("continue"):
+                  continue
+              job = p.split("/")[3]
+              if job in queued:
+                  continue
+              gap = int(sig.get("gap_sec") or 60)
+              print("queue", job, "gap", gap)
+              time.sleep(min(gap, 300))
+              subprocess.check_call(["gh", "workflow", "run", "vision_engine.yml", "-r", "main", "-f", "action=auto", "-f", f"job_id={job}"])
+              queued.add(job)
+          if not queued:
+              print("no continue signals")
+          PY
