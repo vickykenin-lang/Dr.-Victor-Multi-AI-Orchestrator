@@ -7,6 +7,10 @@ on:
         description: "B1 first"
         required: false
         default: "B1"
+      i2v_only:
+        description: "1 = Veo I2V only, no JSON2Video/ffmpeg fake success"
+        required: false
+        default: "1"
 
 permissions:
   contents: write
@@ -23,27 +27,14 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
-      - name: Show video keys (safe)
+      - name: Generate clips I2V
         env:
-          JASON2VIDEO_API_KEY: ${{ secrets.JASON2VIDEO_API_KEY }}
-          JSON2VIDEO_API_KEY: ${{ secrets.JSON2VIDEO_API_KEY }}
-          GEMINI_VIO_API_KEY: ${{ secrets.GEMINI_VIO_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          if [ -n "$JASON2VIDEO_API_KEY" ]; then echo JASON2VIDEO_API_KEY=SET; else echo JASON2VIDEO_API_KEY=EMPTY; fi
-          if [ -n "$JSON2VIDEO_API_KEY" ]; then echo JSON2VIDEO_API_KEY=SET; else echo JSON2VIDEO_API_KEY=EMPTY; fi
-          if [ -n "$GEMINI_VIO_API_KEY" ]; then echo GEMINI_VIO_API_KEY=SET; else echo GEMINI_VIO_API_KEY=EMPTY; fi
-
-      - name: Generate clips
-        env:
-          JASON2VIDEO_API_KEY: ${{ secrets.JASON2VIDEO_API_KEY }}
-          JSON2VIDEO_API_KEY: ${{ secrets.JSON2VIDEO_API_KEY }}
           GEMINI_VIO_API_KEY: ${{ secrets.GEMINI_VIO_API_KEY }}
           GEMINI_VEO_API_KEY: ${{ secrets.GEMINI_VEO_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          NVIDIA_VICTOR_VISION_KEY: ${{ secrets.NVIDIA_VICTOR_VISION_KEY }}
+          JASON2VIDEO_API_KEY: ${{ secrets.JASON2VIDEO_API_KEY }}
           ONLY_IDS: ${{ inputs.only_ids }}
+          I2V_ONLY: ${{ inputs.i2v_only }}
         run: python3 vision/scripts/auto_generate_clips.py
 
       - name: Assemble animatic master
@@ -67,7 +58,7 @@ jobs:
           git config user.email vision-bot@users.noreply.github.com
           git add vision/episodes/EP001_Last_Delivery/clips/ vision/episodes/EP001_Last_Delivery/masters/ || true
           if git diff --staged --quiet; then echo nothing; else
-            git commit -m "vision: EP001 clips ${{ inputs.only_ids }}"
+            git commit -m "vision: EP001 I2V ${{ inputs.only_ids }}"
             git pull --rebase origin main || git pull --rebase --autostash origin main || true
             git push
           fi
