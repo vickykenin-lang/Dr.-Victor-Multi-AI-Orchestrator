@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""EP001 Prompt Manager. Later prompts capped at 1000 chars. B1 is Founder-locked."""
+"""EP001 Prompt Manager. Every I2V prompt starts with reference-image lock. Cap 1000."""
 from __future__ import annotations
 
 MAX_CHARS = 1000
+REF = (
+    "Using reference images. The attached still is the first frame. "
+    "Keep the same face, jacket, bag, box and bike. Do not invent a new person. "
+)
 
 RAHUL = (
     "same locked hero Rahul, Indian man 24, thin tired eyes, short styled black hair, "
@@ -57,10 +61,8 @@ VIDEO_PROMPTS = {
 }
 
 
-def _clip(text: str, shot_id: str) -> str:
+def _clip(text: str) -> str:
     text = text.strip()
-    if shot_id == "B1":
-        return text
     if len(text) <= MAX_CHARS:
         return text
     cut = text[: MAX_CHARS - 1].rsplit(" ", 1)[0]
@@ -70,19 +72,21 @@ def _clip(text: str, shot_id: str) -> str:
 def still_prompt(shot_id: str) -> str:
     sid = shot_id.strip()
     if sid in STILL_PROMPTS:
-        return _clip(STILL_PROMPTS[sid], sid)
+        return _clip(STILL_PROMPTS[sid])
     if sid in VIDEO_PROMPTS:
-        return _clip(VIDEO_PROMPTS[sid] + " still frame", sid)
+        return _clip(VIDEO_PROMPTS[sid] + " still frame")
     raise KeyError(sid)
 
 
 def video_prompt(shot_id: str) -> str:
     sid = shot_id.strip()
     if sid in VIDEO_PROMPTS:
-        return _clip(VIDEO_PROMPTS[sid], sid)
-    if sid in STILL_PROMPTS:
-        return _clip("4s motion. Subject moves. " + STILL_PROMPTS[sid], sid)
-    raise KeyError(sid)
+        body = VIDEO_PROMPTS[sid]
+    elif sid in STILL_PROMPTS:
+        body = "4s motion. Subject moves. " + STILL_PROMPTS[sid]
+    else:
+        raise KeyError(sid)
+    return _clip(REF + body)
 
 
 def all_video_ids():
