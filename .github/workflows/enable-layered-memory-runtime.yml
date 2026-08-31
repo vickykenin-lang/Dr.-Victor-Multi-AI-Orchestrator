@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'scripts/enable_layered_memory_runtime.py'
+      - 'victor-telegram-worker/memory_runtime.test.mjs'
+      - '.github/workflows/enable-layered-memory-runtime.yml'
       - 'memory/MEMORY.md'
       - 'memory/WORKING_MEMORY.md'
       - 'memory/LEARNINGS.md'
@@ -33,8 +35,8 @@ jobs:
         run: |
           git config user.name "victor-memory-runtime"
           git config user.email "actions@users.noreply.github.com"
-          git add victor-telegram-worker/worker.js victor-telegram-worker/memory_runtime.mjs
+          git add victor-telegram-worker/worker.js victor-telegram-worker/memory_runtime.mjs victor-telegram-worker/memory_runtime.test.mjs
           git diff --cached --quiet && exit 0
-          git commit -m "runtime: enable layered long-term memory context"
+          git commit -m "runtime: tighten explicit Founder memory directives"
           git pull --rebase --autostash
           git push
