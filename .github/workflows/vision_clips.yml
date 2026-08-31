@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       only_ids:
-        description: "Start with B1 to test Veo"
+        description: "B1 first"
         required: false
         default: "B1"
 
@@ -25,16 +25,19 @@ jobs:
 
       - name: Show video keys (safe)
         env:
+          JASON2VIDEO_API_KEY: ${{ secrets.JASON2VIDEO_API_KEY }}
+          JSON2VIDEO_API_KEY: ${{ secrets.JSON2VIDEO_API_KEY }}
           GEMINI_VIO_API_KEY: ${{ secrets.GEMINI_VIO_API_KEY }}
-          GEMINI_VEO_API_KEY: ${{ secrets.GEMINI_VEO_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          if [ -n "$JASON2VIDEO_API_KEY" ]; then echo JASON2VIDEO_API_KEY=SET; else echo JASON2VIDEO_API_KEY=EMPTY; fi
+          if [ -n "$JSON2VIDEO_API_KEY" ]; then echo JSON2VIDEO_API_KEY=SET; else echo JSON2VIDEO_API_KEY=EMPTY; fi
           if [ -n "$GEMINI_VIO_API_KEY" ]; then echo GEMINI_VIO_API_KEY=SET; else echo GEMINI_VIO_API_KEY=EMPTY; fi
-          if [ -n "$GEMINI_VEO_API_KEY" ]; then echo GEMINI_VEO_API_KEY=SET; else echo GEMINI_VEO_API_KEY=EMPTY; fi
-          if [ -n "$GEMINI_API_KEY" ]; then echo GEMINI_API_KEY=SET; else echo GEMINI_API_KEY=EMPTY; fi
 
       - name: Generate clips
         env:
+          JASON2VIDEO_API_KEY: ${{ secrets.JASON2VIDEO_API_KEY }}
+          JSON2VIDEO_API_KEY: ${{ secrets.JSON2VIDEO_API_KEY }}
           GEMINI_VIO_API_KEY: ${{ secrets.GEMINI_VIO_API_KEY }}
           GEMINI_VEO_API_KEY: ${{ secrets.GEMINI_VEO_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
