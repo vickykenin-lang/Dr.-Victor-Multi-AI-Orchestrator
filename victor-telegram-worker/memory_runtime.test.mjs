@@ -32,7 +32,11 @@ test('detects explicit Founder memory directives including record karo', () => {
   assert.equal(isExplicitMemoryDirective('Filhal k liye lock karo'), true);
   assert.equal(isExplicitMemoryDirective('Isko yaad rakho'), true);
   assert.equal(isExplicitMemoryDirective('record karo- aura 2 hold me rakho'), true);
+  assert.equal(isExplicitMemoryDirective('Save this decision'), true);
   assert.equal(isExplicitMemoryDirective('Status batao'), false);
+  assert.equal(isExplicitMemoryDirective('Final reply me verified root cause aur next action do'), false);
+  assert.equal(isExplicitMemoryDirective('AURA3 final certification evidence ke saath do'), false);
+  assert.equal(isExplicitMemoryDirective('Record status aur exact next action batao'), false);
 });
 
 test('bare AURA deterministically resolves to AURA3', () => {
