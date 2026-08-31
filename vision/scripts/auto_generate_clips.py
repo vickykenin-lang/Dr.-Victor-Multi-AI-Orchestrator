@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EP001 I2V: Sora 2 first. Default YouTube 16:9 1280x720, not Reels."""
+"""EP001 I2V Sora 16:9 + Director QC retry."""
 from __future__ import annotations
 
 import json
@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone, timedelta
 
+from director_qc import judge
 from prompt_manager import video_prompt
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -19,24 +20,12 @@ STILLS = os.path.join(ROOT, "episodes", "EP001_Last_Delivery", "stills")
 CLIPS = os.path.join(ROOT, "episodes", "EP001_Last_Delivery", "clips")
 IST = timezone(timedelta(hours=5, minutes=30))
 OPENAI = "https://api.openai.com/v1"
-GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
-VEO_MODELS = ["veo-3.1-generate-preview", "veo-3.1-fast-generate-preview", "veo-3.1-lite-generate-preview"]
-SORA_W = 1280
-SORA_H = 720
+SORA_W, SORA_H = 1280, 720
 SORA_SIZE = f"{SORA_W}x{SORA_H}"
 
 
 def sora_key() -> str:
     for name in ("SORA2_API", "SORA2_API_KEY", "OPENAI_API_KEY"):
-        val = (os.environ.get(name) or "").strip()
-        if val:
-            print("using", name, "len", len(val))
-            return val
-    return ""
-
-
-def gemini_key() -> str:
-    for name in ("GEMINI_VIO_API_KEY", "GEMINI_VEO_API_KEY", "GEMINI_API_KEY"):
         val = (os.environ.get(name) or "").strip()
         if val:
             print("using", name, "len", len(val))
@@ -93,11 +82,7 @@ def sora_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
         if status == "failed":
             raise RuntimeError(f"sora failed: {json.dumps(st)[:400]}")
         if status == "completed":
-            req = urllib.request.Request(
-                f"{OPENAI}/videos/{vid}/content",
-                headers=headers,
-                method="GET",
-            )
+            req = urllib.request.Request(f"{OPENAI}/videos/{vid}/content", headers=headers, method="GET")
             with urllib.request.urlopen(req, timeout=180) as resp:
                 data = resp.read()
             if not data or len(data) < 1000:
@@ -106,76 +91,16 @@ def sora_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
     raise RuntimeError(f"sora timeout: {json.dumps(last)[:400]}")
 
 
-def find_video_uri(obj):
-    if isinstance(obj, dict):
-        vid = obj.get("video") or {}
-        if isinstance(vid, dict) and vid.get("uri"):
-            return vid["uri"]
-        if isinstance(obj.get("uri"), str) and str(obj.get("uri")).startswith("http"):
-            return obj["uri"]
-        for v in obj.values():
-            found = find_video_uri(v)
-            if found:
-                return found
-    elif isinstance(obj, list):
-        for v in obj:
-            found = find_video_uri(v)
-            if found:
-                return found
-    return None
-
-
-def veo_i2v(api_key: str, prompt: str, png_path: str) -> bytes:
-    import base64
-    with open(png_path, "rb") as f:
-        img_b64 = base64.b64encode(f.read()).decode("ascii")
-    headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
-    body = {
-        "instances": [{
-            "prompt": prompt,
-            "image": {"bytesBase64Encoded": img_b64, "mimeType": "image/png"},
-        }],
-        "parameters": {"aspectRatio": "16:9"},
-    }
-    last = "no veo"
-    for model in VEO_MODELS:
-        url = f"{GEMINI_BASE}/models/{model}:predictLongRunning"
-        try:
-            op = http_json("POST", url, headers, body, timeout=60)
-        except urllib.error.HTTPError as e:
-            last = f"HTTP {e.code} {model} {e.read().decode('utf-8', errors='replace')[:250]}"
-            print(last)
-            continue
-        name = op.get("name")
-        if not name:
-            continue
-        deadline = time.time() + 240
-        while time.time() < deadline:
-            time.sleep(12)
-            st = http_json("GET", f"{GEMINI_BASE}/{name}", {"x-goog-api-key": api_key}, timeout=60)
-            if st.get("done"):
-                uri = find_video_uri(st)
-                if uri:
-                    req = urllib.request.Request(uri, headers={"x-goog-api-key": api_key})
-                    with urllib.request.urlopen(req, timeout=180) as resp:
-                        return resp.read()
-                last = "done no uri"
-                break
-    raise RuntimeError(last)
-
-
 def main() -> int:
     only = os.environ.get("ONLY_IDS", "B1").strip()
     ids = [x.strip() for x in only.split(",") if x.strip()] or ["B1"]
     os.makedirs(CLIPS, exist_ok=True)
     skey = sora_key()
-    gkey = gemini_key()
     log = {
         "updated": datetime.now(IST).isoformat(),
-        "mode": "i2v",
+        "mode": "i2v+director",
         "size": SORA_SIZE,
         "sora_key": bool(skey),
-        "gemini_key": bool(gkey),
         "results": {},
     }
     any_ok = False
@@ -186,44 +111,48 @@ def main() -> int:
             log["results"][pid] = {"status": "no_still"}
             continue
         action = video_prompt(pid)
-        print(pid, "PROMPT_CHARS", len(action), "SIZE", SORA_SIZE)
-        used = None
-        err = None
-        if skey:
+        print(pid, "PROMPT", action)
+        if not skey:
+            log["results"][pid] = {"status": "failed", "error": "no sora key"}
+            continue
+        last_err = None
+        accepted = False
+        qc = {}
+        for attempt in (1, 2):
             try:
-                print(pid, "Sora 2 I2V 16:9...")
-                vid = sora_i2v(skey, action, still)
+                vid = sora_i2v(skey, action if attempt == 1 else action + " Keep the exact same face as the reference image.", still)
                 with open(out, "wb") as f:
                     f.write(vid)
-                used = "sora2_i2v"
             except Exception as e:
-                err = str(e)[:600]
-                print(pid, "Sora fail", err)
-        if used is None and gkey:
-            try:
-                vid = veo_i2v(gkey, action, still)
-                with open(out, "wb") as f:
-                    f.write(vid)
-                used = "gemini_veo_i2v"
-            except Exception as e:
-                err = ((err + " | ") if err else "") + str(e)[:300]
-        if used is None:
+                last_err = str(e)[:500]
+                print(pid, "Sora fail", last_err)
+                continue
+            qc = judge(pid, out)
+            print(pid, "DIRECTOR", qc)
+            if qc.get("ok") or qc.get("skipped"):
+                accepted = True
+                break
+            last_err = "director reject: " + str(qc.get("reason", ""))
+            print(pid, "retry after director")
+        if not accepted:
             log["results"][pid] = {
                 "status": "failed",
                 "provider": "none",
                 "action_prompt": action,
-                "error": err or "no i2v provider",
+                "director": qc,
+                "error": last_err,
             }
             continue
         log["results"][pid] = {
             "status": "ok",
-            "provider": used,
+            "provider": "sora2_i2v",
             "bytes": os.path.getsize(out),
             "size": SORA_SIZE,
             "action_prompt": action,
-            "error": err,
+            "director": qc,
+            "error": last_err,
         }
-        print(pid, "OK", used, os.path.getsize(out))
+        print(pid, "OK", os.path.getsize(out))
         any_ok = True
     with open(os.path.join(CLIPS, "_run_log.json"), "w", encoding="utf-8") as f:
         json.dump(log, f, indent=2)
