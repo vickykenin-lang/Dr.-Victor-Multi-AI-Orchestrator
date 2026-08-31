@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "status": "LOCKED_BASELINE",
+  "authority": "Founder",
+  "canonical_plan": "docs/VICTOR_FINAL_CORRECTION_PLAN.md",
+  "closure_levels": [
+    "SOURCE_IMPLEMENTED",
+    "AUTOMATED_TEST_PASSED",
+    "RUNTIME_INTEGRATION_PASSED",
+    "LIVE_BEHAVIOR_VERIFIED",
+    "REAL_WORLD_OUTCOME_VERIFIED_WHEN_APPLICABLE"
+  ],
+  "waves": {
+    "P0": {"goal": "Stop misunderstanding and false/stale answers", "modules": [1,2,3,4,5,6,7,8]},
+    "P1": {"goal": "Executive planning, routing, recovery and synthesis", "modules": [9,10,11,12,13,14]},
+    "P2": {"goal": "Organizational memory, learning and source trust", "modules": [15,16,17,18]},
+    "P3": {"goal": "Production reliability and architecture stability", "modules": [19,20,21,22]}
+  },
+  "modules": [
+    {"id":1,"name":"Founder Intent Resolver","priority":"P0","state":"OPEN"},
+    {"id":2,"name":"Conversation State Resolver","priority":"P0","state":"OPEN"},
+    {"id":3,"name":"Founder Decision Binder","priority":"P0","state":"OPEN"},
+    {"id":4,"name":"Goal / Founder Intent Reconciliation","priority":"P0","state":"OPEN"},
+    {"id":5,"name":"Manual Executive Trigger","priority":"P0","state":"IN_PROGRESS","known_defect":"founder-command can return IGNORED_UNKNOWN_CRON"},
+    {"id":6,"name":"Evidence-First Fact Resolver","priority":"P0","state":"PARTIAL"},
+    {"id":7,"name":"Truth Semantics / Status Ontology","priority":"P0","state":"PARTIAL"},
+    {"id":8,"name":"Dynamic Capability Inspector","priority":"P0","state":"OPEN"},
+    {"id":9,"name":"Executive Planner & Task Contract Generator","priority":"P1","state":"PARTIAL"},
+    {"id":10,"name":"Capability-Based Department Router","priority":"P1","state":"PARTIAL"},
+    {"id":11,"name":"Recovery Manager","priority":"P1","state":"OPEN"},
+    {"id":12,"name":"Five Whys / Root-Cause Analyst","priority":"P1","state":"PARTIAL"},
+    {"id":13,"name":"Strategy Pivot Engine","priority":"P1","state":"PARTIAL"},
+    {"id":14,"name":"Victor Result Synthesizer","priority":"P1","state":"PARTIAL"},
+    {"id":15,"name":"Active Session + Durable Memory Reconciliation","priority":"P2","state":"PARTIAL"},
+    {"id":16,"name":"Decision Journal & Learning Engine","priority":"P2","state":"PARTIAL"},
+    {"id":17,"name":"Department Capability / Reliability Score","priority":"P2","state":"OPEN"},
+    {"id":18,"name":"Unified Source Adapter & Trust Hierarchy","priority":"P2","state":"OPEN"},
+    {"id":19,"name":"Single-Flight Execution & Conflict-Safe State","priority":"P3","state":"PARTIAL"},
+    {"id":20,"name":"Unified Department Transport Contract","priority":"P3","state":"PARTIAL"},
+    {"id":21,"name":"Verification / Failure-Injection Test Suite","priority":"P3","state":"PARTIAL"},
+    {"id":22,"name":"Architecture Invariant & Self-Assessment Validator","priority":"P3","state":"OPEN"}
+  ]
+}
