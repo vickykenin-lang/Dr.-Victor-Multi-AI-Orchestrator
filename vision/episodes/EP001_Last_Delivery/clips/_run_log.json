@@ -1,46 +1,46 @@
 {
-  "updated": "2026-08-31T00:56:16.154618+05:30",
+  "updated": "2026-08-31T11:38:09.453370+05:30",
   "results": {
     "B1": {
       "status": "ok",
       "provider": "ffmpeg_motion_still",
-      "bytes": 239337,
+      "bytes": 239431,
       "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
     },
     "B2": {
       "status": "ok",
       "provider": "ffmpeg_motion_still",
-      "bytes": 144434,
+      "bytes": 166338,
       "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
     },
     "B3": {
       "status": "ok",
       "provider": "ffmpeg_motion_still",
-      "bytes": 201038,
+      "bytes": 213448,
       "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
     },
     "B4": {
       "status": "ok",
       "provider": "ffmpeg_motion_still",
-      "bytes": 208209,
+      "bytes": 208093,
       "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
     },
     "B5": {
       "status": "ok",
       "provider": "ffmpeg_motion_still",
-      "bytes": 165748,
+      "bytes": 165750,
       "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
     },
     "B6": {
       "status": "ok",
       "provider": "ffmpeg_motion_still",
-      "bytes": 251357,
+      "bytes": 251746,
       "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
     },
     "B7": {
       "status": "ok",
       "provider": "ffmpeg_motion_still",
-      "bytes": 236239,
+      "bytes": 229484,
       "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
     }
   },
