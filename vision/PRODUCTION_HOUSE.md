@@ -1,66 +1,69 @@
-# Vision Production House Engine
+# Vision — Production House Process Only
 
-This is the studio. EP001 is one job inside the studio. Topic can be anything later (including salary story). Engine does not change when topic changes.
+No story. No characters. No episode names.
+This file is the studio operating process.
 
-Grok amends the engine. GitHub Actions + Director run the job. AURA2 stays out.
+Grok may only amend this process. Workers (GitHub Actions) execute the current stage. Director must pass before the next stage starts.
 
-## What the engine is
-A job folder goes from `inbox` to `published`.
-Every department writes artifacts.
-Director must PASS before the next department starts.
-Founder only at 3 places: Topic OK, Faces OK, Publish OK.
+## 1. Job
+Every film is one job.
+A job has: brief, state, artifacts, qc.
+state = which stage is allowed to run.
+Nothing runs outside the current stage.
 
-## Job
-`vision/jobs/<JOB_ID>/`
-- brief.md        topic + length + language + channel
-- state.json      current department + last director verdict
-- script.md
-- characters.md
-- shot_list.md
-- prompts/
-- stills/
-- clips/
-- audio/
-- masters/
-- qc/
+## 2. Stages (fixed order)
+1. Intake — receive topic + length + language + platform
+2. Development — logline, treatment, tone. No picture.
+3. Screenplay — script + shot plan. No picture.
+4. Look lock — character/location still sheets only. No motion.
+5. Keyframes — one still per shot, must match look lock.
+6. Picture — image-to-video from the approved still + shot prompt
+7. Sound — voice + bed from locked lines
+8. Assembly — cut, mix, subs, master file
+9. Delivery — publish package
 
-state.json department values, in order:
-inbox → research → script → casting → stills → clips → sound → edit → publish → done
+Skip a stage = process broken.
 
-## Departments
-1. Research — turn topic into logline + audience + tone
-2. Writer — script + shot list from brief
-3. Casting — A-sheets only (faces, wardrobe lock)
-4. Camera stills — one scene keyframe per shot, identity from A-sheets
-5. Picture clips — I2V from approved still + Prompt Manager (ref images, ≤1000, 16:9)
-6. Sound — dialogue + bed from locked script lines
-7. Edit — concat, subs, mix
-8. Publish — YouTube file + metadata
+## 3. Director gate (every stage)
+After a stage writes artifacts, Director reviews those artifacts against the previous lock.
+PASS → state advances one stage.
+FAIL → same stage, one retry.
+FAIL again → job stops. Human owner decides.
+Director never invents story. Director only accepts or rejects.
 
-## Director (every level)
-After each department Director reads the artifact + previous lock files and writes `qc/<dept>.json`:
-{ "pass": true|false, "reason": "...", "must_fix": ["..."] }
-PASS → next department.
-FAIL → same department retry once, then stop and ping Founder.
-Director checks continuity: same face, jacket, bag, box, no new actor, no burned text, correct aspect.
+What Director checks, by stage:
+- Development: topic followed, length possible, platform fit
+- Screenplay: scenes cover the treatment, no missing beats
+- Look lock: faces/wardrobe usable and distinct
+- Keyframes: same people as look lock, correct scene, no extra text
+- Picture: same people as keyframe, motion matches shot prompt, aspect correct
+- Sound: right speaker, line matches screenplay
+- Assembly: order matches shot plan, sync, no placeholder
+- Delivery: file spec + metadata complete
 
-## Founder gates (only 3)
-- Topic OK — brief locked, production may start
-- Faces OK — A-sheets locked, stills may start
-- Publish OK — master may upload
+## 4. Owner gates (only three)
+- Topic OK — Intake may leave inbox
+- Look OK — Look lock accepted, keyframes allowed
+- Master OK — Delivery allowed
 
-Founder does not approve every B-still and every clip unless Director failed twice.
+Owner does not sit on every shot if Director passed.
 
-## Trigger
-Founder drops a topic into inbox (or `Topic: ...`).
-Action `vision_engine.yml` runs the current department only, then Director, then stops or advances.
-No full-movie one-click until Director has passed every stage.
+## 5. Run rule
+One job. One stage. One Action run.
+No full-film button.
+No generating picture to repair a failed look lock.
+If picture identity fails, go back to keyframes, not to more video.
 
-## Providers (workers, not the studio)
-Stills: Gemini / NVIDIA FLUX
-Clips: Sora 2 I2V 1280x720, Veo if quota exists
-Sound: existing TTS secret when present
-Never JSON2Video / Ken Burns as picture finish.
+## 6. Prompt rule
+Shot prompts come from the shot plan, not from chat.
+Every picture prompt starts with: using reference images.
+Every picture prompt stays under 1000 characters.
 
-## Isolation
-YouTube Vision channel only. Not AURA2. Not Design Infra.
+## 7. Picture spec
+Master aspect is 16:9 unless the brief says otherwise.
+Workers may change models. Process does not change.
+Slideshow / zoom-on-still is not picture finish.
+
+## 8. Isolation
+This house publishes only to the briefed platform.
+Other products stay out.
