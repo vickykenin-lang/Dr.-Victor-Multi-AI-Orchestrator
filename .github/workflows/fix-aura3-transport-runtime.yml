@@ -1,0 +1,40 @@
+name: Fix AURA3 Transport Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fix_aura3_transport_runtime.py'
+      - '.github/workflows/fix-aura3-transport-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch AURA3 transport runtime
+        run: python scripts/fix_aura3_transport_runtime.py
+      - name: Validate worker syntax
+        run: |
+          node --check victor-telegram-worker/worker.js
+          node --check victor-telegram-worker/department_bridge.mjs
+      - name: Run department bridge tests
+        run: node --test victor-telegram-worker/department_bridge.test.mjs
+      - name: Commit runtime integration
+        run: |
+          git config user.name "victor-aura3-runtime"
+          git config user.email "actions@users.noreply.github.com"
+          git add victor-telegram-worker/worker.js victor-telegram-worker/department_bridge.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m "runtime: harden AURA3 recovery transport"
+          git pull --rebase --autostash
+          git push
