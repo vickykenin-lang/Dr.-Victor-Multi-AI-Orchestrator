@@ -209,6 +209,12 @@ test('10 out of 10 requires objective met evidence', () => {
   assert.equal(card.score, 9);
 });
 
+test('Founder manual executive trigger is a supported execution trigger', async () => {
+  const source = await import('node:fs/promises').then(fs => fs.readFile(new URL('./autonomy_runtime.mjs', import.meta.url), 'utf8'));
+  assert.match(source, /manualFounderTrigger = controller\?\.cron === 'founder-command'/);
+  assert.match(source, /controller\.cron !== SUPERVISION_CRON && !manualFounderTrigger/);
+});
+
 test('cron remains watchdog plus 10 PM IST report', () => {
   assert.deepEqual(AUTONOMY_CRONS, {
     SUPERVISION_CRON: '*/15 * * * *',

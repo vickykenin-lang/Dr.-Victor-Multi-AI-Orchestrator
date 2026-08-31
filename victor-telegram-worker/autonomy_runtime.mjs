@@ -475,7 +475,8 @@ export async function runAutonomousCycle(controller, env) {
     return { status: 'DAILY_REPORT_SENT', goalId: activeGoal?.goal_id || null, target: activeState.last_target || null, revenue };
   }
 
-  if (controller.cron !== SUPERVISION_CRON) return { status: 'IGNORED_UNKNOWN_CRON', cron: controller.cron };
+  const manualFounderTrigger = controller?.cron === 'founder-command';
+  if (controller.cron !== SUPERVISION_CRON && !manualFounderTrigger) return { status: 'IGNORED_UNKNOWN_CRON', cron: controller.cron };
 
   const pause = await isExecutionPaused(env);
   if (pause.paused) return { status: 'SAFE_STOP', goalId: null, target: null, error_code: 'EMERGENCY_PAUSE_ACTIVE', diagnostics: pause };
