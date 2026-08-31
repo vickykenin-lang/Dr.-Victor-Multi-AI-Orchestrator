@@ -1,48 +1,13 @@
 {
-  "updated": "2026-08-31T11:38:09.453370+05:30",
+  "updated": "2026-08-31T11:45:15.312988+05:30",
+  "gemini_key": true,
+  "nvidia_key": true,
   "results": {
     "B1": {
       "status": "ok",
       "provider": "ffmpeg_motion_still",
-      "bytes": 239431,
-      "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
-    },
-    "B2": {
-      "status": "ok",
-      "provider": "ffmpeg_motion_still",
-      "bytes": 166338,
-      "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
-    },
-    "B3": {
-      "status": "ok",
-      "provider": "ffmpeg_motion_still",
-      "bytes": 213448,
-      "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
-    },
-    "B4": {
-      "status": "ok",
-      "provider": "ffmpeg_motion_still",
-      "bytes": 208093,
-      "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
-    },
-    "B5": {
-      "status": "ok",
-      "provider": "ffmpeg_motion_still",
-      "bytes": 165750,
-      "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
-    },
-    "B6": {
-      "status": "ok",
-      "provider": "ffmpeg_motion_still",
-      "bytes": 251746,
-      "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
-    },
-    "B7": {
-      "status": "ok",
-      "provider": "ffmpeg_motion_still",
-      "bytes": 229484,
-      "nvidia_error": "HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano 404 page not found\n"
+      "bytes": 239337,
+      "error": "HTTP 400 veo-3.1-lite-generate-preview {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"`inlineData` isn't supported by this model. Please remove it or refer to the Gemini API documentation for supported usage.\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n | HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano"
     }
-  },
-  "nvidia_key": true
+  }
 }
