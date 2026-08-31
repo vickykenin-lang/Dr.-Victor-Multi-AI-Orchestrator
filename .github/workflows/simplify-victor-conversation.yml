@@ -1,0 +1,90 @@
+name: Simplify Victor Conversation
+
+on:
+  push:
+    paths:
+      - '.github/workflows/simplify-victor-conversation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  simplify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Simplify Telegram AI path
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('victor-telegram-worker/worker.js')
+          s = p.read_text(encoding='utf-8')
+
+          old = """  const intent = classifyFounderMessage(userMessage);\n  const entity = resolveFounderEntityQuery(userMessage);"""
+          new = """  const intent = classifyFounderMessage(userMessage);\n\n  // Conversation-first: casual talk and explanatory questions should behave like a normal AI.\n  // Operational/status/action requests continue through the governed evidence path below.\n  if (isNaturalConversationIntent(intent, userMessage)) {\n    return callVictorNatural(env, userMessage, core.sourceRecords);\n  }\n\n  const entity = resolveFounderEntityQuery(userMessage);"""
+          if old not in s:
+              raise SystemExit('callVictorCore anchor not found')
+          s = s.replace(old, new, 1)
+
+          anchor = """async function askModel(env, system, userMessage) {"""
+          addition = r'''function isNaturalConversationIntent(intent, text) {
+  const value = String(text || '').trim();
+  if (intent === 'GENERAL_CONVERSATION' || intent === 'IDENTITY_QUERY') return true;
+
+  // Questions about what Victor/departments do are explanations, not live-status commands.
+  const explanatory = /\b(kya\s+karta|kya\s+karti|kaun\s+kya|role|roles|kaam\s+kya|kya\s+kaam|about|bare\s+me\s+batao|baare\s+me\s+batao|samjhao|explain)\b/i.test(value);
+  const operational = /\b(status|current|latest|fresh|live|health|healthy|check|verify|evidence|issue|problem|blocker|fix|repair|recover|thik|theek|execute|run|deploy|publish|start|stop|pause|resume|revenue|progress)\b/i.test(value);
+  return String(intent || '').startsWith('SYSTEM_QUERY') && explanatory && !operational;
+}
+
+async function callVictorNatural(env, userMessage, sourceRecords = []) {
+  const registry = sourceRecords.find(record => record?.name === 'DEPARTMENT_REGISTRY' && record?.ok)?.text || '';
+  const system = `
+You are Dr. Victor, Vicky's personal AI assistant and executive orchestrator.
+Talk naturally like a capable general AI assistant.
+
+Normal conversation rules:
+- Answer the user's actual request directly and naturally.
+- Casual requests are allowed: stories, explanations, brainstorming, general knowledge and ordinary conversation.
+- Do not turn a casual question into a governance lecture, runtime report, health check or status template.
+- If asked what Victor or departments do, explain their roles simply from the department registry below.
+- Do not invent live/current execution facts. Live status, actions and consequential operations are handled by Victor's governed execution path, not this conversational path.
+- Match the user's language; Hinglish is fine.
+- Be concise unless detail is requested.
+- Never expose credentials, secrets or tokens.
+
+DEPARTMENT REGISTRY (role/context only):
+${registry.slice(0, 14000)}
+`;
+  return askModel(env, system, userMessage);
+}
+
+'''
+          if anchor not in s:
+              raise SystemExit('askModel anchor not found')
+          s = s.replace(anchor, addition + anchor, 1)
+
+          # Remove the unnecessarily restrictive chatbot sentence from the governed prompt too.
+          s = s.replace(
+              "You are Dr. Victor, Founder Vicky's governed executive AI and orchestration intelligence.\nYou are NOT a generic Telegram chatbot. Telegram is only the Founder communication transport.",
+              "You are Dr. Victor, Founder Vicky's AI assistant and executive orchestration intelligence. Telegram is the Founder communication transport. Speak naturally while preserving evidence and authority boundaries.",
+              1,
+          )
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Syntax check
+        run: node --check victor-telegram-worker/worker.js
+      - name: Remove one-off simplifier and commit runtime
+        run: |
+          rm -f .github/workflows/simplify-victor-conversation.yml
+          git config user.name "victor-conversation-runtime"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "runtime: simplify Victor into conversation-first AI"
+          git pull --rebase origin main
+          git push origin HEAD:main
