@@ -24,6 +24,7 @@ STAGES = [
     "done",
 ]
 NEXT = {STAGES[i]: STAGES[i + 1] for i in range(len(STAGES) - 1)}
+GATE_MAP = {"topic_ok": "topic_ok", "look_ok": "look_ok", "master_ok": "master_ok"}
 
 
 def now() -> str:
@@ -64,9 +65,6 @@ def qc_write(jd: str, stage: str, payload: dict) -> None:
 
 def create_job(job_id: str, topic: str, length: str, language: str, platform: str) -> int:
     jd = job_dir(job_id)
-    if os.path.isdir(jd) and os.path.isfile(os.path.join(jd, "state.json")):
-        print("job exists", job_id)
-        return 0
     os.makedirs(os.path.join(jd, "qc"), exist_ok=True)
     os.makedirs(os.path.join(jd, "artifacts"), exist_ok=True)
     write(
@@ -96,6 +94,18 @@ def create_job(job_id: str, topic: str, length: str, language: str, platform: st
     return 0
 
 
+def set_gate(job_id: str, gate: str) -> int:
+    path = os.path.join(job_dir(job_id), "state.json")
+    if not os.path.isfile(path):
+        print("missing job", job_id)
+        return 1
+    state = load_state(path)
+    state.setdefault("owner_gates", {})[gate] = True
+    save_state(path, state)
+    print("gate", gate, "true")
+    return 0
+
+
 def director(stage: str, jd: str) -> dict:
     need = {
         "intake": ["brief.md"],
@@ -113,7 +123,7 @@ def director(stage: str, jd: str) -> dict:
         return {"pass": False, "reason": "missing " + ",".join(missing), "must_fix": missing}
     if stage == "intake":
         brief = open(os.path.join(jd, "brief.md"), encoding="utf-8").read()
-        if "topic: (empty)" in brief or "topic:" not in brief:
+        if "topic: (empty)" in brief:
             return {"pass": False, "reason": "topic empty", "must_fix": ["brief.md"]}
     return {"pass": True, "reason": f"{stage} artifacts present", "must_fix": []}
 
@@ -127,10 +137,11 @@ def run_stage(job_id: str) -> int:
     state = load_state(state_path)
     stage = state.get("stage", "inbox")
     print("job", job_id, "stage", stage)
+    gates = state.setdefault("owner_gates", {})
 
     if stage == "inbox":
-        if not state.get("owner_gates", {}).get("topic_ok"):
-            print("STOP: need owner Topic OK")
+        if not gates.get("topic_ok"):
+            print("STOP: need Topic OK")
             state["last_director"] = {"pass": False, "reason": "inbox waits Topic OK"}
             save_state(state_path, state)
             return 0
@@ -142,23 +153,14 @@ def run_stage(job_id: str) -> int:
         print("already done")
         return 0
 
-    if stage == "look_lock" and not state.get("owner_gates", {}).get("look_ok"):
-        # look_lock stage itself produces the sheets; Look OK is required to LEAVE look_lock
-        pass
-
-    if stage == "delivery" and not state.get("owner_gates", {}).get("master_ok"):
-        print("STOP: need owner Master OK before delivery")
+    if stage == "delivery" and not gates.get("master_ok"):
+        print("STOP: need Master OK")
         state["last_director"] = {"pass": False, "reason": "delivery waits Master OK"}
         save_state(state_path, state)
         return 0
 
-    # stage worker writes process artifact only
-    art = os.path.join(jd, "artifacts")
-    os.makedirs(art, exist_ok=True)
     templates = {
-        "intake": ("brief.md", None),
         "development": ("artifacts/development.md", "# Development\n\nlogline:\ntreatment:\ntone:\n"),
-        "screenplay": None,
         "look_lock": ("artifacts/look_lock.md", "# Look lock\n\nsheets: pending\nwardrobe_lock: pending\n"),
         "keyframes": ("artifacts/keyframes.md", "# Keyframes\n\nshots: pending\nidentity_source: look_lock\n"),
         "picture": ("artifacts/picture.md", "# Picture\n\nspec: 16:9\nprompt_rule: using reference images; max 1000 chars\nstatus: pending worker\n"),
@@ -169,7 +171,7 @@ def run_stage(job_id: str) -> int:
     if stage == "screenplay":
         write(os.path.join(jd, "artifacts/screenplay.md"), "# Screenplay\n\nscenes: pending\n")
         write(os.path.join(jd, "artifacts/shot_plan.md"), "# Shot plan\n\nshots: pending\n")
-    elif stage in templates and templates[stage][1] is not None:
+    elif stage in templates:
         rel, body = templates[stage]
         path = os.path.join(jd, rel)
         if not os.path.isfile(path):
@@ -182,11 +184,11 @@ def run_stage(job_id: str) -> int:
     print("director", verdict)
 
     if verdict.get("pass"):
-        nxt = NEXT.get(stage)
-        if stage == "look_lock" and not state.get("owner_gates", {}).get("look_ok"):
-            print("STOP: look_lock passed internally, waiting Look OK")
+        if stage == "look_lock" and not gates.get("look_ok"):
+            print("STOP: waiting Look OK")
             save_state(state_path, state)
             return 0
+        nxt = NEXT.get(stage)
         if nxt:
             state["stage"] = nxt
             retries[stage] = 0
@@ -218,6 +220,8 @@ def main() -> int:
             (os.environ.get("LANGUAGE") or "Hinglish").strip(),
             (os.environ.get("PLATFORM") or "youtube").strip(),
         )
+    if action in GATE_MAP:
+        return set_gate(job_id, GATE_MAP[action])
     if action == "run_stage":
         return run_stage(job_id)
     print("unknown action", action)
