@@ -3,7 +3,7 @@
   "stage": "look_lock",
   "owner_gates": {
     "topic_ok": true,
-    "look_ok": false,
+    "look_ok": true,
     "master_ok": false
   },
   "retries": {
@@ -16,5 +16,5 @@
     "reason": "screenplay artifacts present",
     "must_fix": []
   },
-  "updated": "2026-08-31T23:30:40.025778+05:30"
+  "updated": "2026-08-31T23:32:17.394753+05:30"
 }

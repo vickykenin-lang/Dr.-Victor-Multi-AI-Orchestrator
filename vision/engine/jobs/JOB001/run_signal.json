@@ -1,7 +1,7 @@
 {
   "continue": true,
   "gap_sec": 90,
-  "stage": "screenplay",
-  "reason": "advanced to look_lock",
-  "updated": "2026-08-31T23:30:40.025685+05:30"
+  "stage": "look_lock",
+  "reason": "gate look_ok set",
+  "updated": "2026-08-31T23:32:17.394900+05:30"
 }
