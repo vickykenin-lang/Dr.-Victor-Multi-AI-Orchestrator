@@ -250,12 +250,25 @@ export default {
         }
         const brainPhase = brainResult?.result?.phase || brainResult?.result?.assessment?.phase || 'EXECUTIVE_REVIEW';
         const brainTaskId = brainResult?.result?.taskId || null;
+        const assessment = brainResult?.result?.assessment || {};
+        const rootCause = assessment.rootCause || null;
+        const solution = assessment.solution || null;
+        const nextAction = assessment.nextAction || null;
+        const evidenceCount = Array.isArray(assessment.evidence) ? assessment.evidence.length : 0;
+        const goalOutcome = assessment.goalAchieved === true
+          ? 'ACHIEVED_VERIFIED'
+          : (brainResult.status === 'GOAL_PROGRESS_VERIFIED' ? 'IN_PROGRESS' : 'NOT_VERIFIED');
         const lines = [
-          'Victor Brain executive cycle completed.',
+          'Victor Brain executive result',
           `Status: ${brainResult.status}`,
           `Goal: ${brainResult.goalId || 'none'}`,
+          `Goal outcome: ${goalOutcome}`,
           `Route: ${brainResult.target || 'none'}`,
           `Mode: ${brainPhase}`,
+          rootCause ? `Root cause: ${rootCause}` : (brainPhase === 'FIVE_WHYS_DIAGNOSIS' ? 'Root cause: NOT_VERIFIED' : null),
+          solution ? `Decision/Solution: ${solution}` : null,
+          nextAction ? `Next action: ${nextAction}` : null,
+          `Evidence items: ${evidenceCount}`,
           brainTaskId ? `Task ID: ${brainTaskId}` : null,
         ].filter(Boolean);
         await sendTelegramMessage(env, chatId, lines.join('\n'), message.message_id);
