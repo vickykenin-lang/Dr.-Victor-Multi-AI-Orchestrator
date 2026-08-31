@@ -1,12 +1,12 @@
 {
-  "default_sec": 480,
-  "intake": 300,
-  "development": 480,
-  "screenplay": 480,
-  "look_lock": 480,
-  "keyframes": 480,
-  "picture": 600,
-  "sound": 480,
-  "assembly": 480,
-  "delivery": 300
+  "default_sec": 90,
+  "intake": 60,
+  "development": 60,
+  "screenplay": 90,
+  "look_lock": 90,
+  "keyframes": 180,
+  "picture": 480,
+  "sound": 180,
+  "assembly": 120,
+  "delivery": 60
 }
