@@ -1,0 +1,60 @@
+name: Vision Production House Engine
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "create_job or run_stage"
+        required: true
+        default: "run_stage"
+      job_id:
+        description: "Job folder name, e.g. JOB001"
+        required: true
+      topic:
+        description: "Only for create_job"
+        required: false
+        default: ""
+      length:
+        description: "Target length, e.g. 10min"
+        required: false
+        default: "10min"
+      language:
+        required: false
+        default: "Hinglish"
+      platform:
+        required: false
+        default: "youtube"
+
+permissions:
+  contents: write
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run production engine
+        env:
+          ENGINE_ACTION: ${{ inputs.action }}
+          JOB_ID: ${{ inputs.job_id }}
+          TOPIC: ${{ inputs.topic }}
+          LENGTH: ${{ inputs.length }}
+          LANGUAGE: ${{ inputs.language }}
+          PLATFORM: ${{ inputs.platform }}
+        run: python3 vision/scripts/production_engine.py
+
+      - name: Commit job state
+        if: always()
+        run: |
+          git config user.name vision-engine
+          git config user.email vision-engine@users.noreply.github.com
+          git add vision/engine/jobs/ || true
+          if git diff --staged --quiet; then echo nothing; else
+            git commit -m "engine: ${{ inputs.action }} ${{ inputs.job_id }}"
+            git pull --rebase origin main || git pull --rebase --autostash origin main || true
+            git push
+          fi
