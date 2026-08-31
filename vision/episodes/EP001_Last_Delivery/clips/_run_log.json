@@ -1,13 +1,15 @@
 {
-  "updated": "2026-08-31T14:29:22.487655+05:30",
+  "updated": "2026-08-31T15:03:50.263205+05:30",
   "mode": "i2v",
+  "size": "1280x720",
   "sora_key": true,
   "gemini_key": true,
   "results": {
     "B1": {
       "status": "ok",
       "provider": "sora2_i2v",
-      "bytes": 2627755,
+      "bytes": 2756599,
+      "size": "1280x720",
       "action_prompt": "4-second continuous cinematic night action shot. Same locked hero Rahul, with exact face, outfit, bag and motorcycle continuity. Rahul rides naturally toward and then past the camera on a wet Indian city road glowing with neon signs, headlights and colorful reflections. The motorcycle stays in continuous forward motion; both wheels visibly rotate with realistic motion blur, suspension movement and slight water spray. Rahul briefly glances at a phone securely mounted near the handlebar, then looks back at the road. His mouth moves subtly as if speaking to his mother through an earphone. His bag and clothes shift naturally with speed, wind and road vibration. Camera smoothly tracks from a three-quarter rear angle into a dynamic side profile as he passes. Strong background parallax, moving traffic and changing wet-road reflections create real speed. Photorealistic cinematic lighting. No freeze, static frames, sliding bike, frozen wheels, face drift, morphing, cuts or sudden camera jumps.",
       "error": null
     }
