@@ -1,12 +1,12 @@
 {
-  "updated": "2026-08-31T11:46:56.630369+05:30",
+  "updated": "2026-08-31T11:52:38.473035+05:30",
   "gemini_key": true,
   "nvidia_key": true,
   "results": {
     "B1": {
       "status": "ok",
       "provider": "ffmpeg_motion_still",
-      "bytes": 239431,
+      "bytes": 239337,
       "error": "HTTP 429 veo-3.1-lite-generate-preview {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n       | HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano"
     }
   }
