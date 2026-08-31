@@ -1,69 +1,44 @@
 # Vision — Production House Process Only
 
-No story. No characters. No episode names.
-This file is the studio operating process.
+No manual media edits. If identity drifts, change this process and rerun the stage. Do not patch frames by hand.
 
-Grok may only amend this process. Workers (GitHub Actions) execute the current stage. Director must pass before the next stage starts.
+Grok amends process only. Actions execute the current stage. Director must pass before the next stage.
 
 ## 1. Job
-Every film is one job.
-A job has: brief, state, artifacts, qc.
-state = which stage is allowed to run.
-Nothing runs outside the current stage.
+Every film is one job: brief, state, artifacts, qc.
+state = current stage. Nothing runs outside it.
 
-## 2. Stages (fixed order)
-1. Intake — receive topic + length + language + platform
-2. Development — logline, treatment, tone. No picture.
-3. Screenplay — script + shot plan. No picture.
-4. Look lock — character/location still sheets only. No motion.
-5. Keyframes — one still per shot, must match look lock.
-6. Picture — image-to-video from the approved still + shot prompt
-7. Sound — voice + bed from locked lines
-8. Assembly — cut, mix, subs, master file
-9. Delivery — publish package
+## 2. Stages
+1. Intake
+2. Development
+3. Screenplay
+4. Look lock — freeze faces/wardrobe. After Look OK those identities never change.
+5. Keyframes — stills only from locked identities. New face = fail.
+6. Picture — I2V from that keyframe + prompt. New face mid-clip = fail, go back to keyframes.
+7. Sound
+8. Assembly
+9. Delivery
 
-Skip a stage = process broken.
+Skip a stage = broken.
 
-## 3. Director gate (every stage)
-After a stage writes artifacts, Director reviews those artifacts against the previous lock.
-PASS → state advances one stage.
-FAIL → same stage, one retry.
-FAIL again → job stops. Human owner decides.
-Director never invents story. Director only accepts or rejects.
+## 3. Identity rule
+Look lock writes identity_lock.json (sheet ids + wardrobe).
+Keyframes and Picture must use only those ids.
+If a later stage needs a new person, stop and return to Look lock. Do not invent a face in picture.
 
-What Director checks, by stage:
-- Development: topic followed, length possible, platform fit
-- Screenplay: scenes cover the treatment, no missing beats
-- Look lock: faces/wardrobe usable and distinct
-- Keyframes: same people as look lock, correct scene, no extra text
-- Picture: same people as keyframe, motion matches shot prompt, aspect correct
-- Sound: right speaker, line matches screenplay
-- Assembly: order matches shot plan, sync, no placeholder
-- Delivery: file spec + metadata complete
+## 4. Director every stage
+PASS → advance. FAIL → one retry. FAIL again → stop.
+Picture fail because face changed → do not retry video first; retry keyframe.
 
-## 4. Owner gates (only three)
-- Topic OK — Intake may leave inbox
-- Look OK — Look lock accepted, keyframes allowed
-- Master OK — Delivery allowed
+## 5. Owner gates
+Topic OK, Look OK, Master OK.
 
-Owner does not sit on every shot if Director passed.
+## 6. Auto
+After PASS wait gaps.json then trigger next stage.
+Stop on owner gate or double Director fail.
 
-## 5. Run rule
-One job. One stage. One Action run.
-No full-film button.
-No generating picture to repair a failed look lock.
-If picture identity fails, go back to keyframes, not to more video.
+## 7. Prompts
+From shot plan. Start with: using reference images. Max 1000 characters.
 
-## 6. Prompt rule
-Shot prompts come from the shot plan, not from chat.
-Every picture prompt starts with: using reference images.
-Every picture prompt stays under 1000 characters.
-
-## 7. Picture spec
-Master aspect is 16:9 unless the brief says otherwise.
-Workers may change models. Process does not change.
-Slideshow / zoom-on-still is not picture finish.
-
-## 8. Isolation
-This house publishes only to the briefed platform.
-Other products stay out.
+## 8. Picture spec
+16:9 unless brief says otherwise. Still-zoom is not finish.
