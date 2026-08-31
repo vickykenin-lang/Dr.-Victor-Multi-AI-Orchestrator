@@ -1,16 +1,56 @@
 {
-  "updated": "2026-08-31T15:03:50.263205+05:30",
+  "updated": "2026-08-31T17:19:33.283139+05:30",
   "mode": "i2v",
   "size": "1280x720",
   "sora_key": true,
   "gemini_key": true,
   "results": {
-    "B1": {
+    "B2": {
       "status": "ok",
       "provider": "sora2_i2v",
-      "bytes": 2756599,
+      "bytes": 2468446,
       "size": "1280x720",
-      "action_prompt": "4-second continuous cinematic night action shot. Same locked hero Rahul, with exact face, outfit, bag and motorcycle continuity. Rahul rides naturally toward and then past the camera on a wet Indian city road glowing with neon signs, headlights and colorful reflections. The motorcycle stays in continuous forward motion; both wheels visibly rotate with realistic motion blur, suspension movement and slight water spray. Rahul briefly glances at a phone securely mounted near the handlebar, then looks back at the road. His mouth moves subtly as if speaking to his mother through an earphone. His bag and clothes shift naturally with speed, wind and road vibration. Camera smoothly tracks from a three-quarter rear angle into a dynamic side profile as he passes. Strong background parallax, moving traffic and changing wet-road reflections create real speed. Photorealistic cinematic lighting. No freeze, static frames, sliding bike, frozen wheels, face drift, morphing, cuts or sudden camera jumps.",
+      "action_prompt": "4s insert. same locked hero Rahul, Indian man 24, thin tired eyes, short styled black hair, full beard, blue zip-up collared delivery jacket over grey t-shirt, black backpack, NO hoodie NO helmet NO logos pulls closed brown cardboard parcel with red tape and FRAGILE label MRS SHARMA from backpack on parked night bike. Hands move. Push to FRAGILE tape. photorealistic cinematic, no watermark no logos no gore",
+      "error": null
+    },
+    "B3": {
+      "status": "ok",
+      "provider": "sora2_i2v",
+      "bytes": 1909550,
+      "size": "1280x720",
+      "action_prompt": "6s. same locked hero Rahul, Indian man 24, thin tired eyes, short styled black hair, full beard, blue zip-up collared delivery jacket over grey t-shirt, black backpack, NO hoodie NO helmet NO logos at gate with closed brown cardboard parcel with red tape and FRAGILE label MRS SHARMA. Vikram, Indian man 32, neat hair, smart casual shirt, calm polite face with hidden threat leans from car, offers cash. Rahul shakes head, walks to gate. Smile tightens. photorealistic cinematic, no watermark no logos no gore",
+      "error": null
+    },
+    "B4": {
+      "status": "ok",
+      "provider": "sora2_i2v",
+      "bytes": 2335509,
+      "size": "1280x720",
+      "action_prompt": "5s. same locked hero Rahul, Indian man 24, thin tired eyes, short styled black hair, full beard, blue zip-up collared delivery jacket over grey t-shirt, black backpack, NO hoodie NO helmet NO logos rings doorbell with closed brown cardboard parcel with red tape and FRAGILE label MRS SHARMA. Mrs Sharma, Indian woman 58, simple muted cotton saree, grey-black hair in a bun, worried kind face opens, sees box, gestures him in. Over-shoulder then push. photorealistic cinematic, no watermark no logos no gore",
+      "error": null
+    },
+    "B5": {
+      "status": "ok",
+      "provider": "sora2_i2v",
+      "bytes": 2204652,
+      "size": "1280x720",
+      "action_prompt": "4s. same locked hero Rahul, Indian man 24, thin tired eyes, short styled black hair, full beard, blue zip-up collared delivery jacket over grey t-shirt, black backpack, NO hoodie NO helmet NO logos sets closed brown cardboard parcel with red tape and FRAGILE label MRS SHARMA on table. Mrs Sharma, Indian woman 58, simple muted cotton saree, grey-black hair in a bun, worried kind face hand near tape, does not open. Push box to face to wall photo. photorealistic cinematic, no watermark no logos no gore",
+      "error": null
+    },
+    "B6": {
+      "status": "ok",
+      "provider": "sora2_i2v",
+      "bytes": 2751223,
+      "size": "1280x720",
+      "action_prompt": "6s. same locked hero Rahul, Indian man 24, thin tired eyes, short styled black hair, full beard, blue zip-up collared delivery jacket over grey t-shirt, black backpack, NO hoodie NO helmet NO logos hurries wet lane with closed brown cardboard parcel with red tape and FRAGILE label MRS SHARMA, stops under lamp, checks call, phone to ear, urgent line. Follow then CU. photorealistic cinematic, no watermark no logos no gore",
+      "error": null
+    },
+    "B7": {
+      "status": "ok",
+      "provider": "sora2_i2v",
+      "bytes": 2485065,
+      "size": "1280x720",
+      "action_prompt": "5s morning. same locked hero Rahul, Indian man 24, thin tired eyes, short styled black hair, full beard, blue zip-up collared delivery jacket over grey t-shirt, black backpack, NO hoodie NO helmet NO logos rides toward camera, wheels turn, earphone talk, slight relief. photorealistic cinematic, no watermark no logos no gore",
       "error": null
     }
   }
