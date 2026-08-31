@@ -132,6 +132,35 @@ export default {
       });
     }
 
+    if (request.method === 'GET' && ['/aura3-bridge-health', '/aura3-bridge-health/', '/aura3-health', '/aura3-health/'].includes(url.pathname)) {
+      if (!aura3BridgeConfigured(env)) {
+        return json({ service: 'aura3-bridge', status: 'PENDING_CONFIGURATION', token_present: false }, 503);
+      }
+      const headers = {
+        Authorization: `Bearer ${env.GITHUB_ORCHESTRATION_TOKEN}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'Dr-Victor-AURA3-Bridge-Health/1.0',
+      };
+      const repoUrl = 'https://api.github.com/repos/vickykenin-lang/aura-3.0';
+      const workflowUrl = 'https://api.github.com/repos/vickykenin-lang/aura-3.0/actions/workflows/victor-aura3-transport.yml';
+      const [repoResponse, workflowResponse] = await Promise.all([
+        fetch(repoUrl, { headers }),
+        fetch(workflowUrl, { headers }),
+      ]);
+      return json({
+        service: 'aura3-bridge',
+        status: repoResponse.ok && workflowResponse.ok ? 'READ_PATH_VERIFIED' : 'BLOCKED',
+        token_present: true,
+        repository_access_http: repoResponse.status,
+        workflow_access_http: workflowResponse.status,
+        workflow_dispatch_write: 'NOT_TESTED_BY_READ_ONLY_HEALTH_CHECK',
+        expected_actions_permission: 'READ_AND_WRITE',
+        expected_contents_permission: 'READ_ONLY_OR_HIGHER',
+        secrets_exposed: false,
+      }, repoResponse.ok && workflowResponse.ok ? 200 : 503);
+    }
+
     if (request.method === 'GET' && ['/tony-bridge-health', '/tony-bridge-health/', '/tony-health', '/tony-health/'].includes(url.pathname)) {
       if (!tonyBridgeConfigured(env)) {
         return json({ service: 'tony-bridge', status: 'PENDING_CONFIGURATION', token_present: false }, 503);

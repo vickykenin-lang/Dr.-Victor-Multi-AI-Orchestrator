@@ -9,6 +9,7 @@ export function aura3BridgeConfigured(env) {
 
 export function selectAura3TaskType(text) {
   const value = String(text || '').toLowerCase();
+  if (/recover|recovery|thik|fix|repair|production.?ready|system.*(thik|fix)/.test(value)) return 'RECOVERY_EXECUTE';
   if (/certif|bridge|connect|communication|strict|supervision/.test(value)) return 'STRICT_SUPERVISION_PROBE';
   if (/govern|authority|soul|rule/.test(value)) return 'GOVERNANCE_CHECK';
   if (/capabilit|kya kar sak|features|scope/.test(value)) return 'CAPABILITY_CATALOG';
@@ -18,7 +19,7 @@ export function selectAura3TaskType(text) {
 export function shouldContactAura3(text, entity) {
   if (entity?.entity_id !== 'aura3') return false;
   const value = String(text || '').toLowerCase();
-  return /status|report|error|problem|issue|check|pucho|pooch|baat|connect|bridge|communication|certif|supervision|progress|objective/.test(value);
+  return /status|report|error|problem|issue|check|pucho|pooch|baat|connect|bridge|communication|certif|supervision|progress|objective|recover|recovery|thik|fix|repair|production.?ready|system/.test(value);
 }
 
 export async function dispatchAura3Task(env, text, metadata = {}) {
