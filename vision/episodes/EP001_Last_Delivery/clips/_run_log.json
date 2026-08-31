@@ -1,13 +1,13 @@
 {
-  "updated": "2026-08-31T11:45:15.312988+05:30",
+  "updated": "2026-08-31T11:46:56.630369+05:30",
   "gemini_key": true,
   "nvidia_key": true,
   "results": {
     "B1": {
       "status": "ok",
       "provider": "ffmpeg_motion_still",
-      "bytes": 239337,
-      "error": "HTTP 400 veo-3.1-lite-generate-preview {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"`inlineData` isn't supported by this model. Please remove it or refer to the Gemini API documentation for supported usage.\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n | HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano"
+      "bytes": 239431,
+      "error": "HTTP 429 veo-3.1-lite-generate-preview {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n       | HTTP 404 https://integrate.api.nvidia.com/v1/genai/nvidia/cosmos3-nano"
     }
   }
 }
