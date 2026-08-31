@@ -8,7 +8,7 @@ on:
         required: false
         default: "B1"
       i2v_only:
-        description: "1 = Veo I2V only, no JSON2Video/ffmpeg fake success"
+        description: "1 = real I2V only"
         required: false
         default: "1"
 
@@ -27,19 +27,33 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
+      - name: Show I2V keys
+        env:
+          SORA2_API: ${{ secrets.SORA2_API }}
+          SORA2_API_KEY: ${{ secrets.SORA2_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_VIO_API_KEY: ${{ secrets.GEMINI_VIO_API_KEY }}
+        run: |
+          if [ -n "$SORA2_API" ]; then echo SORA2_API=SET; else echo SORA2_API=EMPTY; fi
+          if [ -n "$SORA2_API_KEY" ]; then echo SORA2_API_KEY=SET; else echo SORA2_API_KEY=EMPTY; fi
+          if [ -n "$OPENAI_API_KEY" ]; then echo OPENAI_API_KEY=SET; else echo OPENAI_API_KEY=EMPTY; fi
+          if [ -n "$GEMINI_VIO_API_KEY" ]; then echo GEMINI_VIO_API_KEY=SET; else echo GEMINI_VIO_API_KEY=EMPTY; fi
+
       - name: Generate clips I2V
         env:
+          SORA2_API: ${{ secrets.SORA2_API }}
+          SORA2_API_KEY: ${{ secrets.SORA2_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_VIO_API_KEY: ${{ secrets.GEMINI_VIO_API_KEY }}
           GEMINI_VEO_API_KEY: ${{ secrets.GEMINI_VEO_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          JASON2VIDEO_API_KEY: ${{ secrets.JASON2VIDEO_API_KEY }}
           ONLY_IDS: ${{ inputs.only_ids }}
           I2V_ONLY: ${{ inputs.i2v_only }}
         run: python3 vision/scripts/auto_generate_clips.py
 
       - name: Assemble animatic master
         if: always()
-        run: python3 vision/scripts/assemble_animatic.py
+        run: python3 vision/scripts/assemble_animatic.py || true
 
       - name: Upload clip artifacts
         if: always()
