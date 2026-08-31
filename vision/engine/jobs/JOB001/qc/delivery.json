@@ -1,0 +1,7 @@
+{
+  "stage": "delivery",
+  "checked_at": "2026-08-31T23:38:42.149032+05:30",
+  "pass": true,
+  "reason": "delivery artifacts present",
+  "must_fix": []
+}

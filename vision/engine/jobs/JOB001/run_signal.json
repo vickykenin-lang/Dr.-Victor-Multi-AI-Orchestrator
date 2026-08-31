@@ -1,7 +1,7 @@
 {
-  "continue": true,
-  "gap_sec": 60,
-  "stage": "assembly",
-  "reason": "advanced to delivery",
-  "updated": "2026-08-31T23:38:05.408172+05:30"
+  "continue": false,
+  "gap_sec": 0,
+  "stage": "delivery",
+  "reason": "advanced to done",
+  "updated": "2026-08-31T23:38:42.149151+05:30"
 }
