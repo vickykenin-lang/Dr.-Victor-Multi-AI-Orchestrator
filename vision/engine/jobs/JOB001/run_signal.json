@@ -1,7 +1,7 @@
 {
-  "continue": false,
-  "gap_sec": 0,
+  "continue": true,
+  "gap_sec": 480,
   "stage": "inbox",
-  "reason": "waiting Topic OK",
-  "updated": "2026-08-31T23:26:06.124213+05:30"
+  "reason": "gate topic_ok set",
+  "updated": "2026-08-31T23:26:42.823660+05:30"
 }

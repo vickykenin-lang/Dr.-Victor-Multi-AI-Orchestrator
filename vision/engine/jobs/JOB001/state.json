@@ -2,11 +2,11 @@
   "job_id": "JOB001",
   "stage": "inbox",
   "owner_gates": {
-    "topic_ok": false,
+    "topic_ok": true,
     "look_ok": false,
     "master_ok": false
   },
   "retries": {},
   "last_director": null,
-  "updated": "2026-08-31T23:26:06.124122+05:30"
+  "updated": "2026-08-31T23:26:42.823375+05:30"
 }
