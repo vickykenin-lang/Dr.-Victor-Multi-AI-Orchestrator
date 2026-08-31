@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 worker=ROOT/'victor-telegram-worker/worker.js'
 mem=ROOT/'victor-telegram-worker/memory_runtime.mjs'
+mem_test=ROOT/'victor-telegram-worker/memory_runtime.test.mjs'
 
 w=worker.read_text(encoding='utf-8')
 old="""  ['FOUNDER_MEMORY', 'memory/founder_memory.json', false],
@@ -65,5 +66,43 @@ layered="""    const layered = {
 if 'const layered = {' not in m:
     if anchor not in m: raise SystemExit('MEMORY_PARSE_ANCHOR_NOT_FOUND')
     m=m.replace(anchor,anchor+layered,1)
+
+# Memory writes must be explicit Founder save/lock commands. Ordinary words such as
+# "final reply", "final certification", "permanent issue", or "record status" must
+# not steal an executive/department command from the Brain routing path.
+old_patterns="""const LOCK_PATTERNS = [
+  /\\b(lock|locked|final|permanent|remember|save|store|record)\\b/i,
+  /\\b(yaad\\s+rakh|yaad\\s+rakho|save\\s+kar|store\\s+kar|lock\\s+kar|record\\s+kar|record\\s+karo)\\b/i,
+];
+"""
+new_patterns="""const LOCK_PATTERNS = [
+  /\\b(remember|save|store)\\s+(this|it|this\\s+decision|this\\s+rule|this\\s+instruction)\\b/i,
+  /\\b(yaad\\s+rakh(?:o)?|save\\s+kar(?:o)?|store\\s+kar(?:o)?|lock\\s+kar(?:o)?|record\\s+kar(?:o)?)\\b/i,
+  /\\b(lock|record)\\s+(this|it|this\\s+decision|this\\s+rule|this\\s+instruction)\\b/i,
+];
+"""
+if old_patterns in m:
+    m=m.replace(old_patterns,new_patterns,1)
+elif new_patterns not in m:
+    raise SystemExit('MEMORY_DIRECTIVE_PATTERN_BLOCK_NOT_FOUND')
 mem.write_text(m,encoding='utf-8')
+
+# Regression tests for the false-positive that blocked the AURA3 executive command.
+t=mem_test.read_text(encoding='utf-8')
+needle="""  assert.equal(isExplicitMemoryDirective('record karo- aura 2 hold me rakho'), true);
+  assert.equal(isExplicitMemoryDirective('Status batao'), false);
+"""
+replacement="""  assert.equal(isExplicitMemoryDirective('record karo- aura 2 hold me rakho'), true);
+  assert.equal(isExplicitMemoryDirective('Save this decision'), true);
+  assert.equal(isExplicitMemoryDirective('Status batao'), false);
+  assert.equal(isExplicitMemoryDirective('Final reply me verified root cause aur next action do'), false);
+  assert.equal(isExplicitMemoryDirective('AURA3 final certification evidence ke saath do'), false);
+  assert.equal(isExplicitMemoryDirective('Record status aur exact next action batao'), false);
+"""
+if needle in t:
+    t=t.replace(needle,replacement,1)
+elif "Final reply me verified root cause" not in t:
+    raise SystemExit('MEMORY_TEST_ANCHOR_NOT_FOUND')
+mem_test.write_text(t,encoding='utf-8')
+
 print('LAYERED_MEMORY_RUNTIME_PATCHED')
