@@ -27,31 +27,46 @@ This file is evidence-based. READY_FOR_FOUNDER_TEST is prohibited until every cr
 - Tests cover: canonical current state beating a newer historical alert by truth precedence; same-precedence fresh evidence beating stale conflicting evidence; stale-only evidence remaining labelled stale.
 - Persisted `brain/fact_runtime.mjs` imports and executes `attachResolvedTruth`, proving runtime integration is present.
 
+### Wave 3 — owned outcome state machine + bounded self-healing
+- Added `brain/outcome_state.mjs` with explicit `TASK_SENT`, `WORK_PERFORMED`, `RESULT_VERIFIED`, `OBJECTIVE_ACHIEVED`, `FOUNDER_ONLY_BLOCKER`, and `EXECUTION_UNVERIFIED` states.
+- A verified department result no longer upgrades automatically to objective achievement. `OBJECTIVE_ACHIEVED` requires a verified final outcome/evidence contract (or an explicit verified-goal status with evidence).
+- Genuine Founder boundaries are detected separately from routine internal blockers. Credential/account identity administration, spend ceiling, irreversible commitment, legal/security judgment, explicit objective change/pause, and verified impossibility stop automatic recovery; normal blockers do not.
+- Owned-problem dispatch now persists an `owned_outcome` lineage with attempt count and requested outcome instead of the ambiguous `OWNED_RECOVERY_RUNNING` label.
+- Verified RIO/Tony/AURA3 results now pass through the same outcome evaluator before Founder synthesis.
+- If the requested outcome is still unverified, `requires_follow_up=true`, no Founder boundary exists, and the recovery limit has not been reached, Victor automatically dispatches the next governed recovery action instead of stopping at the blocker report.
+- Recovery is bounded to three attempts per owned-outcome chain. Repeated identical failure/recommendation fingerprints trigger an evidence-backed Five Whys/change-route directive rather than blindly repeating the same action.
+- Natural result synthesis preserves the outcome stage and does not clear the unresolved Founder question unless the objective is actually achieved.
+- Runtime integration is present in the persisted Telegram worker and is covered by outcome-state regression tests.
+
 ### Integration reliability repair
 - Legacy patchers continue to expose exact-anchor assumptions as consolidation progresses. Repaired continuity, natural-conversation and request-gateway patchers to detect semantic end-state rather than reinsert obsolete cache-era structure.
 - Diagnostic CI #40 failed at the old continuity anchor; #41 progressed and exposed the old natural-conversation helper anchor; #42 progressed and exposed the old request-gateway classification anchor. Each failure was used as integration evidence and repaired at the semantic level.
-- CI #43 has passed runtime integration, all registered core tests, syntax checks, backlog validation, and persistence. Final workflow cleanup was still completing at the last observation, so full run conclusion is not overstated here.
+- CI #43 passed runtime integration, registered core tests, syntax checks, backlog validation, and persistence.
+- CI #44 (`33564118904`) completed **SUCCESS** after adding the Wave 3 outcome-state integration. Apply integration, core tests (including `brain/outcome_state.test.mjs`), syntax checks, backlog validation, persistence, and job completion all passed.
 
 ## Evidence
 - Truth resolver module: `e63a61147aacdd108f68d2dd3531474762ba5ab1`
 - Truth resolver tests: `f5d5d3bc74818138be1a2817c17904f97f0b5e4f`
 - Fact evidence resolver: `29f977b918610c6f427cf60880b3e091b22e0f55`
 - Truth runtime integration patcher: `cbf2418c7cb2eeada061e2ca6528695dfeb3923a`
-- CI registration: `c4419c7a348889ca7067c4e52a41f127a2560507`
-- Continuity compatibility repair: `0e7ea8a963cfc847d8adad01540574c11c4f77ba`
-- Natural-conversation compatibility repair: `ba390b46af5dbfd9c60805936c5884a8be9fbc69`
-- Request-gateway compatibility repair: `3cab1b6a6cf684e47317077d09529354f1322125`
+- Outcome state module initial commit: `9150f17b38f77738a2418070982f03c387608994`
+- Outcome milestone correction: `1b2769689977e25f75e111ceb38b6c45298e0bc2`
+- Outcome-state regression tests: `0d6a99db2f5fdcd247dc9d578e44a5d09d8040a9`
+- Outcome runtime integration patcher: `9b7ef379a8615dc87add16b8ef6ef56862a5e75b`
+- CI registration/integration commit: `8725bad6dab2880b5d304c9e1eb302cdacf8475b`
+- Persisted worker SHA after CI #44: `601fc168fa351d919d6a694226d26a4a1ddb2770`
 - CI #40 run `33558627207`: diagnostic failure at legacy continuity anchor.
 - CI #41 run `33558678773`: diagnostic failure at legacy natural-conversation anchor.
 - CI #42 run `33558760484`: diagnostic failure at legacy request-gateway anchor.
-- CI #43 run `33558806564`: integration/tests/syntax/validation/persistence all observed successful; final job cleanup pending at checkpoint.
+- CI #43 run `33558806564`: successful prior consolidation checkpoint.
+- CI #44 run `33564118904`: completed `success`; all apply/test/syntax/validation/persistence steps passed.
 
 ## Remaining P0 gaps
 1. **Actual durable conversation binding is not configured/verified in production.** The abstraction is truthful but production remains best-effort cache-backed until deployment wiring exists.
-2. Truth resolver is now generalized for collected facts, but external-platform result receipts and department-envelope receipts still need to enter the same resolver so publish/result truth can reconcile across all seven hierarchy classes, not only GitHub fact collectors.
-3. Owned-problem recovery still needs end-to-end acceptance proof for `TASK_SENT -> WORK_PERFORMED -> RESULT_VERIFIED -> OBJECTIVE_ACHIEVED`, including retry/replan and repeated-failure Five Whys.
+2. External-platform result receipts and department-envelope receipts still need to enter the generalized truth resolver so publish/result truth can reconcile across all seven hierarchy classes, not only GitHub fact collectors.
+3. Wave 3 now has a deterministic bounded self-healing runtime and unit/regression proof, but a live end-to-end acceptance trace still needs to demonstrate a real owned problem progressing across multiple attempts to either `OBJECTIVE_ACHIEVED` or a genuine `FOUNDER_ONLY_BLOCKER`.
 4. Natural response synthesis still coexists with acknowledgement templates; the 20-scenario adversarial acceptance suite is incomplete.
 5. Multi-department action decomposition still needs one deterministic execution-plan object rather than legacy single-target planner fallback.
 
 ## Next priority
-Wave 3: consolidate outcome ownership into a deterministic execution/outcome state machine, feed department/external result receipts through the generalized truth resolver, and prove that a Founder problem request does not stop at diagnosis when an internal recovery path exists.
+Finish Wave 3 truth integration for department/external result receipts, then build the Wave 4 adversarial acceptance harness. The next highest-value proof is a real or fixture-backed owned-problem chain showing `TASK_SENT -> RESULT_VERIFIED -> automatic recovery/replan -> OBJECTIVE_ACHIEVED`, while rejecting routine approval escalation and forcing Five Whys on repeated failure.
