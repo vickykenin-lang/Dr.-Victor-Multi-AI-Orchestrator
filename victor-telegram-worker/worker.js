@@ -43,6 +43,7 @@ import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } fr
 import { naturalDispatchAcknowledgement, naturalInvestigationAcknowledgement, naturalPendingReply, buildNaturalResultPrompt, naturalResultFallback } from '../brain/founder_conversation.mjs';
 import { classifyOwnedProblem, buildOwnedProblemPrompt, naturalOwnedProblemAck } from '../brain/problem_ownership.mjs';
 import { classifyFactRequest, collectFactEvidence, buildFactAnswerPrompt } from '../brain/fact_runtime.mjs';
+import { buildRuntimeFounderRequest, buildSessionPatchForRequest, buildFactRequestFromFounderRequest, shouldUseFactGateway } from '../brain/request_gateway.mjs';
 import { classifyHulkRequest, hulkActionBlockedReply, hulkStatusReply, isCasualWellbeing, casualWellbeingReply } from '../brain/hulk_guard.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -115,7 +116,7 @@ export default {
         active_thread_memory: 'BEST_EFFORT_WORKING_CONTEXT_V1',
         founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',
         fact_evidence_runtime: 'FRESH_GITHUB_FACTS_V1',
-        founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',
+        founder_request_gateway: 'STRUCTURED_REQUEST_GATEWAY_V1',
         memory_write_configured: Boolean(env.GITHUB_MEMORY_TOKEN),
         aura3_bridge_configured: aura3BridgeConfigured(env),
         tony_bridge_configured: tonyBridgeConfigured(env),
@@ -273,12 +274,15 @@ export default {
       const replyContext = message?.reply_to_message?.text || '';
       const session = await readConversationSession(chatId);
       const activePatch = buildActiveContext(session, { founderText: text, replyContext, messageId: message.message_id });
-      const sessionWithFounderTurn = appendRecentTurn({ ...session, ...activePatch }, 'founder', text);
+      let sessionWithFounderTurn = appendRecentTurn({ ...session, ...activePatch }, 'founder', text);
+      const founderRequest = buildRuntimeFounderRequest(text, sessionWithFounderTurn);
+      const requestSessionPatch = buildSessionPatchForRequest(founderRequest);
+      sessionWithFounderTurn = { ...sessionWithFounderTurn, ...requestSessionPatch };
       await writeConversationSession(chatId, sessionWithFounderTurn);
       const deterministicIntent = resolveFounderIntent(text, replyContext);
       const contextualFollowUp = classifyConversationFollowUp(text, sessionWithFounderTurn);
       const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);
-      const factRequest = classifyFactRequest(text);
+      const factRequest = buildFactRequestFromFounderRequest(founderRequest, text);
       const hulkRequest = classifyHulkRequest(text);
 
       if (!memoryDirective && isCasualWellbeing(text)) {
@@ -293,7 +297,7 @@ export default {
         return json({ ok: true, mode: hulkRequest.mode, target: 'hulk', dispatch: 'NOT_ATTEMPTED_BRIDGE_UNVERIFIED' });
       }
 
-      if (!memoryDirective && factRequest.matched) {
+      if (!memoryDirective && shouldUseFactGateway(founderRequest, factRequest)) {
         processingStage = 'FACT_RETRIEVAL';
         try {
           const evidence = await collectFactEvidence(env, text, factRequest);
@@ -308,7 +312,7 @@ export default {
             reply = `Fresh evidence fetched at ${evidence.fetched_at_utc}. AI synthesis unavailable; raw fact retrieval succeeded.`;
           }
           await sendTelegramMessage(env, chatId, reply, message.message_id);
-          return json({ ok: true, mode: 'FACT_EVIDENCE_QUERY', targets: factRequest.targets });
+          return json({ ok: true, mode: 'FACT_EVIDENCE_QUERY', targets: factRequest.targets, questions: founderRequest.questions.length });
         } catch (error) {
           console.error('Fresh fact retrieval failed:', safeErrorMessage(error));
           await sendTelegramMessage(env, chatId, 'Fresh evidence read fail hua. Main generic status line se gap cover nahi karunga; exact GitHub fact abhi verify nahi hua.', message.message_id);
