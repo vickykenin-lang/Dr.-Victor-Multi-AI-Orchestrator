@@ -1,0 +1,7 @@
+{
+  "stage": "development",
+  "checked_at": "2026-09-01T11:52:48.590331+05:30",
+  "pass": true,
+  "reason": "development artifacts present",
+  "must_fix": []
+}
