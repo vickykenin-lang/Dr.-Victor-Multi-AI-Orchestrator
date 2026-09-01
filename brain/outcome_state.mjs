@@ -37,6 +37,8 @@ export function createOwnedOutcomeState({ target, founderRequest, taskId, previo
     founder_boundary: false,
     objective_achieved: false,
     requires_follow_up: true,
+    work_performed: false,
+    result_verified: false,
     evidence: Array.isArray(prior.evidence) ? prior.evidence : [],
     last_status: 'TASK_DISPATCHED',
     last_next_action: null,
@@ -59,7 +61,7 @@ export function assessVerifiedDepartmentResult(result = {}, priorState = {}) {
   );
 
   const verified = result?.__victor_verified === true;
-  const workPerformed = verified && Boolean(
+  const workPerformed = Boolean(
     result?.governed_business_cycle_performed === true
     || result?.public_action_performed === true
     || result?.changed_files?.length
@@ -68,8 +70,8 @@ export function assessVerifiedDepartmentResult(result = {}, priorState = {}) {
   );
 
   let stage = OUTCOME_STAGE.EXECUTION_UNVERIFIED;
-  if (verified) stage = OUTCOME_STAGE.RESULT_VERIFIED;
   if (workPerformed) stage = OUTCOME_STAGE.WORK_PERFORMED;
+  if (verified) stage = OUTCOME_STAGE.RESULT_VERIFIED;
   if (founderBoundary) stage = OUTCOME_STAGE.FOUNDER_ONLY_BLOCKER;
   if (objectiveAchieved) stage = OUTCOME_STAGE.OBJECTIVE_ACHIEVED;
 
@@ -93,6 +95,7 @@ export function assessVerifiedDepartmentResult(result = {}, priorState = {}) {
     objective_achieved: objectiveAchieved,
     requires_follow_up: requiresFollowUp,
     work_performed: workPerformed,
+    result_verified: verified,
     evidence: [...new Set([...(priorState?.evidence || []), ...evidence])].slice(-100),
     last_status: status,
     last_next_action: nextAction,
@@ -106,6 +109,7 @@ export function shouldContinueOwnedRecovery(state = {}, maxAttempts = 3) {
   return Boolean(
     state.stage !== OUTCOME_STAGE.OBJECTIVE_ACHIEVED
     && state.stage !== OUTCOME_STAGE.FOUNDER_ONLY_BLOCKER
+    && state.result_verified === true
     && state.requires_follow_up === true
     && Number(state.attempts || 0) < maxAttempts
   );
