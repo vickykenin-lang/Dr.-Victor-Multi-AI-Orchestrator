@@ -40,6 +40,7 @@ import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from 
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
 import { classifyConversationFollowUp, buildInvestigationTaskText, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';
 import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } from '../brain/active_context.mjs';
+import { naturalDispatchAcknowledgement, naturalInvestigationAcknowledgement, naturalPendingReply, buildNaturalResultPrompt, naturalResultFallback } from '../brain/founder_conversation.mjs';
 import { classifyHulkRequest, hulkActionBlockedReply, hulkStatusReply, isCasualWellbeing, casualWellbeingReply } from '../brain/hulk_guard.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -110,6 +111,7 @@ export default {
         founder_approval_gate: 'CREDENTIAL_ADMINISTRATION_ONLY',
         memory_recall_mode: 'LAYERED_REPO_MEMORY_V3',
         active_thread_memory: 'BEST_EFFORT_WORKING_CONTEXT_V1',
+        founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',
         memory_write_configured: Boolean(env.GITHUB_MEMORY_TOKEN),
         aura3_bridge_configured: aura3BridgeConfigured(env),
         tony_bridge_configured: tonyBridgeConfigured(env),
@@ -297,7 +299,7 @@ export default {
           unresolved_question: contextualFollowUp.query || text,
           task_state: 'PENDING_INVESTIGATION',
         });
-        await sendTelegramMessage(env, chatId, `${String(contextualFollowUp.target || '').toUpperCase()} ko specific follow-up investigation di hai. Parent task: ${contextualFollowUp.parent_task_id || contextualFollowUp.task_id || 'none'}. Investigation task: ${dispatch.taskId}. Purani report repeat nahi karni; fresh evidence ya evidence-gap ka root cause return karna hai.`, message.message_id);
+        await sendTelegramMessage(env, chatId, naturalInvestigationAcknowledgement(contextualFollowUp.target, contextualFollowUp.query || text), message.message_id);
         if (contextualFollowUp.target === 'rio') ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
         else if (contextualFollowUp.target === 'tony_stark') ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
         else if (contextualFollowUp.target === 'aura3') ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
@@ -373,7 +375,7 @@ export default {
             return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
           }
           await writeConversationSession(chatId, { last_target: 'rio', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' });
-          await sendTelegramMessage(env, chatId, `RIO ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
+          await sendTelegramMessage(env, chatId, naturalDispatchAcknowledgement('rio', text), message.message_id);
           ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
         }
@@ -397,7 +399,7 @@ export default {
             return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
           }
           await writeConversationSession(chatId, { last_target: 'tony_stark', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' });
-          await sendTelegramMessage(env, chatId, `Tony ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
+          await sendTelegramMessage(env, chatId, naturalDispatchAcknowledgement('tony_stark', text), message.message_id);
           ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
         }
@@ -421,7 +423,7 @@ export default {
             return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
           }
           await writeConversationSession(chatId, { last_target: 'aura3', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' });
-          await sendTelegramMessage(env, chatId, `AURA3 ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
+          await sendTelegramMessage(env, chatId, naturalDispatchAcknowledgement('aura3', text), message.message_id);
           ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
         }
@@ -482,22 +484,22 @@ async function handleAura3RoundTrip(env, chatId, dispatch, replyToMessageId) {
   try {
     const received = await waitForAura3Result(dispatch.taskId);
     if (received.status !== 'RESULT_RECEIVED') {
-      await sendTelegramMessage(env, chatId, `AURA3 task ${dispatch.taskId} ka fresh revert timeout hua. Connection ko VERIFIED claim nahi kar raha. Follow-up required hai.`, replyToMessageId);
+      await sendTelegramMessage(env, chatId, 'AURA3 ka fresh result abhi verify nahi ho paya. Main same check ko track kar raha hoon; unverified result ko final nahi maanunga.', replyToMessageId);
       return;
     }
 
     const verification = verifyAura3Result(received.result, dispatch.taskId);
     if (!verification.ok) {
-      await sendTelegramMessage(env, chatId, `AURA3 ka revert mila, lekin strict verification fail hui. Task ${dispatch.taskId} ko VERIFIED_CONNECTED nahi maana jayega.`, replyToMessageId);
+      await sendTelegramMessage(env, chatId, 'AURA3 se result mila, lekin verification pass nahi hui. Main ise reliable final result nahi maan raha.', replyToMessageId);
       return;
     }
 
     const report = formatAura3ResultForFounder(received.result);
-    await sendTelegramMessage(env, chatId, `${report}\n\nVictor verification: round-trip evidence VERIFIED for this task. Ye diagnostic communication verification hai; production/LIVE certification alag gate hai.`, replyToMessageId);
+    await sendNaturalDepartmentResult(env, chatId, 'aura3', report, replyToMessageId);
   } catch (error) {
     console.error('AURA3 round-trip failed:', error?.message || 'unknown');
     try {
-      await sendTelegramMessage(env, chatId, `AURA3 round-trip verify nahi hua. Task ${dispatch.taskId} par error aaya; main connected/success claim nahi karunga.`, replyToMessageId);
+      await sendTelegramMessage(env, chatId, 'AURA3 ka fresh check verify nahi ho paya. Main success claim nahi kar raha; issue internally track ho raha hai.', replyToMessageId);
     } catch (_) {}
   }
 }
@@ -506,19 +508,19 @@ async function handleRioRoundTrip(env, chatId, dispatch, replyToMessageId) {
   try {
     const received = await waitForRioResult(dispatch.taskId);
     if (received.status !== 'RESULT_RECEIVED') {
-      await sendTelegramMessage(env, chatId, `RIO task ${dispatch.taskId} ka fresh revert timeout hua. Connection VERIFIED claim nahi kiya jayega.`, replyToMessageId);
+      await sendTelegramMessage(env, chatId, 'RIO ka fresh result abhi verify nahi ho paya. Main ise success ya connected result claim nahi kar raha; same check ko track karunga.', replyToMessageId);
       return;
     }
     const verification = verifyRioResult(received.result, dispatch.taskId);
     if (!verification.ok) {
-      await sendTelegramMessage(env, chatId, `RIO ka revert mila, lekin strict verification fail hui. Task ${dispatch.taskId} VERIFIED_CONNECTED nahi hai.`, replyToMessageId);
+      await sendTelegramMessage(env, chatId, 'RIO se result mila, lekin verification pass nahi hui. Isliye main us result ko reliable fact ke roop me use nahi karunga.', replyToMessageId);
       return;
     }
     const report = formatRioResultForFounder(received.result);
-    await sendTelegramMessage(env, chatId, `${report}\n\nVictor verification: fresh governed round-trip VERIFIED. Ye communication certification hai; RIO production authority ya objective change nahi hua.`, replyToMessageId);
+    await sendNaturalDepartmentResult(env, chatId, 'rio', report, replyToMessageId);
   } catch (error) {
     console.error('RIO round-trip failed:', error?.message || 'unknown');
-    try { await sendTelegramMessage(env, chatId, `RIO round-trip verify nahi hua. Task ${dispatch.taskId} par error aaya; main connected/success claim nahi karunga.`, replyToMessageId); } catch (_) {}
+    try { await sendTelegramMessage(env, chatId, 'RIO ka fresh check verify nahi ho paya. Main success claim nahi kar raha; exact failure ko internally track kar raha hoon.', replyToMessageId); } catch (_) {}
   }
 }
 
@@ -526,13 +528,13 @@ async function handleTonyRoundTrip(env, chatId, dispatch, replyToMessageId) {
   try {
     const received = await waitForTonyResult(dispatch.taskId, env);
     if (received.status !== 'RESULT_RECEIVED') {
-      await sendTelegramMessage(env, chatId, `Tony task ${dispatch.taskId} ka fresh revert timeout hua. Connection ko VERIFIED claim nahi kar raha. Follow-up required hai.`, replyToMessageId);
+      await sendTelegramMessage(env, chatId, 'Tony ka fresh result abhi verify nahi ho paya. Main same check ko track kar raha hoon aur unverified result ko final nahi maanunga.', replyToMessageId);
       return;
     }
 
     const verification = verifyTonyResult(received.result, dispatch.taskId);
     if (!verification.ok) {
-      await sendTelegramMessage(env, chatId, `Tony ka revert mila, lekin strict verification fail hui. Task ${dispatch.taskId} ko VERIFIED_CONNECTED nahi maana jayega.`, replyToMessageId);
+      await sendTelegramMessage(env, chatId, 'Tony se result mila, lekin verification pass nahi hui. Main ise reliable final result nahi maan raha.', replyToMessageId);
       return;
     }
 
@@ -540,13 +542,36 @@ async function handleTonyRoundTrip(env, chatId, dispatch, replyToMessageId) {
     const verificationNote = dispatch.taskType === 'TASK_REQUEST'
       ? 'Victor verification: governed TASK_REQUEST envelope ka fresh round-trip VERIFIED. Isse task execution complete prove nahi hota; changed files aur tests ka evidence alag verify hoga.'
       : 'Victor verification: fresh round-trip evidence VERIFIED for this task. Ye diagnostic communication verification hai; Tony LIVE certification alag gate hai.';
-    await sendTelegramMessage(env, chatId, `${report}\n\n${verificationNote}`, replyToMessageId);
+    await sendNaturalDepartmentResult(env, chatId, 'tony_stark', `${report}\n\n${verificationNote}`, replyToMessageId);
   } catch (error) {
     console.error('Tony round-trip failed:', error?.message || 'unknown');
     try {
-      await sendTelegramMessage(env, chatId, `Tony round-trip verify nahi hua. Task ${dispatch.taskId} par error aaya; main connected/success claim nahi karunga.`, replyToMessageId);
+      await sendTelegramMessage(env, chatId, 'Tony ka fresh check verify nahi ho paya. Main success claim nahi kar raha; issue internally track ho raha hai.', replyToMessageId);
     } catch (_) {}
   }
+}
+
+async function sendNaturalDepartmentResult(env, chatId, target, rawReport, replyToMessageId) {
+  const session = await readConversationSession(chatId);
+  const founderQuestion = session?.unresolved_question || session?.active_issue || session?.last_founder_text || '';
+  let reply = naturalResultFallback(target, rawReport);
+  if (env.ENABLE_AI_INFERENCE === 'true') {
+    try {
+      reply = await askModel(
+        env,
+        'Rewrite verified department evidence into a natural Founder-facing answer. Follow the supplied rules exactly; never invent or upgrade evidence.',
+        buildNaturalResultPrompt(target, founderQuestion, rawReport),
+      );
+    } catch (error) {
+      console.error('Natural Founder result synthesis failed:', safeErrorMessage(error));
+    }
+  }
+  await writeConversationSession(chatId, {
+    last_victor_reply: reply,
+    unresolved_question: null,
+    task_state: 'RESULT_VERIFIED',
+  });
+  await sendTelegramMessage(env, chatId, reply, replyToMessageId);
 }
 
 async function readConversationSession(chatId) {
@@ -618,11 +643,11 @@ async function answerExistingDepartmentTask(env, chatId, followUp, session, repl
 
     if (report) {
       await writeConversationSession(chatId, { last_target: target, last_task_id: taskId, task_state: 'RESULT_VERIFIED' });
-      await sendTelegramMessage(env, chatId, `${report}\n\nVictor verification: existing task ka fresh result VERIFIED. Naya duplicate task dispatch nahi kiya.`, replyToMessageId);
+      await sendNaturalDepartmentResult(env, chatId, target, report, replyToMessageId);
       return true;
     }
 
-    await sendTelegramMessage(env, chatId, formatPendingTaskStatus({ last_target: target, last_task_id: taskId }), replyToMessageId);
+    await sendTelegramMessage(env, chatId, naturalPendingReply(target), replyToMessageId);
     return true;
   } catch (error) {
     console.error('Existing task status lookup failed:', safeErrorMessage(error));
