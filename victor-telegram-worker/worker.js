@@ -42,6 +42,7 @@ import { classifyConversationFollowUp, buildInvestigationTaskText, formatPending
 import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } from '../brain/active_context.mjs';
 import { naturalDispatchAcknowledgement, naturalInvestigationAcknowledgement, naturalPendingReply, buildNaturalResultPrompt, naturalResultFallback } from '../brain/founder_conversation.mjs';
 import { classifyOwnedProblem, buildOwnedProblemPrompt, naturalOwnedProblemAck } from '../brain/problem_ownership.mjs';
+import { createOwnedOutcomeState, assessVerifiedDepartmentResult, shouldContinueOwnedRecovery, buildOwnedRecoveryDirective } from '../brain/outcome_state.mjs';
 import { conversationStateCapability, readConversationState, writeConversationState } from '../brain/conversation_state_store.mjs';
 import { classifyFactRequest, collectFactEvidence, buildFactAnswerPrompt } from '../brain/fact_runtime.mjs';
 import { buildRuntimeFounderRequest, buildSessionPatchForRequest, buildFactRequestFromFounderRequest, shouldUseFactGateway } from '../brain/request_gateway.mjs';
@@ -326,13 +327,19 @@ export default {
       if (!memoryDirective && ownedProblem.matched) {
         const recoveryText = buildOwnedProblemPrompt(ownedProblem.target, text);
         const dispatch = await dispatchContextualInvestigation(env, ownedProblem.target, recoveryText, { messageId: message.message_id });
+        const ownedOutcome = createOwnedOutcomeState({
+          target: ownedProblem.target,
+          founderRequest: text,
+          taskId: dispatch.taskId,
+        });
         await writeConversationSession(chatId, {
           last_target: ownedProblem.target,
           last_task_id: dispatch.taskId,
           last_task_type: 'OWNED_PROBLEM_RECOVERY',
           active_issue: text,
           unresolved_question: text,
-          task_state: 'OWNED_RECOVERY_RUNNING',
+          task_state: ownedOutcome.stage,
+          owned_outcome: ownedOutcome,
         }, env);
         await sendTelegramMessage(env, chatId, naturalOwnedProblemAck(ownedProblem.target), message.message_id);
         if (ownedProblem.target === 'rio') ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
@@ -548,6 +555,7 @@ async function handleAura3RoundTrip(env, chatId, dispatch, replyToMessageId) {
       return;
     }
 
+    if (await maybeContinueOwnedOutcome(env, chatId, 'aura3', dispatch, received.result, replyToMessageId)) return;
     const report = formatAura3ResultForFounder(received.result);
     await sendNaturalDepartmentResult(env, chatId, 'aura3', report, replyToMessageId);
   } catch (error) {
@@ -570,6 +578,7 @@ async function handleRioRoundTrip(env, chatId, dispatch, replyToMessageId) {
       await sendTelegramMessage(env, chatId, 'RIO se result mila, lekin verification pass nahi hui. Isliye main us result ko reliable fact ke roop me use nahi karunga.', replyToMessageId);
       return;
     }
+    if (await maybeContinueOwnedOutcome(env, chatId, 'rio', dispatch, received.result, replyToMessageId)) return;
     const report = formatRioResultForFounder(received.result);
     await sendNaturalDepartmentResult(env, chatId, 'rio', report, replyToMessageId);
   } catch (error) {
@@ -592,6 +601,7 @@ async function handleTonyRoundTrip(env, chatId, dispatch, replyToMessageId) {
       return;
     }
 
+    if (await maybeContinueOwnedOutcome(env, chatId, 'tony_stark', dispatch, received.result, replyToMessageId)) return;
     const report = formatTonyResultForFounder(received.result);
     const verificationNote = dispatch.taskType === 'TASK_REQUEST'
       ? 'Victor verification: governed TASK_REQUEST envelope ka fresh round-trip VERIFIED. Isse task execution complete prove nahi hota; changed files aur tests ka evidence alag verify hoga.'
@@ -603,6 +613,53 @@ async function handleTonyRoundTrip(env, chatId, dispatch, replyToMessageId) {
       await sendTelegramMessage(env, chatId, 'Tony ka fresh check verify nahi ho paya. Main success claim nahi kar raha; issue internally track ho raha hai.', replyToMessageId);
     } catch (_) {}
   }
+}
+
+async function maybeContinueOwnedOutcome(env, chatId, target, dispatch, rawResult, replyToMessageId) {
+  const session = await readConversationSession(chatId, env);
+  if (session?.last_task_type !== 'OWNED_PROBLEM_RECOVERY') return false;
+  if (session?.last_task_id && session.last_task_id !== dispatch.taskId) return false;
+
+  const prior = session?.owned_outcome || createOwnedOutcomeState({
+    target,
+    founderRequest: session?.active_issue || session?.unresolved_question || session?.last_founder_text || '',
+    taskId: dispatch.taskId,
+  });
+  const assessed = assessVerifiedDepartmentResult({ ...rawResult, __victor_verified: true }, prior);
+  await writeConversationSession(chatId, {
+    task_state: assessed.stage,
+    owned_outcome: assessed,
+  }, env);
+
+  if (!shouldContinueOwnedRecovery(assessed)) return false;
+
+  const founderRequest = assessed.founder_request || session?.active_issue || session?.unresolved_question || session?.last_founder_text || '';
+  const continuationText = [
+    buildOwnedProblemPrompt(target, founderRequest, rawResult),
+    buildOwnedRecoveryDirective(assessed),
+  ].join('
+
+');
+  const nextDispatch = await dispatchContextualInvestigation(env, target, continuationText, { messageId: 'owned-recovery' });
+  const nextOutcome = createOwnedOutcomeState({
+    target,
+    founderRequest,
+    taskId: nextDispatch.taskId,
+    previous: assessed,
+  });
+  await writeConversationSession(chatId, {
+    last_target: target,
+    last_task_id: nextDispatch.taskId,
+    last_task_type: 'OWNED_PROBLEM_RECOVERY',
+    task_state: nextOutcome.stage,
+    owned_outcome: nextOutcome,
+    unresolved_question: founderRequest,
+  }, env);
+
+  if (target === 'rio') await handleRioRoundTrip(env, chatId, nextDispatch, replyToMessageId);
+  else if (target === 'tony_stark') await handleTonyRoundTrip(env, chatId, nextDispatch, replyToMessageId);
+  else if (target === 'aura3') await handleAura3RoundTrip(env, chatId, nextDispatch, replyToMessageId);
+  return true;
 }
 
 async function sendNaturalDepartmentResult(env, chatId, target, rawReport, replyToMessageId) {
@@ -620,10 +677,11 @@ async function sendNaturalDepartmentResult(env, chatId, target, rawReport, reply
       console.error('Natural Founder result synthesis failed:', safeErrorMessage(error));
     }
   }
+  const finalSession = await readConversationSession(chatId, env);
   await writeConversationSession(chatId, {
     last_victor_reply: reply,
-    unresolved_question: null,
-    task_state: 'RESULT_VERIFIED',
+    unresolved_question: finalSession?.owned_outcome?.objective_achieved === true ? null : finalSession?.unresolved_question || null,
+    task_state: finalSession?.owned_outcome?.stage || 'RESULT_VERIFIED',
   }, env);
   await sendTelegramMessage(env, chatId, reply, replyToMessageId);
 }
