@@ -128,6 +128,8 @@ def reopen(job_id: str, stage: str = "look_lock") -> int:
         stage = "look_lock"
     state = load_json(path, {})
     state["stage"] = stage
+    state["retries"] = {}
+    state["last_director"] = None
     state["updated"] = now()
     save_json(path, state)
     signal(job_id, True, stage, f"reopen at {stage}")
