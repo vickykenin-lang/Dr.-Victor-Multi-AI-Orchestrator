@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared still + Sora helpers. Gemini API key + Nano Banana 2 Lite first."""
+"""Shared still + Sora helpers. One Gemini image model, long timeout."""
 from __future__ import annotations
 
 import base64
@@ -13,16 +13,7 @@ import urllib.request
 
 OPENAI = "https://api.openai.com/v1"
 GEMINI = "https://generativelanguage.googleapis.com/v1beta"
-GEMINI_STILL_MODELS = [
-    "gemini-3.1-flash-lite-image",
-    "gemini-3.1-flash-image",
-    "gemini-2.5-flash-image",
-    "gemini-2.0-flash-preview-image-generation",
-]
-FLUX_URLS = [
-    "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev",
-    "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell",
-]
+GEMINI_STILL_MODELS = ["gemini-3.1-flash-lite-image", "gemini-2.5-flash-image"]
 
 
 def _env(*names: str) -> str:
@@ -53,12 +44,6 @@ def _http_json(method: str, url: str, headers: dict, body=None, timeout=180):
         return json.loads(raw.decode("utf-8")) if raw else {}
 
 
-def _b64_to_bytes(val: str) -> bytes:
-    if "," in val and val.strip().startswith("data:"):
-        val = val.split(",", 1)[1]
-    return base64.b64decode(val)
-
-
 def gemini_still(prompt: str) -> bytes:
     key = gemini_key()
     if not key:
@@ -70,12 +55,12 @@ def gemini_still(prompt: str) -> bytes:
         body = {
             "contents": [{"role": "user", "parts": [{"text": prompt[:900]}]}],
             "generationConfig": {
-                "responseModalities": ["IMAGE", "TEXT"],
+                "responseModalities": ["IMAGE"],
                 "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"},
             },
         }
         try:
-            out = _http_json("POST", url, headers, body, timeout=180)
+            out = _http_json("POST", url, headers, body, timeout=300)
         except urllib.error.HTTPError as e:
             err = e.read().decode("utf-8", "ignore")[:180]
             last = f"{model} HTTP {e.code} {err}"
@@ -96,45 +81,10 @@ def gemini_still(prompt: str) -> bytes:
     raise RuntimeError(last)
 
 
-def flux_still(prompt: str) -> bytes:
-    key = nvidia_key()
-    if not key:
-        raise RuntimeError("no nvidia key")
-    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "Accept": "application/json"}
-    last = "flux failed"
-    for url in FLUX_URLS:
-        try:
-            out = _http_json("POST", url, headers, {"prompt": prompt[:800], "height": 1024, "width": 1024}, timeout=120)
-        except urllib.error.HTTPError as e:
-            last = f"{url} HTTP {e.code}"
-            print(last)
-            continue
-        b64 = out.get("image")
-        if not b64:
-            arts = out.get("artifacts") or out.get("data") or []
-            if arts and isinstance(arts, list):
-                b64 = arts[0].get("base64") or arts[0].get("b64_json")
-        if isinstance(b64, str) and len(b64) > 80:
-            return _b64_to_bytes(b64)
-        last = f"{url} empty"
-    raise RuntimeError(last)
-
-
 def make_still(prompt: str) -> bytes:
-    last = None
-    if gemini_key():
-        try:
-            return gemini_still(prompt)
-        except Exception as e:
-            last = e
-            print("gemini still fail", e)
-    if nvidia_key():
-        try:
-            return flux_still(prompt)
-        except Exception as e:
-            last = e
-            print("flux fail", e)
-    raise RuntimeError(str(last) if last else "no still provider")
+    if not gemini_key():
+        raise RuntimeError("GEMINI_API_KEY missing")
+    return gemini_still(prompt)
 
 
 def resize_png(src: str, w: int, h: int) -> str:
