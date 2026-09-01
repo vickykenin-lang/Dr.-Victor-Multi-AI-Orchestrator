@@ -37,6 +37,7 @@ import {
 
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
+import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
@@ -259,7 +260,28 @@ export default {
       }
 
       processingStage = 'REQUEST_PLANNING';
-      const plan = await planFounderRequest(env, text, message?.reply_to_message?.text || '');
+      const replyContext = message?.reply_to_message?.text || '';
+      const deterministicIntent = resolveFounderIntent(text, replyContext);
+
+      if (!memoryDirective && deterministicIntent.mode === 'FOUNDER_DIRECTION') {
+        await sendTelegramMessage(env, chatId, founderDirectionReply(), message.message_id);
+        return json({ ok: true, mode: deterministicIntent.mode, reason: deterministicIntent.reason });
+      }
+
+      if (!memoryDirective && deterministicIntent.mode === 'CLARIFICATION') {
+        let clarification = clarificationFallback(replyContext);
+        if (replyContext && env.ENABLE_AI_INFERENCE === 'true') {
+          clarification = await askModel(
+            env,
+            'Explain the immediately previous Victor reply to the Founder. Use the supplied previous reply as context. Do not greet, reintroduce yourself, change topic, or execute a new task. Answer concisely in the Founder language.',
+            `Previous Victor reply: ${replyContext}\nFounder clarification: ${text}`,
+          );
+        }
+        await sendTelegramMessage(env, chatId, clarification, message.message_id);
+        return json({ ok: true, mode: deterministicIntent.mode, reason: deterministicIntent.reason });
+      }
+
+      const plan = await planFounderRequest(env, text, replyContext);
 
       if (!memoryDirective && plan.mode === 'EXECUTIVE_GOAL') {
         processingStage = 'EXECUTIVE_EXECUTION';
@@ -532,6 +554,10 @@ Modes:
 - DEPARTMENT_STATUS: asks current/fresh/status/result/facts about RIO, Tony Stark or AURA3.
 - DEPARTMENT_ACTION: asks to fix, run, start, stop, recover, build, change, execute or otherwise act on RIO, Tony Stark or AURA3.
 - EXECUTIVE_GOAL: organization-level objective/strategy/root-cause/replanning request that Victor should manage across departments.
+
+Important semantic guard:
+- Operating preference/direction such as 'focus on operation, not payment' is NOT an EXECUTIVE_GOAL trigger by itself. It is handled before this planner.
+- Do not reinterpret a Founder preference statement as permission to run the currently active goal.
 
 Targets: rio, tony_stark, aura3, or null.
 Rules:
