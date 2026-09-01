@@ -1,7 +1,7 @@
 {
-  "continue": true,
-  "gap_sec": 60,
+  "continue": false,
+  "gap_sec": 0,
   "stage": "look_lock",
   "reason": "worker fail",
-  "updated": "2026-09-01T13:58:24.722152+05:30"
+  "updated": "2026-09-01T14:02:12.748280+05:30"
 }

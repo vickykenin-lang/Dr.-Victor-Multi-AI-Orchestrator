@@ -10,7 +10,7 @@
     "intake": 0,
     "development": 0,
     "screenplay": 0,
-    "look_lock": 1,
+    "look_lock": 2,
     "keyframes": 0,
     "picture": 0,
     "sound": 0,
@@ -24,5 +24,5 @@
       "look_lock"
     ]
   },
-  "updated": "2026-09-01T13:58:24.721916+05:30"
+  "updated": "2026-09-01T14:02:12.748148+05:30"
 }
