@@ -14,8 +14,8 @@ export function resolveFounderIntent(text, replyContext = '') {
     };
   }
 
-  const operationFocus = /(focus (?:only |just )?on (?:the )?operation|focus on operations|operation par focus|operations par focus|sirf operation|sirf operations|just focus on operation)/i.test(value);
-  const paymentDeprioritized = /(i don'?t want any payment|i do not want any payment|payment (?:par )?focus mat|payment nahi chahiye|revenue (?:par )?focus mat)/i.test(value);
+  const operationFocus = /(focus (?:only |just )?on (?:the )?operation|focus on operations|operation par focus|operations par focus|sirf operation|sirf operations|just focus on operation|sirf kaam par dhyan|sirf kaam pe dhyan|kaam par dhyan|kaam pe dhyan)/i.test(value);
+  const paymentDeprioritized = /(i don'?t want any payment|i do not want any payment|payment (?:par |pe )?focus mat|payment nahi chahiye|revenue (?:par |pe )?focus mat|payment par nhi|payment pe nhi|payment par nahi|payment pe nahi|payment nahi)/i.test(value);
   const explicitObjectiveChange = /(change|replace|update|amend).{0,24}(goal|objective)|(goal|objective).{0,24}(change|replace|update|amend)/i.test(value);
 
   if ((operationFocus || paymentDeprioritized) && !explicitObjectiveChange) {
@@ -38,7 +38,7 @@ export function resolveFounderIntent(text, replyContext = '') {
 }
 
 export function founderDirectionReply() {
-  return 'Samajh gaya. Payment/revenue metric ko is instruction ka immediate focus nahi banaunga; operational execution par focus rahega. Existing locked goal ko silently replace nahi kiya gaya. Agar aap objective itself change karna chahte hain, usse explicit Founder objective-change ke roop me bind karunga.';
+  return 'Samajh gaya. Sirf kaam/operation par focus rahega; payment ya revenue ko immediate task priority nahi banaunga. Existing locked goal ko silently replace nahi kiya gaya. Agar aap objective itself change karna chahte hain, usse explicit Founder objective-change ke roop me bind karunga.';
 }
 
 export function clarificationFallback(replyContext = '') {
