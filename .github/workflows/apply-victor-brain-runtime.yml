@@ -13,6 +13,7 @@ on:
       - 'scripts/apply_hulk_routing_guard.py'
       - 'scripts/apply_active_thread_memory.py'
       - 'scripts/apply_contextual_investigation_fix.py'
+      - 'scripts/apply_natural_founder_conversation.py'
       - 'brain/runtime.mjs'
       - 'brain/runtime.test.mjs'
       - 'brain/founder_intent.mjs'
@@ -23,6 +24,8 @@ on:
       - 'brain/hulk_guard.test.mjs'
       - 'brain/active_context.mjs'
       - 'brain/active_context.test.mjs'
+      - 'brain/founder_conversation.mjs'
+      - 'brain/founder_conversation.test.mjs'
       - 'docs/VICTOR_FINAL_CORRECTION_PLAN.md'
       - 'data/victor_correction_backlog.json'
       - '.github/workflows/apply-victor-brain-runtime.yml'
@@ -53,8 +56,9 @@ jobs:
           python scripts/apply_hulk_routing_guard.py
           python scripts/apply_active_thread_memory.py
           python scripts/apply_contextual_investigation_fix.py
+          python scripts/apply_natural_founder_conversation.py
       - name: Run core tests
-        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
+        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs brain/founder_conversation.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
       - name: Syntax checks
         run: |
           node --check brain/runtime.mjs
@@ -62,6 +66,7 @@ jobs:
           node --check brain/conversation_runtime.mjs
           node --check brain/hulk_guard.mjs
           node --check brain/active_context.mjs
+          node --check brain/founder_conversation.mjs
           node --check victor-telegram-worker/autonomy_runtime.mjs
           node --check victor-telegram-worker/department_bridge.mjs
           node --check victor-telegram-worker/worker.js
