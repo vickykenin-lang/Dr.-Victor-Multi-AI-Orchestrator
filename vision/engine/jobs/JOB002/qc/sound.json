@@ -1,0 +1,7 @@
+{
+  "stage": "sound",
+  "checked_at": "2026-09-01T11:58:09.588822+05:30",
+  "pass": true,
+  "reason": "sound artifacts present",
+  "must_fix": []
+}
