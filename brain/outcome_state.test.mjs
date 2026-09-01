@@ -35,15 +35,51 @@ test('verified work remains RESULT_VERIFIED and does not become objective achiev
   assert.equal(shouldContinueOwnedRecovery(state), true);
 });
 
-test('objective achievement requires verified final outcome evidence', () => {
+test('publish objective does not accept department final-outcome claim without external verification', () => {
+  const prior = createOwnedOutcomeState({ target: 'rio', founderRequest: 'post publish karo', taskId: 't1' });
+  const state = assessVerifiedDepartmentResult({
+    __victor_verified: true,
+    public_action_performed: true,
+    strict_supervision: { status: 'GOAL_ACHIEVED_VERIFIED', evidence: ['meta:media:123'], requires_follow_up: false },
+    final_outcome: { verified: true, objective_met: true, evidence: ['data/ig_published.json'] },
+  }, prior);
+  assert.equal(state.stage, OUTCOME_STAGE.RESULT_VERIFIED);
+  assert.equal(state.objective_achieved, false);
+  assert.equal(state.external_outcome_required, true);
+  assert.equal(state.external_outcome_verified, false);
+  assert.equal(state.requires_follow_up, true);
+  assert.equal(shouldContinueOwnedRecovery(state), true);
+});
+
+test('publish objective reaches OBJECTIVE_ACHIEVED only with explicit external verification', () => {
   const prior = createOwnedOutcomeState({ target: 'rio', founderRequest: 'post publish karo', taskId: 't1' });
   const state = assessVerifiedDepartmentResult({
     __victor_verified: true,
     strict_supervision: { status: 'GOAL_ACHIEVED_VERIFIED', evidence: ['meta:media:123'], requires_follow_up: false },
     final_outcome: { verified: true, objective_met: true, evidence: ['https://instagram.com/p/example'] },
+    external_verification: {
+      verified: true,
+      objective_met: true,
+      platform: 'instagram',
+      external_id: '123',
+      permalink: 'https://instagram.com/p/example',
+      evidence: ['Meta media ID 123', 'permalink verified'],
+    },
   }, prior);
   assert.equal(state.stage, OUTCOME_STAGE.OBJECTIVE_ACHIEVED);
+  assert.equal(state.external_outcome_verified, true);
   assert.equal(shouldContinueOwnedRecovery(state), false);
+});
+
+test('non-external engineering objective can still complete from verified department evidence', () => {
+  const prior = createOwnedOutcomeState({ target: 'tony_stark', founderRequest: 'validator bug fix karo', taskId: 't1' });
+  const state = assessVerifiedDepartmentResult({
+    __victor_verified: true,
+    strict_supervision: { status: 'OBJECTIVE_MET_VERIFIED', evidence: ['tests:pass'], requires_follow_up: false },
+    final_outcome: { verified: true, objective_met: true, evidence: ['tests:pass'] },
+  }, prior);
+  assert.equal(state.stage, OUTCOME_STAGE.OBJECTIVE_ACHIEVED);
+  assert.equal(state.external_outcome_required, false);
 });
 
 test('genuine credential boundary stops automatic recovery', () => {
