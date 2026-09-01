@@ -10,6 +10,7 @@ export const OUTCOME_STAGE = Object.freeze({
 });
 
 const FOUNDER_BOUNDARY = /(?:ADD|CREATE|PROVISION|REPLACE|ROTATE|REVOKE|EXPAND).{0,40}(?:CREDENTIAL|SECRET|ACCOUNT IDENTITY)|(?:CREDENTIAL|SECRET|ACCOUNT IDENTITY).{0,40}(?:ADD|CREATE|PROVISION|REPLACE|ROTATE|REVOKE|EXPAND)|SPEND.{0,30}(?:CEILING|LIMIT|APPROVAL)|IRREVERSIBLE|LEGAL.{0,30}(?:JUDGMENT|DECISION|APPROVAL)|SECURITY.{0,30}(?:JUDGMENT|DECISION|APPROVAL)|OBJECTIVE_IMPOSSIBLE|GOAL_IMPOSSIBLE|CHANGE_(?:GOAL|OBJECTIVE|SUCCESS_CRITERIA)|FOUNDER_(?:PAUSE|HOLD|GOAL_CHANGE_REQUIRED)/i;
+const EXTERNAL_OUTCOME_INTENT = /\b(?:publish|published|post(?:ed)?|instagram|meta|payment|paid|revenue|sale|order|transaction|permalink|live\s+external|external\s+platform)\b/i;
 
 function text(value) {
   return Array.isArray(value) ? value.filter(Boolean).join(' | ') : String(value ?? '');
@@ -23,6 +24,19 @@ function evidenceOf(result = {}) {
     ...(Array.isArray(finalOutcome.evidence) ? finalOutcome.evidence : []),
   ];
   return [...new Set(evidence.filter(Boolean).map(String))];
+}
+
+function hasResolvedExternalOutcome(result = {}, target = null) {
+  const fact = `${target || result?.sender || 'unknown'}.external.objective_outcome`;
+  const resolved = result?.resolved_truth?.facts?.[fact];
+  return Boolean(
+    resolved?.status === 'RESOLVED'
+    && resolved?.selected?.source_class === 'EXTERNAL_RESULT'
+    && resolved?.selected?.value?.verified === true
+    && resolved?.selected?.value?.objective_met === true
+    && Array.isArray(resolved?.selected?.value?.evidence)
+    && resolved.selected.value.evidence.length > 0
+  );
 }
 
 export function createOwnedOutcomeState({ target, founderRequest, taskId, previous = null } = {}) {
@@ -62,11 +76,13 @@ export function assessVerifiedDepartmentResult(result = {}, priorState = {}) {
   const nextAction = strict.next_action || truthAttached.next_valid_action || null;
   const boundaryText = [status, text(blocker), text(nextAction)].join(' ');
   const founderBoundary = FOUNDER_BOUNDARY.test(boundaryText);
-
-  const objectiveAchieved = Boolean(
+  const externalOutcomeRequired = EXTERNAL_OUTCOME_INTENT.test(String(priorState?.founder_request || ''));
+  const externalOutcomeVerified = hasResolvedExternalOutcome(truthAttached, priorState?.target || truthAttached?.sender || null);
+  const departmentOutcomeClaim = Boolean(
     (finalOutcome?.verified === true && finalOutcome?.objective_met === true && Array.isArray(finalOutcome.evidence) && finalOutcome.evidence.length > 0)
     || (/GOAL_ACHIEVED_VERIFIED|OBJECTIVE_MET_VERIFIED/.test(status) && evidence.length > 0)
   );
+  const objectiveAchieved = externalOutcomeRequired ? externalOutcomeVerified : departmentOutcomeClaim;
 
   const verified = truthAttached?.__victor_verified === true;
   const workPerformed = Boolean(
@@ -87,7 +103,7 @@ export function assessVerifiedDepartmentResult(result = {}, priorState = {}) {
     ? false
     : founderBoundary
       ? false
-      : strict.requires_follow_up === true;
+      : (externalOutcomeRequired && departmentOutcomeClaim ? true : strict.requires_follow_up === true);
 
   const failureFingerprint = blocker || nextAction
     ? [priorState?.target || truthAttached?.sender || 'unknown', status, text(blocker), text(nextAction)].filter(Boolean).join('|').slice(0, 500)
@@ -101,6 +117,8 @@ export function assessVerifiedDepartmentResult(result = {}, priorState = {}) {
     stage,
     founder_boundary: founderBoundary,
     objective_achieved: objectiveAchieved,
+    external_outcome_required: externalOutcomeRequired,
+    external_outcome_verified: externalOutcomeVerified,
     requires_follow_up: requiresFollowUp,
     work_performed: workPerformed,
     result_verified: verified,
@@ -131,6 +149,7 @@ export function buildOwnedRecoveryDirective(state = {}) {
     'VICTOR OWNED OUTCOME CONTINUATION',
     `Current stage: ${state.stage || 'UNKNOWN'}`,
     `Attempt: ${Number(state.attempts || 0) + 1}`,
+    state.external_outcome_required && !state.external_outcome_verified ? 'External outcome proof is still missing; do not treat a department completion claim as the Founder outcome.' : null,
     state.last_status ? `Last verified status: ${state.last_status}` : null,
     state.last_blocker ? `Last blocker: ${text(state.last_blocker)}` : null,
     state.last_next_action ? `Last next action: ${text(state.last_next_action)}` : null,
