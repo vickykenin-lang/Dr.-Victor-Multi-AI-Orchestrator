@@ -1,7 +1,7 @@
 {
-  "continue": false,
-  "gap_sec": 0,
-  "stage": "done",
-  "reason": "complete",
-  "updated": "2026-09-01T12:02:54.201931+05:30"
+  "continue": true,
+  "gap_sec": 60,
+  "stage": "look_lock",
+  "reason": "reopen at look_lock",
+  "updated": "2026-09-01T13:54:19.399542+05:30"
 }
