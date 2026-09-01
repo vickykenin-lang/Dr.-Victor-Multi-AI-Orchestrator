@@ -1,7 +1,7 @@
 {
   "continue": false,
   "gap_sec": 0,
-  "stage": "delivery",
-  "reason": "advanced to done",
-  "updated": "2026-09-01T12:00:57.905130+05:30"
+  "stage": "done",
+  "reason": "complete",
+  "updated": "2026-09-01T12:02:54.201931+05:30"
 }
