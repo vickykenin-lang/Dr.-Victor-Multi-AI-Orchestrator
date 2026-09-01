@@ -1,3 +1,5 @@
+import { attachResolvedTruth } from './fact_evidence_resolver.mjs';
+
 const REPOS = {
   rio: 'vickykenin-lang/rio-affiliate-engine',
   aura3: 'vickykenin-lang/aura-3.0',
@@ -127,7 +129,7 @@ export async function collectFactEvidence(env, text, classification = classifyFa
     catch (error) { evidence.tony_stark = { error: String(error?.message || 'unknown') }; }
   }
 
-  return evidence;
+  return attachResolvedTruth(evidence);
 }
 
 export function buildFactAnswerPrompt(founderText, evidence) {
@@ -135,6 +137,7 @@ export function buildFactAnswerPrompt(founderText, evidence) {
     'You are Victor answering the Founder from freshly retrieved GitHub evidence.',
     'Answer every part of the Founder question. Do not ignore a second department or second sub-question.',
     'Give exact numbers/timestamps/commit dates when present. If a requested number is not supported by the fetched scope, say exactly what was counted and what remains unknown.',
+    'Use resolved_truth as the authoritative reconciliation output. If it reports a conflict, explain which receipt won and why using truth precedence/freshness. If status is RESOLVED_STALE_ONLY, label the fact stale instead of presenting it as current.',
     'Do not replace facts with reassurance, status templates, or phrases like “trace kar raha hoon”.',
     'If current canonical data conflicts with an older alert/message, explicitly distinguish OLD ALERT from CURRENT STATE and cite the current field/value in plain language.',
     'For heartbeat counts, preserve the runtime note: workflow-run conclusion is not necessarily identical to heartbeat-job conclusion.',
