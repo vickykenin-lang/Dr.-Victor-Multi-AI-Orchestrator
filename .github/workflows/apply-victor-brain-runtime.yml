@@ -19,6 +19,7 @@ on:
       - 'scripts/apply_request_gateway.py'
       - 'scripts/apply_conversation_state_store.py'
       - 'scripts/apply_truth_resolver.py'
+      - 'scripts/apply_outcome_state.py'
       - 'brain/runtime.mjs'
       - 'brain/runtime.test.mjs'
       - 'brain/founder_intent.mjs'
@@ -33,6 +34,8 @@ on:
       - 'brain/founder_conversation.test.mjs'
       - 'brain/problem_ownership.mjs'
       - 'brain/problem_ownership.test.mjs'
+      - 'brain/outcome_state.mjs'
+      - 'brain/outcome_state.test.mjs'
       - 'brain/fact_runtime.mjs'
       - 'brain/fact_runtime.test.mjs'
       - 'brain/fact_evidence_resolver.mjs'
@@ -80,8 +83,9 @@ jobs:
           python scripts/apply_request_gateway.py
           python scripts/apply_conversation_state_store.py
           python scripts/apply_truth_resolver.py
+          python scripts/apply_outcome_state.py
       - name: Run core tests
-        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs brain/founder_conversation.test.mjs brain/problem_ownership.test.mjs brain/fact_runtime.test.mjs brain/truth_resolver.test.mjs brain/founder_request.test.mjs brain/request_gateway.test.mjs brain/conversation_state_store.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
+        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs brain/founder_conversation.test.mjs brain/problem_ownership.test.mjs brain/outcome_state.test.mjs brain/fact_runtime.test.mjs brain/truth_resolver.test.mjs brain/founder_request.test.mjs brain/request_gateway.test.mjs brain/conversation_state_store.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
       - name: Syntax checks
         run: |
           node --check brain/runtime.mjs
@@ -91,6 +95,7 @@ jobs:
           node --check brain/active_context.mjs
           node --check brain/founder_conversation.mjs
           node --check brain/problem_ownership.mjs
+          node --check brain/outcome_state.mjs
           node --check brain/fact_runtime.mjs
           node --check brain/fact_evidence_resolver.mjs
           node --check brain/truth_resolver.mjs
