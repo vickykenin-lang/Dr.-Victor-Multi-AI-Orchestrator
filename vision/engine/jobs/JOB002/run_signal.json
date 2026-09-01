@@ -1,7 +1,7 @@
 {
   "continue": true,
   "gap_sec": 60,
-  "stage": "screenplay",
-  "reason": "advanced to look_lock",
-  "updated": "2026-09-01T11:53:43.370161+05:30"
+  "stage": "look_lock",
+  "reason": "advanced to keyframes",
+  "updated": "2026-09-01T11:54:53.699367+05:30"
 }
