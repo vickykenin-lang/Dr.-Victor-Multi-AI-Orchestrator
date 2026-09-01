@@ -38,6 +38,7 @@ import {
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
+import { classifyConversationFollowUp, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
@@ -261,7 +262,14 @@ export default {
 
       processingStage = 'REQUEST_PLANNING';
       const replyContext = message?.reply_to_message?.text || '';
+      const session = await readConversationSession(chatId);
       const deterministicIntent = resolveFounderIntent(text, replyContext);
+      const contextualFollowUp = classifyConversationFollowUp(text, session);
+
+      if (!memoryDirective && contextualFollowUp.mode) {
+        const handled = await answerExistingDepartmentTask(env, chatId, contextualFollowUp, session, message.message_id);
+        if (handled) return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, task_id: contextualFollowUp.task_id });
+      }
 
       if (!memoryDirective && deterministicIntent.mode === 'FOUNDER_DIRECTION') {
         await sendTelegramMessage(env, chatId, founderDirectionReply(), message.message_id);
@@ -303,6 +311,11 @@ export default {
         processingStage = 'DEPARTMENT_EXECUTION';
         const target = plan.target;
 
+        if (plan.mode === 'DEPARTMENT_STATUS' && session?.last_target === target && session?.last_task_id) {
+          const handled = await answerExistingDepartmentTask(env, chatId, { mode: 'TASK_STATUS_FOLLOWUP', target, task_id: session.last_task_id }, session, message.message_id);
+          if (handled) return json({ ok: true, mode: 'DEPARTMENT_STATUS_REUSED', target, task_id: session.last_task_id });
+        }
+
         if (target === 'rio') {
           const pause = await isExecutionPaused(env, 'rio');
           if (pause.paused) {
@@ -321,6 +334,7 @@ export default {
             await sendTelegramMessage(env, chatId, 'RIO ko task dispatch nahi hua. Victor ne failure record kiya hai; duplicate retry nahi karega.', message.message_id);
             return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
           }
+          await writeConversationSession(chatId, { last_target: 'rio', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' });
           await sendTelegramMessage(env, chatId, `RIO ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
           ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
@@ -344,6 +358,7 @@ export default {
             await sendTelegramMessage(env, chatId, 'Tony ko task dispatch nahi hua. Victor ne failure record kiya hai; duplicate retry nahi karega.', message.message_id);
             return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
           }
+          await writeConversationSession(chatId, { last_target: 'tony_stark', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' });
           await sendTelegramMessage(env, chatId, `Tony ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
           ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
@@ -367,6 +382,7 @@ export default {
             await sendTelegramMessage(env, chatId, 'AURA3 ko task dispatch nahi hua. Victor ne failure record kiya hai; duplicate retry nahi karega.', message.message_id);
             return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
           }
+          await writeConversationSession(chatId, { last_target: 'aura3', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' });
           await sendTelegramMessage(env, chatId, `AURA3 ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);
           ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
@@ -492,6 +508,72 @@ async function handleTonyRoundTrip(env, chatId, dispatch, replyToMessageId) {
     try {
       await sendTelegramMessage(env, chatId, `Tony round-trip verify nahi hua. Task ${dispatch.taskId} par error aaya; main connected/success claim nahi karunga.`, replyToMessageId);
     } catch (_) {}
+  }
+}
+
+async function readConversationSession(chatId) {
+  try {
+    const cache = caches.default;
+    const key = new Request(`https://victor.internal/conversation/${encodeURIComponent(String(chatId))}`);
+    const hit = await cache.match(key);
+    return hit ? await hit.json() : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+async function writeConversationSession(chatId, next) {
+  try {
+    const cache = caches.default;
+    const key = new Request(`https://victor.internal/conversation/${encodeURIComponent(String(chatId))}`);
+    const current = await readConversationSession(chatId);
+    const payload = { ...current, ...next, updated_at: new Date().toISOString() };
+    await cache.put(key, new Response(JSON.stringify(payload), { headers: { 'Cache-Control': 'public, max-age=900', 'Content-Type': 'application/json' } }));
+  } catch (_) {}
+}
+
+async function answerExistingDepartmentTask(env, chatId, followUp, session, replyToMessageId) {
+  const target = followUp?.target || session?.last_target;
+  const taskId = followUp?.task_id || session?.last_task_id;
+  if (!target || !taskId) return false;
+  try {
+    let received;
+    let verification;
+    let report;
+    if (target === 'rio') {
+      received = await waitForRioResult(taskId, { attempts: 1, delayMs: 0 });
+      if (received.status === 'RESULT_RECEIVED') {
+        verification = verifyRioResult(received.result, taskId);
+        if (verification.ok) report = formatRioResultForFounder(received.result);
+      }
+    } else if (target === 'tony_stark') {
+      received = await waitForTonyResult(taskId, env, { attempts: 1, delayMs: 0 });
+      if (received.status === 'RESULT_RECEIVED') {
+        verification = verifyTonyResult(received.result, taskId);
+        if (verification.ok) report = formatTonyResultForFounder(received.result);
+      }
+    } else if (target === 'aura3') {
+      received = await waitForAura3Result(taskId, { attempts: 1, delayMs: 0 });
+      if (received.status === 'RESULT_RECEIVED') {
+        verification = verifyAura3Result(received.result, taskId);
+        if (verification.ok) report = formatAura3ResultForFounder(received.result);
+      }
+    } else {
+      return false;
+    }
+
+    if (report) {
+      await writeConversationSession(chatId, { last_target: target, last_task_id: taskId, task_state: 'RESULT_VERIFIED' });
+      await sendTelegramMessage(env, chatId, `${report}\n\nVictor verification: existing task ka fresh result VERIFIED. Naya duplicate task dispatch nahi kiya.`, replyToMessageId);
+      return true;
+    }
+
+    await sendTelegramMessage(env, chatId, formatPendingTaskStatus({ last_target: target, last_task_id: taskId }), replyToMessageId);
+    return true;
+  } catch (error) {
+    console.error('Existing task status lookup failed:', safeErrorMessage(error));
+    await sendTelegramMessage(env, chatId, `Existing task ${taskId} ka fresh status abhi verify nahi hua. Victor naya duplicate task dispatch nahi karega; same task ko track karega.`, replyToMessageId);
+    return true;
   }
 }
 
