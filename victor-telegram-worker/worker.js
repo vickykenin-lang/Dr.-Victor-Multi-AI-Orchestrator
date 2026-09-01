@@ -39,6 +39,7 @@ import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from 
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
 import { classifyConversationFollowUp, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';
+import { classifyHulkRequest, hulkActionBlockedReply, hulkStatusReply, isCasualWellbeing, casualWellbeingReply } from '../brain/hulk_guard.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
@@ -265,6 +266,19 @@ export default {
       const session = await readConversationSession(chatId);
       const deterministicIntent = resolveFounderIntent(text, replyContext);
       const contextualFollowUp = classifyConversationFollowUp(text, session);
+      const hulkRequest = classifyHulkRequest(text);
+
+      if (!memoryDirective && isCasualWellbeing(text)) {
+        await sendTelegramMessage(env, chatId, casualWellbeingReply(), message.message_id);
+        return json({ ok: true, mode: 'CASUAL_WELLBEING' });
+      }
+
+      if (!memoryDirective && hulkRequest.matched) {
+        await writeConversationSession(chatId, { last_target: 'hulk', last_founder_text: text, task_state: 'NO_VERIFIED_BRIDGE' });
+        const reply = hulkRequest.mode === 'HULK_ACTION' ? hulkActionBlockedReply() : hulkStatusReply();
+        await sendTelegramMessage(env, chatId, reply, message.message_id);
+        return json({ ok: true, mode: hulkRequest.mode, target: 'hulk', dispatch: 'NOT_ATTEMPTED_BRIDGE_UNVERIFIED' });
+      }
 
       if (!memoryDirective && contextualFollowUp.mode) {
         const handled = await answerExistingDepartmentTask(env, chatId, contextualFollowUp, session, message.message_id);
@@ -641,7 +655,7 @@ Important semantic guard:
 - Operating preference/direction such as 'focus on operation, not payment' is NOT an EXECUTIVE_GOAL trigger by itself. It is handled before this planner.
 - Do not reinterpret a Founder preference statement as permission to run the currently active goal.
 
-Targets: rio, tony_stark, aura3, or null.
+Targets: rio, tony_stark, aura3, hulk, or null. HULK is intercepted before planner execution; never map HULK to RIO.
 Rules:
 - A department name inside an explanation does NOT make it an action.
 - "Tell me what departments do" is CHAT.
@@ -650,14 +664,14 @@ Rules:
 - "Tony ko RIO website me help karne bolo" is DEPARTMENT_ACTION target tony_stark.
 - Casual conversation stays CHAT even though Victor is an orchestrator.
 
-Schema: {"mode":"CHAT|DEPARTMENT_STATUS|DEPARTMENT_ACTION|EXECUTIVE_GOAL","target":"rio|tony_stark|aura3|null","reason":"short"}
+Schema: {"mode":"CHAT|DEPARTMENT_STATUS|DEPARTMENT_ACTION|EXECUTIVE_GOAL","target":"rio|tony_stark|aura3|hulk|null","reason":"short"}
 `;
   const content = await askModel(env, system, `${replyContext ? `Previous message: ${replyContext}\n` : ''}Founder: ${text}`);
   const cleaned = content.replace(/```json|```/gi, '').trim();
   let parsed;
   try { parsed = JSON.parse(cleaned); } catch (_) { parsed = null; }
   const allowedModes = new Set(['CHAT', 'DEPARTMENT_STATUS', 'DEPARTMENT_ACTION', 'EXECUTIVE_GOAL']);
-  const allowedTargets = new Set(['rio', 'tony_stark', 'aura3', null]);
+  const allowedTargets = new Set(['rio', 'tony_stark', 'aura3', 'hulk', null]);
   if (!parsed || !allowedModes.has(parsed.mode) || !allowedTargets.has(parsed.target ?? null)) {
     const entity = resolveFounderEntityQuery(text);
     const target = ['rio', 'tony_stark', 'aura3'].includes(entity?.entity_id) ? entity.entity_id : null;
