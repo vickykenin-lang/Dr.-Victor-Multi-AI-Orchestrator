@@ -3,6 +3,18 @@ from pathlib import Path
 path = Path('victor-telegram-worker/worker.js')
 text = path.read_text(encoding='utf-8')
 
+# This integration may already be present because later patches extend the same planning block.
+# Treat the semantic end-state as success instead of requiring an old exact anchor.
+if (
+    "import { classifyConversationFollowUp, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';" in text
+    and "const session = await readConversationSession(chatId);" in text
+    and "async function writeConversationSession(chatId, next)" in text
+    and "async function answerExistingDepartmentTask(env, chatId, followUp, session, replyToMessageId)" in text
+    and "last_task_id: dispatch.taskId" in text
+):
+    print('CONVERSATION_CONTINUITY_ALREADY_APPLIED')
+    raise SystemExit(0)
+
 intent_import = "import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';\n"
 conversation_import = "import { classifyConversationFollowUp, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';\n"
 if conversation_import not in text:
@@ -17,7 +29,7 @@ if replacement not in text:
         raise SystemExit('planning continuity anchor missing')
     text = text.replace(planning, replacement, 1)
 
-for target, marker in [('rio', 'RIO'), ('tony_stark', 'Tony'), ('aura3', 'AURA3')]:
+for target in ['rio', 'tony_stark', 'aura3']:
     if target == 'rio':
         anchor = "          await sendTelegramMessage(env, chatId, `RIO ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);\n          ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));"
         repl = "          await writeConversationSession(chatId, { last_target: 'rio', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' });\n          await sendTelegramMessage(env, chatId, `RIO ko task de diya. Task ID: ${dispatch.taskId}.`, message.message_id);\n          ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));"
@@ -32,7 +44,6 @@ for target, marker in [('rio', 'RIO'), ('tony_stark', 'Tony'), ('aura3', 'AURA3'
             raise SystemExit(f'{target} session anchor missing')
         text = text.replace(anchor, repl, 1)
 
-# Reuse a recent same-department status task instead of dispatching duplicates.
 status_anchor = "      if (!memoryDirective && (plan.mode === 'DEPARTMENT_STATUS' || plan.mode === 'DEPARTMENT_ACTION')) {\n        processingStage = 'DEPARTMENT_EXECUTION';\n        const target = plan.target;\n"
 status_repl = "      if (!memoryDirective && (plan.mode === 'DEPARTMENT_STATUS' || plan.mode === 'DEPARTMENT_ACTION')) {\n        processingStage = 'DEPARTMENT_EXECUTION';\n        const target = plan.target;\n\n        if (plan.mode === 'DEPARTMENT_STATUS' && session?.last_target === target && session?.last_task_id) {\n          const handled = await answerExistingDepartmentTask(env, chatId, { mode: 'TASK_STATUS_FOLLOWUP', target, task_id: session.last_task_id }, session, message.message_id);\n          if (handled) return json({ ok: true, mode: 'DEPARTMENT_STATUS_REUSED', target, task_id: session.last_task_id });\n        }\n"
 if status_repl not in text:
