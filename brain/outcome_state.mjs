@@ -1,3 +1,5 @@
+import { attachResultTruth } from './result_truth_receipts.mjs';
+
 export const OUTCOME_STAGE = Object.freeze({
   TASK_SENT: 'TASK_SENT',
   WORK_PERFORMED: 'WORK_PERFORMED',
@@ -40,18 +42,24 @@ export function createOwnedOutcomeState({ target, founderRequest, taskId, previo
     work_performed: false,
     result_verified: false,
     evidence: Array.isArray(prior.evidence) ? prior.evidence : [],
+    truth_receipts: Array.isArray(prior.truth_receipts) ? prior.truth_receipts : [],
+    resolved_truth: prior.resolved_truth || null,
     last_status: 'TASK_DISPATCHED',
     last_next_action: null,
   };
 }
 
 export function assessVerifiedDepartmentResult(result = {}, priorState = {}) {
-  const strict = result?.strict_supervision || {};
-  const finalOutcome = result?.final_outcome || strict?.final_outcome || {};
-  const evidence = evidenceOf(result);
-  const status = String(strict.status || result.execution_status || 'UNKNOWN').toUpperCase();
-  const blocker = strict.error_or_blocker ?? result.blockers ?? null;
-  const nextAction = strict.next_action || result.next_valid_action || null;
+  const truthAttached = attachResultTruth(result, {
+    target: priorState?.target || result?.sender || null,
+    taskId: result?.task_id || priorState?.task_id || null,
+  });
+  const strict = truthAttached?.strict_supervision || {};
+  const finalOutcome = truthAttached?.final_outcome || strict?.final_outcome || {};
+  const evidence = evidenceOf(truthAttached);
+  const status = String(strict.status || truthAttached.execution_status || 'UNKNOWN').toUpperCase();
+  const blocker = strict.error_or_blocker ?? truthAttached.blockers ?? null;
+  const nextAction = strict.next_action || truthAttached.next_valid_action || null;
   const boundaryText = [status, text(blocker), text(nextAction)].join(' ');
   const founderBoundary = FOUNDER_BOUNDARY.test(boundaryText);
 
@@ -60,13 +68,13 @@ export function assessVerifiedDepartmentResult(result = {}, priorState = {}) {
     || (/GOAL_ACHIEVED_VERIFIED|OBJECTIVE_MET_VERIFIED/.test(status) && evidence.length > 0)
   );
 
-  const verified = result?.__victor_verified === true;
+  const verified = truthAttached?.__victor_verified === true;
   const workPerformed = Boolean(
-    result?.governed_business_cycle_performed === true
-    || result?.public_action_performed === true
-    || result?.changed_files?.length
-    || result?.snapshot?.changed_files?.length
-    || (!/READ_ONLY|REPORTING_CONNECTED|STATUS_CHECK/.test(String(result.execution_status || '').toUpperCase()) && evidence.length > 0)
+    truthAttached?.governed_business_cycle_performed === true
+    || truthAttached?.public_action_performed === true
+    || truthAttached?.changed_files?.length
+    || truthAttached?.snapshot?.changed_files?.length
+    || (!/READ_ONLY|REPORTING_CONNECTED|STATUS_CHECK/.test(String(truthAttached.execution_status || '').toUpperCase()) && evidence.length > 0)
   );
 
   let stage = OUTCOME_STAGE.EXECUTION_UNVERIFIED;
@@ -82,7 +90,7 @@ export function assessVerifiedDepartmentResult(result = {}, priorState = {}) {
       : strict.requires_follow_up === true;
 
   const failureFingerprint = blocker || nextAction
-    ? [priorState?.target || result?.sender || 'unknown', status, text(blocker), text(nextAction)].filter(Boolean).join('|').slice(0, 500)
+    ? [priorState?.target || truthAttached?.sender || 'unknown', status, text(blocker), text(nextAction)].filter(Boolean).join('|').slice(0, 500)
     : null;
   const repeatedFailureCount = failureFingerprint && failureFingerprint === priorState?.last_failure_fingerprint
     ? Number(priorState?.repeated_failure_count || 0) + 1
@@ -97,6 +105,8 @@ export function assessVerifiedDepartmentResult(result = {}, priorState = {}) {
     work_performed: workPerformed,
     result_verified: verified,
     evidence: [...new Set([...(priorState?.evidence || []), ...evidence])].slice(-100),
+    truth_receipts: [...(Array.isArray(priorState?.truth_receipts) ? priorState.truth_receipts : []), ...(truthAttached.truth_receipts || [])].slice(-100),
+    resolved_truth: truthAttached.resolved_truth || priorState?.resolved_truth || null,
     last_status: status,
     last_next_action: nextAction,
     last_blocker: blocker,
