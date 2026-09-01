@@ -10,9 +10,11 @@ if fact_import not in text:
         raise SystemExit('fact runtime import anchor missing')
     text = text.replace(anchor_import, anchor_import + fact_import, 1)
 
-classify_anchor = "      const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);\n      const hulkRequest = classifyHulkRequest(text);\n"
-classify_repl = "      const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);\n      const factRequest = classifyFactRequest(text);\n      const hulkRequest = classifyHulkRequest(text);\n"
-if classify_repl not in text:
+# Later request-gateway integration may derive factRequest from the structured Founder
+# request instead of classifyFactRequest(text). Either form is a valid fact classifier.
+if "const factRequest =" not in text:
+    classify_anchor = "      const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);\n      const hulkRequest = classifyHulkRequest(text);\n"
+    classify_repl = "      const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);\n      const factRequest = classifyFactRequest(text);\n      const hulkRequest = classifyHulkRequest(text);\n"
     if classify_anchor not in text:
         raise SystemExit('fact classification anchor missing')
     text = text.replace(classify_anchor, classify_repl, 1)
@@ -42,24 +44,22 @@ handler = '''      if (!memoryDirective && factRequest.matched) {
       }
 
 '''
-if handler not in text:
+# Gateway handler is semantically equivalent and intentionally preferred.
+if "processingStage = 'FACT_RETRIEVAL';" not in text:
     if handler_anchor not in text:
         raise SystemExit('fact handler anchor missing')
     text = text.replace(handler_anchor, handler + handler_anchor, 1)
 
-# Remove accidental duplicated contextual investigation block if it exists twice consecutively.
 needle = "      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {"
 first = text.find(needle)
 if first != -1:
     second = text.find(needle, first + len(needle))
     if second != -1:
-        # Find the next generic contextual-follow-up block after the duplicate and remove duplicate block only.
         end_anchor = "      if (!memoryDirective && contextualFollowUp.mode) {"
         end = text.find(end_anchor, second)
         if end != -1:
             text = text[:second] + text[end:]
 
-# Remove duplicate health property left by previous patch stacking.
 text = text.replace("        founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',\n        founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',\n", "        founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',\n")
 if "        fact_evidence_runtime: 'FRESH_GITHUB_FACTS_V1',\n" not in text:
     health_anchor = "        founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',\n"
@@ -67,4 +67,4 @@ if "        fact_evidence_runtime: 'FRESH_GITHUB_FACTS_V1',\n" not in text:
         text = text.replace(health_anchor, health_anchor + "        fact_evidence_runtime: 'FRESH_GITHUB_FACTS_V1',\n", 1)
 
 path.write_text(text, encoding='utf-8')
-print('FACT_RUNTIME_APPLIED')
+print('FACT_RUNTIME_VERIFIED_OR_APPLIED')
