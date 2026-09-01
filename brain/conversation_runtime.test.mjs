@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyConversationFollowUp, formatPendingTaskStatus } from './conversation_runtime.mjs';
+import { classifyConversationFollowUp, buildInvestigationTaskText, formatPendingTaskStatus } from './conversation_runtime.mjs';
 
 test('short continuation binds to recent RIO context', () => {
   const result = classifyConversationFollowUp('pata karke batao', { last_target: 'rio', last_task_id: 'victor-rio-123' });
@@ -27,6 +27,38 @@ test('contextual next step binds to active topic even without task', () => {
   assert.equal(result.mode, 'CONTEXTUAL_NEXT_STEP');
   assert.equal(result.target, 'aura3');
   assert.equal(result.task_id, null);
+});
+
+test('specific evidence-gap follow-up becomes new investigation, not status replay', () => {
+  const result = classifyConversationFollowUp(
+    'New-design creative: fresh verified evidence unavailable; no absolute claim. Iska pata karo',
+    {
+      last_target: 'rio',
+      last_task_id: 'victor-rio-123',
+      last_victor_reply: 'New-design creative: fresh verified evidence unavailable; no absolute claim.',
+    },
+  );
+  assert.equal(result.mode, 'CONTEXTUAL_INVESTIGATION');
+  assert.equal(result.target, 'rio');
+  assert.equal(result.parent_task_id, 'victor-rio-123');
+});
+
+test('generic verify-this on previous evidence gap becomes investigation', () => {
+  const result = classifyConversationFollowUp('iska pata karo', {
+    last_target: 'rio',
+    last_task_id: 'victor-rio-123',
+    last_victor_reply: 'New-design creative: fresh verified evidence unavailable; no absolute claim.',
+  });
+  assert.equal(result.mode, 'CONTEXTUAL_INVESTIGATION');
+});
+
+test('investigation task explicitly forbids parent-report replay', () => {
+  const text = buildInvestigationTaskText(
+    { target: 'rio', parent_task_id: 'parent-1', query: 'iska pata karo' },
+    { last_victor_reply: 'fresh verified evidence unavailable' },
+  );
+  assert.match(text, /Do not merely repeat the parent task report/i);
+  assert.match(text, /root cause of the evidence gap/i);
 });
 
 test('follow-up without recent context remains unresolved', () => {
