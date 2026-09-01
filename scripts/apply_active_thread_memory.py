@@ -14,7 +14,7 @@ if active_import not in text:
 # semantic integration first instead of requiring the original exact neighborhood.
 active_semantic_markers = [
     "const activePatch = buildActiveContext(",
-    "const sessionWithFounderTurn = appendRecentTurn(",
+    "sessionWithFounderTurn = appendRecentTurn(",
     "classifyConversationFollowUp(text, sessionWithFounderTurn)",
 ]
 if not all(marker in text for marker in active_semantic_markers):
