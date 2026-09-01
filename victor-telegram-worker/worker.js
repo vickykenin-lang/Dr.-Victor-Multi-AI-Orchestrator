@@ -42,6 +42,7 @@ import { classifyConversationFollowUp, buildInvestigationTaskText, formatPending
 import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } from '../brain/active_context.mjs';
 import { naturalDispatchAcknowledgement, naturalInvestigationAcknowledgement, naturalPendingReply, buildNaturalResultPrompt, naturalResultFallback } from '../brain/founder_conversation.mjs';
 import { classifyOwnedProblem, buildOwnedProblemPrompt, naturalOwnedProblemAck } from '../brain/problem_ownership.mjs';
+import { classifyFactRequest, collectFactEvidence, buildFactAnswerPrompt } from '../brain/fact_runtime.mjs';
 import { classifyHulkRequest, hulkActionBlockedReply, hulkStatusReply, isCasualWellbeing, casualWellbeingReply } from '../brain/hulk_guard.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -113,6 +114,7 @@ export default {
         memory_recall_mode: 'LAYERED_REPO_MEMORY_V3',
         active_thread_memory: 'BEST_EFFORT_WORKING_CONTEXT_V1',
         founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',
+        fact_evidence_runtime: 'FRESH_GITHUB_FACTS_V1',
         founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',
         memory_write_configured: Boolean(env.GITHUB_MEMORY_TOKEN),
         aura3_bridge_configured: aura3BridgeConfigured(env),
@@ -276,6 +278,7 @@ export default {
       const deterministicIntent = resolveFounderIntent(text, replyContext);
       const contextualFollowUp = classifyConversationFollowUp(text, sessionWithFounderTurn);
       const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);
+      const factRequest = classifyFactRequest(text);
       const hulkRequest = classifyHulkRequest(text);
 
       if (!memoryDirective && isCasualWellbeing(text)) {
@@ -288,6 +291,29 @@ export default {
         const reply = hulkRequest.mode === 'HULK_ACTION' ? hulkActionBlockedReply() : hulkStatusReply();
         await sendTelegramMessage(env, chatId, reply, message.message_id);
         return json({ ok: true, mode: hulkRequest.mode, target: 'hulk', dispatch: 'NOT_ATTEMPTED_BRIDGE_UNVERIFIED' });
+      }
+
+      if (!memoryDirective && factRequest.matched) {
+        processingStage = 'FACT_RETRIEVAL';
+        try {
+          const evidence = await collectFactEvidence(env, text, factRequest);
+          let reply;
+          if (env.ENABLE_AI_INFERENCE === 'true' && env.API_VICTOR) {
+            reply = await askModel(
+              env,
+              'Answer from fresh GitHub evidence only. Cover every sub-question. Be natural and concise; never replace facts with reassurance or a status template.',
+              buildFactAnswerPrompt(text, evidence),
+            );
+          } else {
+            reply = `Fresh evidence fetched at ${evidence.fetched_at_utc}. AI synthesis unavailable; raw fact retrieval succeeded.`;
+          }
+          await sendTelegramMessage(env, chatId, reply, message.message_id);
+          return json({ ok: true, mode: 'FACT_EVIDENCE_QUERY', targets: factRequest.targets });
+        } catch (error) {
+          console.error('Fresh fact retrieval failed:', safeErrorMessage(error));
+          await sendTelegramMessage(env, chatId, 'Fresh evidence read fail hua. Main generic status line se gap cover nahi karunga; exact GitHub fact abhi verify nahi hua.', message.message_id);
+          return json({ ok: true, mode: 'FACT_EVIDENCE_QUERY_FAILED' });
+        }
       }
 
       if (!memoryDirective && ownedProblem.matched) {
@@ -306,25 +332,6 @@ export default {
         else if (ownedProblem.target === 'tony_stark') ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
         else if (ownedProblem.target === 'aura3') ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
         return json({ ok: true, mode: ownedProblem.mode, target: ownedProblem.target, task_id: dispatch.taskId });
-      }
-
-      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {
-        const investigationText = buildInvestigationTaskText(contextualFollowUp, sessionWithFounderTurn);
-        const dispatch = await dispatchContextualInvestigation(env, contextualFollowUp.target, investigationText, { messageId: message.message_id });
-        await writeConversationSession(chatId, {
-          last_target: contextualFollowUp.target,
-          last_task_id: dispatch.taskId,
-          parent_task_id: contextualFollowUp.parent_task_id || contextualFollowUp.task_id || null,
-          last_task_type: 'CONTEXTUAL_INVESTIGATION',
-          active_issue: contextualFollowUp.query || text,
-          unresolved_question: contextualFollowUp.query || text,
-          task_state: 'PENDING_INVESTIGATION',
-        });
-        await sendTelegramMessage(env, chatId, naturalInvestigationAcknowledgement(contextualFollowUp.target, contextualFollowUp.query || text), message.message_id);
-        if (contextualFollowUp.target === 'rio') ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
-        else if (contextualFollowUp.target === 'tony_stark') ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
-        else if (contextualFollowUp.target === 'aura3') ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
-        return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, parent_task_id: contextualFollowUp.parent_task_id || null, task_id: dispatch.taskId });
       }
 
       if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {
