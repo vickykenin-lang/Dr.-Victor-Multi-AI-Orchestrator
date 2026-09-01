@@ -41,6 +41,7 @@ import { resolveFounderIntent, founderDirectionReply, clarificationFallback } fr
 import { classifyConversationFollowUp, buildInvestigationTaskText, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';
 import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } from '../brain/active_context.mjs';
 import { naturalDispatchAcknowledgement, naturalInvestigationAcknowledgement, naturalPendingReply, buildNaturalResultPrompt, naturalResultFallback } from '../brain/founder_conversation.mjs';
+import { classifyOwnedProblem, buildOwnedProblemPrompt, naturalOwnedProblemAck } from '../brain/problem_ownership.mjs';
 import { classifyHulkRequest, hulkActionBlockedReply, hulkStatusReply, isCasualWellbeing, casualWellbeingReply } from '../brain/hulk_guard.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -111,6 +112,7 @@ export default {
         founder_approval_gate: 'CREDENTIAL_ADMINISTRATION_ONLY',
         memory_recall_mode: 'LAYERED_REPO_MEMORY_V3',
         active_thread_memory: 'BEST_EFFORT_WORKING_CONTEXT_V1',
+        founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',
         founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',
         memory_write_configured: Boolean(env.GITHUB_MEMORY_TOKEN),
         aura3_bridge_configured: aura3BridgeConfigured(env),
@@ -273,6 +275,7 @@ export default {
       await writeConversationSession(chatId, sessionWithFounderTurn);
       const deterministicIntent = resolveFounderIntent(text, replyContext);
       const contextualFollowUp = classifyConversationFollowUp(text, sessionWithFounderTurn);
+      const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);
       const hulkRequest = classifyHulkRequest(text);
 
       if (!memoryDirective && isCasualWellbeing(text)) {
@@ -285,6 +288,43 @@ export default {
         const reply = hulkRequest.mode === 'HULK_ACTION' ? hulkActionBlockedReply() : hulkStatusReply();
         await sendTelegramMessage(env, chatId, reply, message.message_id);
         return json({ ok: true, mode: hulkRequest.mode, target: 'hulk', dispatch: 'NOT_ATTEMPTED_BRIDGE_UNVERIFIED' });
+      }
+
+      if (!memoryDirective && ownedProblem.matched) {
+        const recoveryText = buildOwnedProblemPrompt(ownedProblem.target, text);
+        const dispatch = await dispatchContextualInvestigation(env, ownedProblem.target, recoveryText, { messageId: message.message_id });
+        await writeConversationSession(chatId, {
+          last_target: ownedProblem.target,
+          last_task_id: dispatch.taskId,
+          last_task_type: 'OWNED_PROBLEM_RECOVERY',
+          active_issue: text,
+          unresolved_question: text,
+          task_state: 'OWNED_RECOVERY_RUNNING',
+        });
+        await sendTelegramMessage(env, chatId, naturalOwnedProblemAck(ownedProblem.target), message.message_id);
+        if (ownedProblem.target === 'rio') ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
+        else if (ownedProblem.target === 'tony_stark') ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
+        else if (ownedProblem.target === 'aura3') ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
+        return json({ ok: true, mode: ownedProblem.mode, target: ownedProblem.target, task_id: dispatch.taskId });
+      }
+
+      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {
+        const investigationText = buildInvestigationTaskText(contextualFollowUp, sessionWithFounderTurn);
+        const dispatch = await dispatchContextualInvestigation(env, contextualFollowUp.target, investigationText, { messageId: message.message_id });
+        await writeConversationSession(chatId, {
+          last_target: contextualFollowUp.target,
+          last_task_id: dispatch.taskId,
+          parent_task_id: contextualFollowUp.parent_task_id || contextualFollowUp.task_id || null,
+          last_task_type: 'CONTEXTUAL_INVESTIGATION',
+          active_issue: contextualFollowUp.query || text,
+          unresolved_question: contextualFollowUp.query || text,
+          task_state: 'PENDING_INVESTIGATION',
+        });
+        await sendTelegramMessage(env, chatId, naturalInvestigationAcknowledgement(contextualFollowUp.target, contextualFollowUp.query || text), message.message_id);
+        if (contextualFollowUp.target === 'rio') ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
+        else if (contextualFollowUp.target === 'tony_stark') ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
+        else if (contextualFollowUp.target === 'aura3') ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
+        return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, parent_task_id: contextualFollowUp.parent_task_id || null, task_id: dispatch.taskId });
       }
 
       if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {

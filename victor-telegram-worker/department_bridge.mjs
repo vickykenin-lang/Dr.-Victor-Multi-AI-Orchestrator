@@ -136,7 +136,7 @@ export function rioBridgeConfigured(env) { return Boolean(env.GITHUB_ORCHESTRATI
 
 export function selectRioTaskType(text) {
   const value = String(text || '').toLowerCase();
-  if (/victor goal contract|goal id:|org-revenue-001|replan_execute/.test(value)) return 'GOAL_EXECUTE';
+  if (/victor goal contract|victor owned problem recovery|goal id:|org-revenue-001|replan_execute/.test(value)) return 'GOAL_EXECUTE';
   if (/activat|start|resume|kaam par|self.?mode/.test(value)) return 'PRIORITY_CHECK';
   if (/certif|bridge|connect|communication|strict|supervision|round.?trip/.test(value)) return 'STRICT_SUPERVISION_PROBE';
   if (/govern|authority|objective|soul|rule/.test(value)) return 'GOVERNANCE_CHECK';
