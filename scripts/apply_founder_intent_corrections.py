@@ -10,20 +10,29 @@ if import_line not in text:
         raise SystemExit('founder intent import anchor missing')
     text = text.replace(import_anchor, import_anchor + import_line, 1)
 
-planning_anchor = "      processingStage = 'REQUEST_PLANNING';\n      const plan = await planFounderRequest(env, text, message?.reply_to_message?.text || '');\n"
-replacement = "      processingStage = 'REQUEST_PLANNING';\n      const replyContext = message?.reply_to_message?.text || '';\n      const deterministicIntent = resolveFounderIntent(text, replyContext);\n\n      if (!memoryDirective && deterministicIntent.mode === 'FOUNDER_DIRECTION') {\n        await sendTelegramMessage(env, chatId, founderDirectionReply(), message.message_id);\n        return json({ ok: true, mode: deterministicIntent.mode, reason: deterministicIntent.reason });\n      }\n\n      if (!memoryDirective && deterministicIntent.mode === 'CLARIFICATION') {\n        let clarification = clarificationFallback(replyContext);\n        if (replyContext && env.ENABLE_AI_INFERENCE === 'true') {\n          clarification = await askModel(\n            env,\n            'Explain the immediately previous Victor reply to the Founder. Use the supplied previous reply as context. Do not greet, reintroduce yourself, change topic, or execute a new task. Answer concisely in the Founder language.',\n            `Previous Victor reply: ${replyContext}\\nFounder clarification: ${text}`,\n          );\n        }\n        await sendTelegramMessage(env, chatId, clarification, message.message_id);\n        return json({ ok: true, mode: deterministicIntent.mode, reason: deterministicIntent.reason });\n      }\n\n      const plan = await planFounderRequest(env, text, replyContext);\n"
-if replacement not in text:
+# If the integrated Founder intent flow already exists, do not try to reapply an
+# obsolete exact block. This patcher must remain idempotent as later runtime
+# layers add session/context logic around the same planning stage.
+integrated = (
+    "const deterministicIntent = resolveFounderIntent(text, replyContext);" in text
+    and "deterministicIntent.mode === 'FOUNDER_DIRECTION'" in text
+    and "deterministicIntent.mode === 'CLARIFICATION'" in text
+)
+
+if not integrated:
+    planning_anchor = "      processingStage = 'REQUEST_PLANNING';\n      const plan = await planFounderRequest(env, text, message?.reply_to_message?.text || '');\n"
+    replacement = "      processingStage = 'REQUEST_PLANNING';\n      const replyContext = message?.reply_to_message?.text || '';\n      const deterministicIntent = resolveFounderIntent(text, replyContext);\n\n      if (!memoryDirective && deterministicIntent.mode === 'FOUNDER_DIRECTION') {\n        await sendTelegramMessage(env, chatId, founderDirectionReply(), message.message_id);\n        return json({ ok: true, mode: deterministicIntent.mode, reason: deterministicIntent.reason });\n      }\n\n      if (!memoryDirective && deterministicIntent.mode === 'CLARIFICATION') {\n        let clarification = clarificationFallback(replyContext);\n        if (replyContext && env.ENABLE_AI_INFERENCE === 'true') {\n          clarification = await askModel(env, 'Explain the immediately previous Victor reply to the Founder. Do not greet, change topic, or execute a new task.', `Previous Victor reply: ${replyContext}\\nFounder clarification: ${text}`);\n        }\n        await sendTelegramMessage(env, chatId, clarification, message.message_id);\n        return json({ ok: true, mode: deterministicIntent.mode, reason: deterministicIntent.reason });\n      }\n\n      const plan = await planFounderRequest(env, text, replyContext);\n"
     if planning_anchor not in text:
-        raise SystemExit('planning anchor missing')
+        raise SystemExit('founder intent flow missing and legacy planning anchor unavailable')
     text = text.replace(planning_anchor, replacement, 1)
 
-# Planner prompt must explicitly reserve Founder direction/objective-change semantics.
-old_modes = "Modes:\n- CHAT: normal conversation, story, explanation, brainstorming, general question.\n- DEPARTMENT_STATUS: asks current/fresh/status/result/facts about RIO, Tony Stark or AURA3.\n- DEPARTMENT_ACTION: asks to fix, run, start, stop, recover, build, change, execute or otherwise act on RIO, Tony Stark or AURA3.\n- EXECUTIVE_GOAL: organization-level objective/strategy/root-cause/replanning request that Victor should manage across departments.\n"
-new_modes = old_modes + "\nImportant semantic guard:\n- Operating preference/direction such as 'focus on operation, not payment' is NOT an EXECUTIVE_GOAL trigger by itself. It is handled before this planner.\n- Do not reinterpret a Founder preference statement as permission to run the currently active goal.\n"
-if new_modes not in text:
-    if old_modes not in text:
-        raise SystemExit('planner modes anchor missing')
-    text = text.replace(old_modes, new_modes, 1)
+# Add semantic guard only when the legacy planner wording is present. Later
+# planner revisions may already contain equivalent or stronger language.
+guard = "- Do not reinterpret a Founder preference statement as permission to run the currently active goal."
+if guard not in text:
+    old_modes = "Modes:\n- CHAT: normal conversation, story, explanation, brainstorming, general question.\n- DEPARTMENT_STATUS: asks current/fresh/status/result/facts about RIO, Tony Stark or AURA3.\n- DEPARTMENT_ACTION: asks to fix, run, start, stop, recover, build, change, execute or otherwise act on RIO, Tony Stark or AURA3.\n- EXECUTIVE_GOAL: organization-level objective/strategy/root-cause/replanning request that Victor should manage across departments.\n"
+    if old_modes in text:
+        text = text.replace(old_modes, old_modes + "\nImportant semantic guard:\n- Operating preference/direction such as 'focus on operation, not payment' is NOT an EXECUTIVE_GOAL trigger by itself. It is handled before this planner.\n- Do not reinterpret a Founder preference statement as permission to run the currently active goal.\n", 1)
 
 path.write_text(text, encoding='utf-8')
-print('Founder intent corrections applied')
+print('Founder intent corrections verified/applied')
