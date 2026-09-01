@@ -16,7 +16,7 @@ test('owned outcome starts at TASK_SENT and increments attempt lineage', () => {
   assert.equal(second.attempts, 2);
 });
 
-test('verified work is not automatically objective achieved', () => {
+test('verified work remains RESULT_VERIFIED and does not become objective achieved', () => {
   const prior = createOwnedOutcomeState({ target: 'rio', founderRequest: 'post publish karo', taskId: 't1' });
   const state = assessVerifiedDepartmentResult({
     __victor_verified: true,
@@ -29,7 +29,8 @@ test('verified work is not automatically objective achieved', () => {
       next_action: 'publish next',
     },
   }, prior);
-  assert.equal(state.stage, OUTCOME_STAGE.WORK_PERFORMED);
+  assert.equal(state.stage, OUTCOME_STAGE.RESULT_VERIFIED);
+  assert.equal(state.work_performed, true);
   assert.equal(state.objective_achieved, false);
   assert.equal(shouldContinueOwnedRecovery(state), true);
 });
