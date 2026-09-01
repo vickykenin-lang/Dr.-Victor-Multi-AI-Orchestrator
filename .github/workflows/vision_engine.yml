@@ -6,11 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "create_job | run_stage | auto | scan_auto | topic_ok | look_ok | master_ok"
+        description: "create_job | run_stage | auto | scan_auto | reopen | topic_ok"
         required: false
         default: "scan_auto"
       job_id:
-        description: "JOB001 or empty for scan_auto"
         required: false
         default: ""
       topic:
@@ -33,12 +32,13 @@ permissions:
 jobs:
   engine:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Run production engine
         env:
           ENGINE_ACTION: ${{ inputs.action || 'scan_auto' }}
@@ -47,8 +47,14 @@ jobs:
           LENGTH: ${{ inputs.length }}
           LANGUAGE: ${{ inputs.language }}
           PLATFORM: ${{ inputs.platform }}
+          SORA2_API: ${{ secrets.SORA2_API }}
+          SORA2_API_KEY: ${{ secrets.SORA2_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_VIO_API_KEY: ${{ secrets.GEMINI_VIO_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NVIDIA_VICTOR_VISION_KEY: ${{ secrets.NVIDIA_VICTOR_VISION_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: python3 vision/scripts/production_engine.py
-
       - name: Commit job state
         if: always()
         run: |
@@ -60,28 +66,24 @@ jobs:
             git pull --rebase origin main || git pull --rebase --autostash origin main || true
             git push
           fi
-
       - name: Auto trigger next after gap
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 - <<'PY'
-          import json, os, subprocess, time, glob
-          paths = glob.glob("vision/engine/jobs/*/run_signal.json")
-          queued = set()
-          for p in paths:
-              sig = json.load(open(p))
-              if not sig.get("continue"):
-                  continue
-              job = p.split("/")[3]
-              if job in queued:
-                  continue
-              gap = int(sig.get("gap_sec") or 60)
-              print("queue", job, "gap", gap)
-              time.sleep(min(gap, 300))
-              subprocess.check_call(["gh", "workflow", "run", "vision_engine.yml", "-r", "main", "-f", "action=auto", "-f", f"job_id={job}"])
-              queued.add(job)
-          if not queued:
-              print("no continue signals")
+          import json, glob, subprocess, time
+          queued=set()
+          for p in glob.glob("vision/engine/jobs/*/run_signal.json"):
+              sig=json.load(open(p))
+              if not sig.get("continue"): persist=False
+              else:
+                  job=p.split("/")[3]
+                  if job in queued: continue
+                  gap=min(int(sig.get("gap_sec") or 60), 300)
+                  print("queue", job, "gap", gap)
+                  time.sleep(gap)
+                  subprocess.check_call(["gh","workflow","run","vision_engine.yml","-r","main","-f","action=auto","-f",f"job_id={job}"])
+                  queued.add(job)
+          if not queued: print("no continue")
           PY

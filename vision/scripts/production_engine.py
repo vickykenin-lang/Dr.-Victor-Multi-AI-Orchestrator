@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Vision Production House Engine. Unattended after Topic OK."""
+"""Vision Production House Engine. Workers on look/keyframes/picture."""
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
@@ -63,31 +64,34 @@ def signal(job_id: str, cont: bool, stage: str, reason: str) -> None:
     )
 
 
+def topic_of(jd: str) -> str:
+    brief = os.path.join(jd, "brief.md")
+    if not os.path.isfile(brief):
+        return ""
+    for line in open(brief, encoding="utf-8"):
+        if line.lower().startswith("topic:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
 def list_jobs() -> list[str]:
     if not os.path.isdir(ROOT):
         return []
-    out = []
-    for name in sorted(os.listdir(ROOT)):
-        if os.path.isfile(os.path.join(ROOT, name, "state.json")):
-            out.append(name)
-    return out
+    return [n for n in sorted(os.listdir(ROOT)) if os.path.isfile(os.path.join(ROOT, n, "state.json"))]
 
 
 def create_job(job_id: str, topic: str, length: str, language: str, platform: str) -> int:
     jd = job_dir(job_id)
     os.makedirs(os.path.join(jd, "qc"), exist_ok=True)
     os.makedirs(os.path.join(jd, "artifacts"), exist_ok=True)
-    write(
-        os.path.join(jd, "brief.md"),
-        "\n".join([
-            "# Brief",
-            f"topic: {topic or '(empty)'}",
-            f"length: {length}",
-            f"language: {language}",
-            f"platform: {platform}",
-            "status: waiting Topic OK",
-        ]),
-    )
+    write(os.path.join(jd, "brief.md"), "\n".join([
+        "# Brief",
+        f"topic: {topic or '(empty)'}",
+        f"length: {length}",
+        f"language: {language}",
+        f"platform: {platform}",
+        "status: waiting Topic OK",
+    ]))
     save_json(os.path.join(jd, "state.json"), {
         "job_id": job_id,
         "stage": "inbox",
@@ -115,12 +119,41 @@ def set_gate(job_id: str, gate: str) -> int:
     return 0
 
 
+def reopen(job_id: str, stage: str = "look_lock") -> int:
+    path = os.path.join(job_dir(job_id), "state.json")
+    if not os.path.isfile(path):
+        print("missing job", job_id)
+        return 1
+    if stage not in STAGES:
+        stage = "look_lock"
+    state = load_json(path, {})
+    state["stage"] = stage
+    state["updated"] = now()
+    save_json(path, state)
+    signal(job_id, True, stage, f"reopen at {stage}")
+    print("reopened", job_id, stage)
+    return 0
+
+
 def director(stage: str, jd: str) -> dict:
+    if stage == "look_lock":
+        sheets = glob.glob(os.path.join(jd, "artifacts", "look", "L*.png"))
+        lock = os.path.isfile(os.path.join(jd, "artifacts", "identity_lock.json"))
+        if len(sheets) < 3 or not lock:
+            return {"pass": False, "reason": f"look sheets={len(sheets)} lock={lock}", "must_fix": ["look sheets"]}
+    if stage == "keyframes":
+        frames = glob.glob(os.path.join(jd, "artifacts", "keyframes", "K*.png"))
+        if len(frames) < 3:
+            return {"pass": False, "reason": f"keyframes={len(frames)}", "must_fix": ["keyframes"]}
+    if stage == "picture":
+        clips = glob.glob(os.path.join(jd, "artifacts", "picture", "K*.mp4"))
+        if len(clips) < 1:
+            return {"pass": False, "reason": "no picture mp4", "must_fix": ["picture"]}
     need = {
         "intake": ["brief.md"],
         "development": ["artifacts/development.md"],
         "screenplay": ["artifacts/screenplay.md", "artifacts/shot_plan.md"],
-        "look_lock": ["artifacts/look_lock.md"],
+        "look_lock": ["artifacts/look_lock.md", "artifacts/identity_lock.json"],
         "keyframes": ["artifacts/keyframes.md"],
         "picture": ["artifacts/picture.md"],
         "sound": ["artifacts/sound.md"],
@@ -130,11 +163,31 @@ def director(stage: str, jd: str) -> dict:
     missing = [p for p in need.get(stage, []) if not os.path.isfile(os.path.join(jd, p))]
     if missing:
         return {"pass": False, "reason": "missing " + ",".join(missing), "must_fix": missing}
-    if stage == "intake":
-        brief = open(os.path.join(jd, "brief.md"), encoding="utf-8").read()
-        if "topic: (empty)" in brief:
-            return {"pass": False, "reason": "topic empty", "must_fix": ["brief.md"]}
     return {"pass": True, "reason": f"{stage} artifacts present", "must_fix": []}
+
+
+def run_workers(stage: str, jd: str) -> None:
+    topic = topic_of(jd)
+    if stage == "look_lock":
+        from worker_look import run as look_run
+        look_run(jd, topic)
+    elif stage == "keyframes":
+        from worker_keyframes import run as kf_run
+        kf_run(jd, topic)
+    elif stage == "picture":
+        from worker_picture import run as pic_run
+        pic_run(jd, topic)
+    elif stage == "screenplay":
+        write(os.path.join(jd, "artifacts/screenplay.md"), "# Screenplay\n\nscenes from brief only\n")
+        write(os.path.join(jd, "artifacts/shot_plan.md"), "# Shot plan\n\nK1 list, K2 guard, K3 intern print, K4 CCTV\n")
+    elif stage == "development":
+        write(os.path.join(jd, "artifacts/development.md"), f"# Development\n\ntopic: {topic}\n")
+    elif stage == "sound":
+        write(os.path.join(jd, "artifacts/sound.md"), "# Sound\n\nstatus: pending tts worker\n")
+    elif stage == "assembly":
+        write(os.path.join(jd, "artifacts/assembly.md"), "# Assembly\n\nstatus: pending concat worker\n")
+    elif stage == "delivery":
+        write(os.path.join(jd, "artifacts/delivery.md"), "# Delivery\n\nstatus: pending publish worker\n")
 
 
 def run_stage(job_id: str) -> int:
@@ -147,11 +200,9 @@ def run_stage(job_id: str) -> int:
     stage = state.get("stage", "inbox")
     gates = state.setdefault("owner_gates", {})
     print("job", job_id, "stage", stage)
-
     if stage == "done":
         signal(job_id, False, "done", "complete")
         return 0
-
     if stage == "inbox":
         if not gates.get("topic_ok"):
             signal(job_id, False, "inbox", "waiting Topic OK")
@@ -161,39 +212,27 @@ def run_stage(job_id: str) -> int:
             return 0
         state["stage"] = "intake"
         stage = "intake"
-
-    templates = {
-        "development": ("artifacts/development.md", "# Development\n\nlogline:\ntreatment:\ntone:\n"),
-        "look_lock": ("artifacts/look_lock.md", "# Look lock\n\nsheets: pending\nwardrobe_lock: pending\n"),
-        "keyframes": ("artifacts/keyframes.md", "# Keyframes\n\nshots: pending\nidentity_source: look_lock\n"),
-        "picture": ("artifacts/picture.md", "# Picture\n\nspec: 16:9\nprompt_rule: using reference images; max 1000 chars\nstatus: pending worker\n"),
-        "sound": ("artifacts/sound.md", "# Sound\n\nlines_source: screenplay\nstatus: pending worker\n"),
-        "assembly": ("artifacts/assembly.md", "# Assembly\n\ncut: pending\nsubs: pending\nmaster: pending\n"),
-        "delivery": ("artifacts/delivery.md", "# Delivery\n\nplatform_from_brief: yes\npackage: pending\n"),
-    }
-    if stage == "screenplay":
-        write(os.path.join(jd, "artifacts/screenplay.md"), "# Screenplay\n\nscenes: pending\n")
-        write(os.path.join(jd, "artifacts/shot_plan.md"), "# Shot plan\n\nshots: pending\n")
-    elif stage in templates:
-        rel, body = templates[stage]
-        path = os.path.join(jd, rel)
-        if not os.path.isfile(path):
-            write(path, body)
-    if stage == "look_lock":
-        write(os.path.join(jd, "artifacts/identity_lock.json"), json.dumps({
-            "frozen": True,
-            "rule": "later stages cannot add a new face",
-            "updated": now(),
-        }, indent=2))
-        gates["look_ok"] = True
-
+    try:
+        run_workers(stage, jd)
+    except Exception as e:
+        print("worker fail", stage, e)
+        verdict = {"pass": False, "reason": str(e)[:300], "must_fix": [stage]}
+        write(os.path.join(jd, "qc", f"{stage}.json"), json.dumps({"stage": stage, "checked_at": now(), **verdict}, indent=2))
+        state["last_director"] = verdict
+        retries = state.setdefault("retries", {})
+        retries[stage] = int(retries.get(stage, 0)) + 1
+        state["updated"] = now()
+        save_json(state_path, state)
+        signal(job_id, retries[stage] < 2, stage, "worker fail")
+        return 0 if retries[stage] < 2 else 1
     verdict = director(stage, jd)
     write(os.path.join(jd, "qc", f"{stage}.json"), json.dumps({"stage": stage, "checked_at": now(), **verdict}, indent=2))
     state["last_director"] = verdict
     retries = state.setdefault("retries", {})
     print("director", verdict)
-
     if verdict.get("pass"):
+        if stage == "look_lock":
+            gates["look_ok"] = True
         nxt = NEXT.get(stage)
         if nxt:
             state["stage"] = nxt
@@ -205,27 +244,23 @@ def run_stage(job_id: str) -> int:
         state["updated"] = now()
         save_json(state_path, state)
         return 0
-
     retries[stage] = int(retries.get(stage, 0)) + 1
     state["updated"] = now()
     save_json(state_path, state)
-    if retries[stage] >= 2:
-        signal(job_id, False, stage, "director failed twice")
-        return 1
-    signal(job_id, True, stage, "director fail retry")
-    return 0
+    signal(job_id, retries[stage] < 2, stage, "director fail retry")
+    return 0 if retries[stage] < 2 else 1
 
 
 def scan_auto() -> int:
-    codes = 0
     jobs = list_jobs()
     if not jobs:
         print("no jobs")
         return 0
+    code = 0
     for job_id in jobs:
         print("scan", job_id)
-        codes |= run_stage(job_id)
-    return 0 if codes == 0 else 1
+        code |= run_stage(job_id)
+    return 0 if code == 0 else 1
 
 
 def main() -> int:
@@ -236,13 +271,12 @@ def main() -> int:
         if not job_id:
             print("JOB_ID required")
             return 1
-        return create_job(
-            job_id,
-            (os.environ.get("TOPIC") or "").strip(),
-            (os.environ.get("LENGTH") or "10min").strip(),
-            (os.environ.get("LANGUAGE") or "Hinglish").strip(),
-            (os.environ.get("PLATFORM") or "youtube").strip(),
-        )
+        return create_job(job_id, (os.environ.get("TOPIC") or "").strip(), (os.environ.get("LENGTH") or "10min").strip(), (os.environ.get("LANGUAGE") or "Hinglish").strip(), (os.environ.get("PLATFORM") or "youtube").strip())
+    if action == "reopen":
+        if not job_id:
+            print("JOB_ID required")
+            return 1
+        return reopen(job_id, (os.environ.get("REOPEN_STAGE") or "look_lock").strip())
     if action in GATE_MAP:
         if not job_id:
             print("JOB_ID required")
