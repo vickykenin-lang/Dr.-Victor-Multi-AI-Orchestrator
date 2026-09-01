@@ -6,23 +6,7 @@
     "look_ok": true,
     "master_ok": false
   },
-  "retries": {
-    "intake": 0,
-    "development": 0,
-    "screenplay": 0,
-    "look_lock": 6,
-    "keyframes": 0,
-    "picture": 0,
-    "sound": 0,
-    "assembly": 0,
-    "delivery": 0
-  },
-  "last_director": {
-    "pass": false,
-    "reason": "The read operation timed out",
-    "must_fix": [
-      "look_lock"
-    ]
-  },
-  "updated": "2026-09-01T23:11:39.450563+05:30"
+  "retries": {},
+  "last_director": null,
+  "updated": "2026-09-01T23:21:12.442566+05:30"
 }
