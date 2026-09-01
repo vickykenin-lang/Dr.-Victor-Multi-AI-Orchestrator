@@ -17,6 +17,7 @@ on:
       - 'scripts/apply_problem_ownership.py'
       - 'scripts/apply_fact_runtime.py'
       - 'scripts/apply_request_gateway.py'
+      - 'scripts/apply_conversation_state_store.py'
       - 'brain/runtime.mjs'
       - 'brain/runtime.test.mjs'
       - 'brain/founder_intent.mjs'
@@ -37,6 +38,8 @@ on:
       - 'brain/founder_request.test.mjs'
       - 'brain/request_gateway.mjs'
       - 'brain/request_gateway.test.mjs'
+      - 'brain/conversation_state_store.mjs'
+      - 'brain/conversation_state_store.test.mjs'
       - 'docs/VICTOR_FINAL_CORRECTION_PLAN.md'
       - 'data/victor_correction_backlog.json'
       - '.github/workflows/apply-victor-brain-runtime.yml'
@@ -71,8 +74,9 @@ jobs:
           python scripts/apply_problem_ownership.py
           python scripts/apply_fact_runtime.py
           python scripts/apply_request_gateway.py
+          python scripts/apply_conversation_state_store.py
       - name: Run core tests
-        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs brain/founder_conversation.test.mjs brain/problem_ownership.test.mjs brain/fact_runtime.test.mjs brain/founder_request.test.mjs brain/request_gateway.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
+        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs brain/founder_conversation.test.mjs brain/problem_ownership.test.mjs brain/fact_runtime.test.mjs brain/founder_request.test.mjs brain/request_gateway.test.mjs brain/conversation_state_store.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
       - name: Syntax checks
         run: |
           node --check brain/runtime.mjs
@@ -85,6 +89,7 @@ jobs:
           node --check brain/fact_runtime.mjs
           node --check brain/founder_request.mjs
           node --check brain/request_gateway.mjs
+          node --check brain/conversation_state_store.mjs
           node --check victor-telegram-worker/autonomy_runtime.mjs
           node --check victor-telegram-worker/department_bridge.mjs
           node --check victor-telegram-worker/worker.js
