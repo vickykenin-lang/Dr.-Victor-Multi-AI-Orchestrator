@@ -1,7 +1,9 @@
 {
   "stage": "look_lock",
-  "checked_at": "2026-09-01T11:54:53.699219+05:30",
-  "pass": true,
-  "reason": "look_lock artifacts present",
-  "must_fix": []
+  "checked_at": "2026-09-01T13:58:24.721594+05:30",
+  "pass": false,
+  "reason": "HTTP Error 404: Not Found",
+  "must_fix": [
+    "look_lock"
+  ]
 }

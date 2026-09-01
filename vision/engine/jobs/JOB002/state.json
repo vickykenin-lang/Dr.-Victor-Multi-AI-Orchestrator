@@ -10,7 +10,7 @@
     "intake": 0,
     "development": 0,
     "screenplay": 0,
-    "look_lock": 0,
+    "look_lock": 1,
     "keyframes": 0,
     "picture": 0,
     "sound": 0,
@@ -18,9 +18,11 @@
     "delivery": 0
   },
   "last_director": {
-    "pass": true,
-    "reason": "delivery artifacts present",
-    "must_fix": []
+    "pass": false,
+    "reason": "HTTP Error 404: Not Found",
+    "must_fix": [
+      "look_lock"
+    ]
   },
-  "updated": "2026-09-01T13:54:19.399309+05:30"
+  "updated": "2026-09-01T13:58:24.721916+05:30"
 }
