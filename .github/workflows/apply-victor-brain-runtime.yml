@@ -8,8 +8,11 @@ on:
       - 'scripts/apply_victor_rio_bridge_fixes.py'
       - 'scripts/fix_autonomy_state_concurrency.py'
       - 'scripts/apply_founder_manual_trigger_fix.py'
+      - 'scripts/apply_founder_intent_corrections.py'
       - 'brain/runtime.mjs'
       - 'brain/runtime.test.mjs'
+      - 'brain/founder_intent.mjs'
+      - 'brain/founder_intent.test.mjs'
       - 'docs/VICTOR_FINAL_CORRECTION_PLAN.md'
       - 'data/victor_correction_backlog.json'
       - '.github/workflows/apply-victor-brain-runtime.yml'
@@ -35,11 +38,13 @@ jobs:
           python scripts/apply_victor_rio_bridge_fixes.py
           python scripts/fix_autonomy_state_concurrency.py
           python scripts/apply_founder_manual_trigger_fix.py
+          python scripts/apply_founder_intent_corrections.py
       - name: Run core tests
-        run: node --test brain/runtime.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
+        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
       - name: Syntax checks
         run: |
           node --check brain/runtime.mjs
+          node --check brain/founder_intent.mjs
           node --check victor-telegram-worker/autonomy_runtime.mjs
           node --check victor-telegram-worker/department_bridge.mjs
           node --check victor-telegram-worker/worker.js
