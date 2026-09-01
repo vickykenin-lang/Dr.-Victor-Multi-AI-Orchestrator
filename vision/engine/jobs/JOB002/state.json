@@ -7,7 +7,7 @@
     "master_ok": false
   },
   "retries": {
-    "look_lock": 3
+    "look_lock": 4
   },
   "last_director": {
     "pass": false,
@@ -16,5 +16,5 @@
       "look_lock"
     ]
   },
-  "updated": "2026-09-02T00:19:33.654806+05:30"
+  "updated": "2026-09-02T02:58:10.694633+05:30"
 }
