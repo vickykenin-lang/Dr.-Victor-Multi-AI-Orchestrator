@@ -42,6 +42,7 @@ import { classifyConversationFollowUp, buildInvestigationTaskText, formatPending
 import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } from '../brain/active_context.mjs';
 import { naturalDispatchAcknowledgement, naturalInvestigationAcknowledgement, naturalPendingReply, buildNaturalResultPrompt, naturalResultFallback } from '../brain/founder_conversation.mjs';
 import { classifyOwnedProblem, buildOwnedProblemPrompt, naturalOwnedProblemAck } from '../brain/problem_ownership.mjs';
+import { conversationStateCapability, readConversationState, writeConversationState } from '../brain/conversation_state_store.mjs';
 import { classifyFactRequest, collectFactEvidence, buildFactAnswerPrompt } from '../brain/fact_runtime.mjs';
 import { buildRuntimeFounderRequest, buildSessionPatchForRequest, buildFactRequestFromFounderRequest, shouldUseFactGateway } from '../brain/request_gateway.mjs';
 import { classifyHulkRequest, hulkActionBlockedReply, hulkStatusReply, isCasualWellbeing, casualWellbeingReply } from '../brain/hulk_guard.mjs';
@@ -113,7 +114,9 @@ export default {
         operating_mode: 'GOVERNED_SELF_MODE',
         founder_approval_gate: 'CREDENTIAL_ADMINISTRATION_ONLY',
         memory_recall_mode: 'LAYERED_REPO_MEMORY_V3',
-        active_thread_memory: 'BEST_EFFORT_WORKING_CONTEXT_V1',
+        active_thread_memory: conversationStateCapability(env).durable ? 'DURABLE_CONVERSATION_STATE_V1' : 'BEST_EFFORT_WORKING_CONTEXT_V1',
+        active_thread_memory_durable: conversationStateCapability(env).durable,
+        active_thread_memory_reason: conversationStateCapability(env).reason,
         founder_conversation_layer: 'NATURAL_CONVERSATION_FIRST_V1',
         fact_evidence_runtime: 'FRESH_GITHUB_FACTS_V1',
         founder_request_gateway: 'STRUCTURED_REQUEST_GATEWAY_V1',
@@ -272,13 +275,13 @@ export default {
 
       processingStage = 'REQUEST_PLANNING';
       const replyContext = message?.reply_to_message?.text || '';
-      const session = await readConversationSession(chatId);
+      const session = await readConversationSession(chatId, env);
       const activePatch = buildActiveContext(session, { founderText: text, replyContext, messageId: message.message_id });
       let sessionWithFounderTurn = appendRecentTurn({ ...session, ...activePatch }, 'founder', text);
       const founderRequest = buildRuntimeFounderRequest(text, sessionWithFounderTurn);
       const requestSessionPatch = buildSessionPatchForRequest(founderRequest);
       sessionWithFounderTurn = { ...sessionWithFounderTurn, ...requestSessionPatch };
-      await writeConversationSession(chatId, sessionWithFounderTurn);
+      await writeConversationSession(chatId, sessionWithFounderTurn, env);
       const deterministicIntent = resolveFounderIntent(text, replyContext);
       const contextualFollowUp = classifyConversationFollowUp(text, sessionWithFounderTurn);
       const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);
@@ -291,7 +294,7 @@ export default {
       }
 
       if (!memoryDirective && hulkRequest.matched) {
-        await writeConversationSession(chatId, { last_target: 'hulk', last_founder_text: text, task_state: 'NO_VERIFIED_BRIDGE' });
+        await writeConversationSession(chatId, { last_target: 'hulk', last_founder_text: text, task_state: 'NO_VERIFIED_BRIDGE' }, env);
         const reply = hulkRequest.mode === 'HULK_ACTION' ? hulkActionBlockedReply() : hulkStatusReply();
         await sendTelegramMessage(env, chatId, reply, message.message_id);
         return json({ ok: true, mode: hulkRequest.mode, target: 'hulk', dispatch: 'NOT_ATTEMPTED_BRIDGE_UNVERIFIED' });
@@ -330,7 +333,7 @@ export default {
           active_issue: text,
           unresolved_question: text,
           task_state: 'OWNED_RECOVERY_RUNNING',
-        });
+        }, env);
         await sendTelegramMessage(env, chatId, naturalOwnedProblemAck(ownedProblem.target), message.message_id);
         if (ownedProblem.target === 'rio') ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
         else if (ownedProblem.target === 'tony_stark') ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
@@ -349,7 +352,7 @@ export default {
           active_issue: contextualFollowUp.query || text,
           unresolved_question: contextualFollowUp.query || text,
           task_state: 'PENDING_INVESTIGATION',
-        });
+        }, env);
         await sendTelegramMessage(env, chatId, naturalInvestigationAcknowledgement(contextualFollowUp.target, contextualFollowUp.query || text), message.message_id);
         if (contextualFollowUp.target === 'rio') ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
         else if (contextualFollowUp.target === 'tony_stark') ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
@@ -425,7 +428,7 @@ export default {
             await sendTelegramMessage(env, chatId, 'RIO ko task dispatch nahi hua. Victor ne failure record kiya hai; duplicate retry nahi karega.', message.message_id);
             return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
           }
-          await writeConversationSession(chatId, { last_target: 'rio', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' });
+          await writeConversationSession(chatId, { last_target: 'rio', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' }, env);
           await sendTelegramMessage(env, chatId, naturalDispatchAcknowledgement('rio', text), message.message_id);
           ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
@@ -449,7 +452,7 @@ export default {
             await sendTelegramMessage(env, chatId, 'Tony ko task dispatch nahi hua. Victor ne failure record kiya hai; duplicate retry nahi karega.', message.message_id);
             return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
           }
-          await writeConversationSession(chatId, { last_target: 'tony_stark', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' });
+          await writeConversationSession(chatId, { last_target: 'tony_stark', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' }, env);
           await sendTelegramMessage(env, chatId, naturalDispatchAcknowledgement('tony_stark', text), message.message_id);
           ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
@@ -473,7 +476,7 @@ export default {
             await sendTelegramMessage(env, chatId, 'AURA3 ko task dispatch nahi hua. Victor ne failure record kiya hai; duplicate retry nahi karega.', message.message_id);
             return json({ ok: true, mode: plan.mode, target, dispatch: 'FAILED' });
           }
-          await writeConversationSession(chatId, { last_target: 'aura3', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' });
+          await writeConversationSession(chatId, { last_target: 'aura3', last_task_id: dispatch.taskId, last_task_type: dispatch.taskType || plan.mode, last_founder_text: text, task_state: 'PENDING' }, env);
           await sendTelegramMessage(env, chatId, naturalDispatchAcknowledgement('aura3', text), message.message_id);
           ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
           return json({ ok: true, mode: plan.mode, target, task_id: dispatch.taskId });
@@ -603,7 +606,7 @@ async function handleTonyRoundTrip(env, chatId, dispatch, replyToMessageId) {
 }
 
 async function sendNaturalDepartmentResult(env, chatId, target, rawReport, replyToMessageId) {
-  const session = await readConversationSession(chatId);
+  const session = await readConversationSession(chatId, env);
   const founderQuestion = session?.unresolved_question || session?.active_issue || session?.last_founder_text || '';
   let reply = naturalResultFallback(target, rawReport);
   if (env.ENABLE_AI_INFERENCE === 'true') {
@@ -621,28 +624,22 @@ async function sendNaturalDepartmentResult(env, chatId, target, rawReport, reply
     last_victor_reply: reply,
     unresolved_question: null,
     task_state: 'RESULT_VERIFIED',
-  });
+  }, env);
   await sendTelegramMessage(env, chatId, reply, replyToMessageId);
 }
 
-async function readConversationSession(chatId) {
+async function readConversationSession(chatId, env = {}) {
   try {
-    const cache = caches.default;
-    const key = new Request(`https://victor.internal/conversation/${encodeURIComponent(String(chatId))}`);
-    const hit = await cache.match(key);
-    return hit ? await hit.json() : {};
+    const record = await readConversationState(env, chatId);
+    return record.state || {};
   } catch (_) {
     return {};
   }
 }
 
-async function writeConversationSession(chatId, next) {
+async function writeConversationSession(chatId, next, env = {}) {
   try {
-    const cache = caches.default;
-    const key = new Request(`https://victor.internal/conversation/${encodeURIComponent(String(chatId))}`);
-    const current = await readConversationSession(chatId);
-    const payload = { ...current, ...next, updated_at: new Date().toISOString() };
-    await cache.put(key, new Response(JSON.stringify(payload), { headers: { 'Cache-Control': 'public, max-age=7200', 'Content-Type': 'application/json' } }));
+    await writeConversationState(env, chatId, next || {});
   } catch (_) {}
 }
 
@@ -693,7 +690,7 @@ async function answerExistingDepartmentTask(env, chatId, followUp, session, repl
     }
 
     if (report) {
-      await writeConversationSession(chatId, { last_target: target, last_task_id: taskId, task_state: 'RESULT_VERIFIED' });
+      await writeConversationSession(chatId, { last_target: target, last_task_id: taskId, task_state: 'RESULT_VERIFIED' }, env);
       await sendNaturalDepartmentResult(env, chatId, target, report, replyToMessageId);
       return true;
     }
@@ -1063,9 +1060,9 @@ async function sendTelegramMessage(env, chatId, text, replyToMessageId) {
   });
   if (!response.ok) throw new Error(`Telegram sendMessage HTTP ${response.status}`);
   try {
-    const current = await readConversationSession(chatId);
+    const current = await readConversationSession(chatId, env);
     const withReply = appendRecentTurn({ ...current, last_victor_reply: cleanText.slice(0, 1200) }, 'victor', cleanText.slice(0, 1200));
-    await writeConversationSession(chatId, withReply);
+    await writeConversationSession(chatId, withReply, env);
   } catch (_) {}
 }
 
