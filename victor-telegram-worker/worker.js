@@ -38,7 +38,7 @@ import {
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
-import { classifyConversationFollowUp, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';
+import { classifyConversationFollowUp, buildInvestigationTaskText, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';
 import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } from '../brain/active_context.mjs';
 import { classifyHulkRequest, hulkActionBlockedReply, hulkStatusReply, isCasualWellbeing, casualWellbeingReply } from '../brain/hulk_guard.mjs';
 
@@ -283,6 +283,25 @@ export default {
         const reply = hulkRequest.mode === 'HULK_ACTION' ? hulkActionBlockedReply() : hulkStatusReply();
         await sendTelegramMessage(env, chatId, reply, message.message_id);
         return json({ ok: true, mode: hulkRequest.mode, target: 'hulk', dispatch: 'NOT_ATTEMPTED_BRIDGE_UNVERIFIED' });
+      }
+
+      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {
+        const investigationText = buildInvestigationTaskText(contextualFollowUp, sessionWithFounderTurn);
+        const dispatch = await dispatchContextualInvestigation(env, contextualFollowUp.target, investigationText, { messageId: message.message_id });
+        await writeConversationSession(chatId, {
+          last_target: contextualFollowUp.target,
+          last_task_id: dispatch.taskId,
+          parent_task_id: contextualFollowUp.parent_task_id || contextualFollowUp.task_id || null,
+          last_task_type: 'CONTEXTUAL_INVESTIGATION',
+          active_issue: contextualFollowUp.query || text,
+          unresolved_question: contextualFollowUp.query || text,
+          task_state: 'PENDING_INVESTIGATION',
+        });
+        await sendTelegramMessage(env, chatId, `${String(contextualFollowUp.target || '').toUpperCase()} ko specific follow-up investigation di hai. Parent task: ${contextualFollowUp.parent_task_id || contextualFollowUp.task_id || 'none'}. Investigation task: ${dispatch.taskId}. Purani report repeat nahi karni; fresh evidence ya evidence-gap ka root cause return karna hai.`, message.message_id);
+        if (contextualFollowUp.target === 'rio') ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
+        else if (contextualFollowUp.target === 'tony_stark') ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
+        else if (contextualFollowUp.target === 'aura3') ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
+        return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, parent_task_id: contextualFollowUp.parent_task_id || null, task_id: dispatch.taskId });
       }
 
       if (!memoryDirective && contextualFollowUp.mode) {
@@ -549,6 +568,22 @@ async function writeConversationSession(chatId, next) {
     const payload = { ...current, ...next, updated_at: new Date().toISOString() };
     await cache.put(key, new Response(JSON.stringify(payload), { headers: { 'Cache-Control': 'public, max-age=7200', 'Content-Type': 'application/json' } }));
   } catch (_) {}
+}
+
+async function dispatchContextualInvestigation(env, target, investigationText, metadata = {}) {
+  if (target === 'rio') {
+    if (!rioBridgeConfigured(env)) throw new Error('RIO_BRIDGE_NOT_CONFIGURED');
+    return dispatchRioTask(env, investigationText, metadata);
+  }
+  if (target === 'tony_stark') {
+    if (!tonyBridgeConfigured(env)) throw new Error('TONY_BRIDGE_NOT_CONFIGURED');
+    return dispatchTonyTask(env, investigationText, metadata);
+  }
+  if (target === 'aura3') {
+    if (!aura3BridgeConfigured(env)) throw new Error('AURA3_BRIDGE_NOT_CONFIGURED');
+    return dispatchAura3Task(env, investigationText, metadata);
+  }
+  throw new Error('CONTEXTUAL_INVESTIGATION_TARGET_UNSUPPORTED');
 }
 
 async function answerExistingDepartmentTask(env, chatId, followUp, session, replyToMessageId) {
