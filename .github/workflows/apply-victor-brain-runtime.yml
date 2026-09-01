@@ -12,6 +12,7 @@ on:
       - 'scripts/apply_conversation_continuity_fix.py'
       - 'scripts/apply_hulk_routing_guard.py'
       - 'scripts/apply_active_thread_memory.py'
+      - 'scripts/apply_contextual_investigation_fix.py'
       - 'brain/runtime.mjs'
       - 'brain/runtime.test.mjs'
       - 'brain/founder_intent.mjs'
@@ -51,6 +52,7 @@ jobs:
           python scripts/apply_conversation_continuity_fix.py
           python scripts/apply_hulk_routing_guard.py
           python scripts/apply_active_thread_memory.py
+          python scripts/apply_contextual_investigation_fix.py
       - name: Run core tests
         run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
       - name: Syntax checks
