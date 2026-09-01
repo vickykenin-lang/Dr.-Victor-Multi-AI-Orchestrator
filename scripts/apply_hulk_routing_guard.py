@@ -11,8 +11,9 @@ if hulk_import not in text:
     text = text.replace(conversation_import, conversation_import + hulk_import, 1)
 
 anchor = "      const deterministicIntent = resolveFounderIntent(text, replyContext);\n      const contextualFollowUp = classifyConversationFollowUp(text, session);\n"
-replacement = anchor + "      const hulkRequest = classifyHulkRequest(text);\n\n      if (!memoryDirective && isCasualWellbeing(text)) {\n        await sendTelegramMessage(env, chatId, casualWellbeingReply(), message.message_id);\n        return json({ ok: true, mode: 'CASUAL_WELLBEING' });\n      }\n\n      if (!memoryDirective && hulkRequest.matched) {\n        await writeConversationSession(chatId, { last_target: 'hulk', last_founder_text: text, task_state: 'NO_VERIFIED_BRIDGE' });\n        const reply = hulkRequest.mode === 'HULK_ACTION' ? hulkActionBlockedReply() : hulkStatusReply();\n        await sendTelegramMessage(env, chatId, reply, message.message_id);\n        return json({ ok: true, mode: hulkRequest.mode, target: 'hulk', dispatch: 'NOT_ATTEMPTED_BRIDGE_UNVERIFIED' });\n      }\n"
-if replacement not in text:
+inserted_marker = "      const hulkRequest = classifyHulkRequest(text);\n"
+if inserted_marker not in text:
+    replacement = anchor + "      const hulkRequest = classifyHulkRequest(text);\n\n      if (!memoryDirective && isCasualWellbeing(text)) {\n        await sendTelegramMessage(env, chatId, casualWellbeingReply(), message.message_id);\n        return json({ ok: true, mode: 'CASUAL_WELLBEING' });\n      }\n\n      if (!memoryDirective && hulkRequest.matched) {\n        await writeConversationSession(chatId, { last_target: 'hulk', last_founder_text: text, task_state: 'NO_VERIFIED_BRIDGE' });\n        const reply = hulkRequest.mode === 'HULK_ACTION' ? hulkActionBlockedReply() : hulkStatusReply();\n        await sendTelegramMessage(env, chatId, reply, message.message_id);\n        return json({ ok: true, mode: hulkRequest.mode, target: 'hulk', dispatch: 'NOT_ATTEMPTED_BRIDGE_UNVERIFIED' });\n      }\n"
     if anchor not in text:
         raise SystemExit('request planning anchor missing')
     text = text.replace(anchor, replacement, 1)
@@ -39,4 +40,4 @@ if new_allowed not in text:
     text = text.replace(old_allowed, new_allowed, 1)
 
 path.write_text(text, encoding='utf-8')
-print('HULK routing guard applied')
+print('HULK_ROUTING_GUARD_ALREADY_APPLIED' if inserted_marker in text else 'HULK routing guard applied')
