@@ -10,9 +10,16 @@ if active_import not in text:
         raise SystemExit('conversation runtime import missing')
     text = text.replace(conv_import, conv_import + active_import, 1)
 
-old = "      const session = await readConversationSession(chatId);\n      const deterministicIntent = resolveFounderIntent(text, replyContext);\n      const contextualFollowUp = classifyConversationFollowUp(text, session);\n"
-new = "      const session = await readConversationSession(chatId);\n      const activePatch = buildActiveContext(session, { founderText: text, replyContext, messageId: message.message_id });\n      const sessionWithFounderTurn = appendRecentTurn({ ...session, ...activePatch }, 'founder', text);\n      await writeConversationSession(chatId, sessionWithFounderTurn);\n      const deterministicIntent = resolveFounderIntent(text, replyContext);\n      const contextualFollowUp = classifyConversationFollowUp(text, sessionWithFounderTurn);\n"
-if new not in text:
+# The active-thread block may have later gateway/state-store arguments added. Detect the
+# semantic integration first instead of requiring the original exact neighborhood.
+active_semantic_markers = [
+    "const activePatch = buildActiveContext(",
+    "const sessionWithFounderTurn = appendRecentTurn(",
+    "classifyConversationFollowUp(text, sessionWithFounderTurn)",
+]
+if not all(marker in text for marker in active_semantic_markers):
+    old = "      const session = await readConversationSession(chatId);\n      const deterministicIntent = resolveFounderIntent(text, replyContext);\n      const contextualFollowUp = classifyConversationFollowUp(text, session);\n"
+    new = "      const session = await readConversationSession(chatId);\n      const activePatch = buildActiveContext(session, { founderText: text, replyContext, messageId: message.message_id });\n      const sessionWithFounderTurn = appendRecentTurn({ ...session, ...activePatch }, 'founder', text);\n      await writeConversationSession(chatId, sessionWithFounderTurn);\n      const deterministicIntent = resolveFounderIntent(text, replyContext);\n      const contextualFollowUp = classifyConversationFollowUp(text, sessionWithFounderTurn);\n"
     if old not in text:
         raise SystemExit('active context planning anchor missing')
     text = text.replace(old, new, 1)
@@ -64,24 +71,24 @@ if active_contract not in text:
         raise SystemExit('memory contract anchor missing')
     text = text.replace(memory_contract_anchor, active_contract + memory_contract_anchor, 1)
 
-# Persist every Victor Telegram reply into working-thread memory so the next Founder turn can refer to it.
-send_anchor = "  if (!response.ok) throw new Error(`Telegram sendMessage HTTP ${response.status}`);\n}\n"
-send_repl = "  if (!response.ok) throw new Error(`Telegram sendMessage HTTP ${response.status}`);\n  try {\n    const current = await readConversationSession(chatId);\n    const withReply = appendRecentTurn({ ...current, last_victor_reply: cleanText.slice(0, 1200) }, 'victor', cleanText.slice(0, 1200));\n    await writeConversationSession(chatId, withReply);\n  } catch (_) {}\n}\n"
-if send_repl not in text:
+# Persist every Victor Telegram reply into working-thread memory. A later durable
+# state-store patch may add env arguments; either form counts as already integrated.
+if "appendRecentTurn({ ...current, last_victor_reply:" not in text:
+    send_anchor = "  if (!response.ok) throw new Error(`Telegram sendMessage HTTP ${response.status}`);\n}\n"
+    send_repl = "  if (!response.ok) throw new Error(`Telegram sendMessage HTTP ${response.status}`);\n  try {\n    const current = await readConversationSession(chatId);\n    const withReply = appendRecentTurn({ ...current, last_victor_reply: cleanText.slice(0, 1200) }, 'victor', cleanText.slice(0, 1200));\n    await writeConversationSession(chatId, withReply);\n  } catch (_) {}\n}\n"
     if send_anchor not in text:
         raise SystemExit('Telegram send anchor missing')
     text = text.replace(send_anchor, send_repl, 1)
 
-# Extend best-effort current-memory window from 15 minutes to 2 hours. It remains non-durable conversational state.
 text = text.replace("'Cache-Control': 'public, max-age=900'", "'Cache-Control': 'public, max-age=7200'")
 
-# Health surface should expose the new layer without claiming durable persistence.
-health_anchor = "        memory_recall_mode: 'LAYERED_REPO_MEMORY_V3',\n"
-health_new = "        memory_recall_mode: 'LAYERED_REPO_MEMORY_V3',\n        active_thread_memory: 'BEST_EFFORT_WORKING_CONTEXT_V1',\n"
-if health_new not in text:
+# Expose best-effort health only when no later dynamic state capability surface exists.
+if 'active_thread_memory:' not in text:
+    health_anchor = "        memory_recall_mode: 'LAYERED_REPO_MEMORY_V3',\n"
+    health_new = "        memory_recall_mode: 'LAYERED_REPO_MEMORY_V3',\n        active_thread_memory: 'BEST_EFFORT_WORKING_CONTEXT_V1',\n"
     if health_anchor not in text:
         raise SystemExit('health memory anchor missing')
     text = text.replace(health_anchor, health_new, 1)
 
 path.write_text(text, encoding='utf-8')
-print('Active working-thread memory integration applied')
+print('Active working-thread memory integration verified/applied')
