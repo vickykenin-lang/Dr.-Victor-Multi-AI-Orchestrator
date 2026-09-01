@@ -39,6 +39,7 @@ import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from 
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
 import { classifyConversationFollowUp, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';
+import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } from '../brain/active_context.mjs';
 import { classifyHulkRequest, hulkActionBlockedReply, hulkStatusReply, isCasualWellbeing, casualWellbeingReply } from '../brain/hulk_guard.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -108,6 +109,7 @@ export default {
         operating_mode: 'GOVERNED_SELF_MODE',
         founder_approval_gate: 'CREDENTIAL_ADMINISTRATION_ONLY',
         memory_recall_mode: 'LAYERED_REPO_MEMORY_V3',
+        active_thread_memory: 'BEST_EFFORT_WORKING_CONTEXT_V1',
         memory_write_configured: Boolean(env.GITHUB_MEMORY_TOKEN),
         aura3_bridge_configured: aura3BridgeConfigured(env),
         tony_bridge_configured: tonyBridgeConfigured(env),
@@ -264,8 +266,11 @@ export default {
       processingStage = 'REQUEST_PLANNING';
       const replyContext = message?.reply_to_message?.text || '';
       const session = await readConversationSession(chatId);
+      const activePatch = buildActiveContext(session, { founderText: text, replyContext, messageId: message.message_id });
+      const sessionWithFounderTurn = appendRecentTurn({ ...session, ...activePatch }, 'founder', text);
+      await writeConversationSession(chatId, sessionWithFounderTurn);
       const deterministicIntent = resolveFounderIntent(text, replyContext);
-      const contextualFollowUp = classifyConversationFollowUp(text, session);
+      const contextualFollowUp = classifyConversationFollowUp(text, sessionWithFounderTurn);
       const hulkRequest = classifyHulkRequest(text);
 
       if (!memoryDirective && isCasualWellbeing(text)) {
@@ -281,7 +286,7 @@ export default {
       }
 
       if (!memoryDirective && contextualFollowUp.mode) {
-        const handled = await answerExistingDepartmentTask(env, chatId, contextualFollowUp, session, message.message_id);
+        const handled = await answerExistingDepartmentTask(env, chatId, contextualFollowUp, sessionWithFounderTurn, message.message_id);
         if (handled) return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, task_id: contextualFollowUp.task_id });
       }
 
@@ -303,7 +308,7 @@ export default {
         return json({ ok: true, mode: deterministicIntent.mode, reason: deterministicIntent.reason });
       }
 
-      const plan = await planFounderRequest(env, text, replyContext);
+      const plan = await planFounderRequest(env, text, replyContext, sessionWithFounderTurn);
 
       if (!memoryDirective && plan.mode === 'EXECUTIVE_GOAL') {
         processingStage = 'EXECUTIVE_EXECUTION';
@@ -325,9 +330,9 @@ export default {
         processingStage = 'DEPARTMENT_EXECUTION';
         const target = plan.target;
 
-        if (plan.mode === 'DEPARTMENT_STATUS' && session?.last_target === target && session?.last_task_id) {
-          const handled = await answerExistingDepartmentTask(env, chatId, { mode: 'TASK_STATUS_FOLLOWUP', target, task_id: session.last_task_id }, session, message.message_id);
-          if (handled) return json({ ok: true, mode: 'DEPARTMENT_STATUS_REUSED', target, task_id: session.last_task_id });
+        if (plan.mode === 'DEPARTMENT_STATUS' && sessionWithFounderTurn?.last_target === target && sessionWithFounderTurn?.last_task_id) {
+          const handled = await answerExistingDepartmentTask(env, chatId, { mode: 'TASK_STATUS_FOLLOWUP', target, task_id: sessionWithFounderTurn.last_task_id }, sessionWithFounderTurn, message.message_id);
+          if (handled) return json({ ok: true, mode: 'DEPARTMENT_STATUS_REUSED', target, task_id: sessionWithFounderTurn.last_task_id });
         }
 
         if (target === 'rio') {
@@ -415,7 +420,7 @@ export default {
           telegramWebhookAuthenticated: true,
           telegramMessageReceivedNow: true,
           diagnosticDepartmentBridgeAvailable: aura3BridgeConfigured(env) || tonyBridgeConfigured(env) || rioBridgeConfigured(env),
-        });
+        }, sessionWithFounderTurn);
       } else {
         reply = 'Victor Telegram gateway connected hai, lekin AI inference disabled hai. Main paid inference Founder approval ke bina enable nahi karunga.';
       }
@@ -542,7 +547,7 @@ async function writeConversationSession(chatId, next) {
     const key = new Request(`https://victor.internal/conversation/${encodeURIComponent(String(chatId))}`);
     const current = await readConversationSession(chatId);
     const payload = { ...current, ...next, updated_at: new Date().toISOString() };
-    await cache.put(key, new Response(JSON.stringify(payload), { headers: { 'Cache-Control': 'public, max-age=900', 'Content-Type': 'application/json' } }));
+    await cache.put(key, new Response(JSON.stringify(payload), { headers: { 'Cache-Control': 'public, max-age=7200', 'Content-Type': 'application/json' } }));
   } catch (_) {}
 }
 
@@ -640,10 +645,15 @@ async function loadVictorCore() {
   return payload;
 }
 
-async function planFounderRequest(env, text, replyContext = '') {
+async function planFounderRequest(env, text, replyContext = '', activeSession = {}) {
   const system = `
 You are Victor's request planner. Understand the Founder's intent like a normal AI.
 Return ONLY one JSON object, no prose.
+
+ACTIVE WORKING THREAD:
+${formatActiveContextForPrompt(activeSession)}
+
+Continuity rule: short, elliptical or pronoun-based messages normally refer to this active thread unless the Founder clearly starts a new topic. Do not reset context merely because the current message omits the department or task name.
 
 Modes:
 - CHAT: normal conversation, story, explanation, brainstorming, general question.
@@ -680,7 +690,7 @@ Schema: {"mode":"CHAT|DEPARTMENT_STATUS|DEPARTMENT_ACTION|EXECUTIVE_GOAL","targe
   return { mode: parsed.mode, target: parsed.target ?? null, reason: String(parsed.reason || '').slice(0, 160) };
 }
 
-async function callVictorCore(env, userMessage, requestFacts) {
+async function callVictorCore(env, userMessage, requestFacts, activeSession = {}) {
   if (!env.API_VICTOR) throw codedError('AI_CREDENTIAL_MISSING', 'API_VICTOR is not configured');
 
   const core = await loadVictorCore();
@@ -714,6 +724,15 @@ ${buildPrecedenceDirective()}
 ${buildTruthContract(intent, truthSnapshot)}
 
 ${entityDirective}
+
+ACTIVE WORKING THREAD:
+${formatActiveContextForPrompt(activeSession)}
+
+THREAD CONTINUITY CONTRACT:
+- Treat the active thread as the default referent for short follow-ups such as 'pata karke batao', 'iska kya hua', 'kyu', 'status?', 'continue', or 'thik karo'.
+- A new explicit department/topic may replace the active thread.
+- Working-thread memory is conversational context, not proof of external state; current operational facts still require fresh evidence.
+- Do not contradict a recent Founder correction unless newer explicit Founder wording changes it.
 
 MEMORY CONTRACT:
 - Relevant memory is supporting context, not proof of current external state.
@@ -932,6 +951,11 @@ async function sendTelegramMessage(env, chatId, text, replyToMessageId) {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error(`Telegram sendMessage HTTP ${response.status}`);
+  try {
+    const current = await readConversationSession(chatId);
+    const withReply = appendRecentTurn({ ...current, last_victor_reply: cleanText.slice(0, 1200) }, 'victor', cleanText.slice(0, 1200));
+    await writeConversationSession(chatId, withReply);
+  } catch (_) {}
 }
 
 function constantTimeEqual(a, b) {
