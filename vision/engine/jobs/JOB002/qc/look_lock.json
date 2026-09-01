@@ -1,8 +1,8 @@
 {
   "stage": "look_lock",
-  "checked_at": "2026-09-01T21:09:15.578938+05:30",
+  "checked_at": "2026-09-01T23:11:39.450292+05:30",
   "pass": false,
-  "reason": "imagen-3.0-generate-002 HTTP 404",
+  "reason": "The read operation timed out",
   "must_fix": [
     "look_lock"
   ]
