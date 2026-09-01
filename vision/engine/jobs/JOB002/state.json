@@ -10,7 +10,7 @@
     "intake": 0,
     "development": 0,
     "screenplay": 0,
-    "look_lock": 2,
+    "look_lock": 3,
     "keyframes": 0,
     "picture": 0,
     "sound": 0,
@@ -19,10 +19,10 @@
   },
   "last_director": {
     "pass": false,
-    "reason": "HTTP Error 404: Not Found",
+    "reason": "imagen-3.0-generate-002 HTTP 404",
     "must_fix": [
       "look_lock"
     ]
   },
-  "updated": "2026-09-01T15:34:32.795275+05:30"
+  "updated": "2026-09-01T15:38:04.007422+05:30"
 }

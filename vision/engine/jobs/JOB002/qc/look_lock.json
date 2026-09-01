@@ -1,8 +1,8 @@
 {
   "stage": "look_lock",
-  "checked_at": "2026-09-01T14:02:12.747889+05:30",
+  "checked_at": "2026-09-01T15:38:04.007173+05:30",
   "pass": false,
-  "reason": "HTTP Error 404: Not Found",
+  "reason": "imagen-3.0-generate-002 HTTP 404",
   "must_fix": [
     "look_lock"
   ]
