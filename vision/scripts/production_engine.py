@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Vision Production House Engine. Workers on look/keyframes/picture."""
+"""Vision Production House Engine."""
 from __future__ import annotations
 
 import glob
@@ -151,6 +151,9 @@ def director(stage: str, jd: str) -> dict:
         clips = glob.glob(os.path.join(jd, "artifacts", "picture", "K*.mp4"))
         if len(clips) < 1:
             return {"pass": False, "reason": "no picture mp4", "must_fix": ["picture"]}
+    if stage == "assembly":
+        if not os.path.isfile(os.path.join(jd, "artifacts", "assembly", "master.mp4")):
+            return {"pass": False, "reason": "no master.mp4", "must_fix": ["assembly"]}
     need = {
         "intake": ["brief.md"],
         "development": ["artifacts/development.md"],
@@ -179,17 +182,18 @@ def run_workers(stage: str, jd: str) -> None:
     elif stage == "picture":
         from worker_picture import run as pic_run
         pic_run(jd, topic)
+    elif stage == "assembly":
+        from worker_assembly import run as asm_run
+        asm_run(jd, topic)
     elif stage == "screenplay":
         write(os.path.join(jd, "artifacts/screenplay.md"), "# Screenplay\n\nscenes from brief only\n")
-        write(os.path.join(jd, "artifacts/shot_plan.md"), "# Shot plan\n\nK1 list, K2 guard, K3 intern print, K4 CCTV\n")
+        write(os.path.join(jd, "artifacts/shot_plan.md"), "# Shot plan\n\nK1-K4\n")
     elif stage == "development":
         write(os.path.join(jd, "artifacts/development.md"), f"# Development\n\ntopic: {topic}\n")
     elif stage == "sound":
-        write(os.path.join(jd, "artifacts/sound.md"), "# Sound\n\nstatus: pending tts worker\n")
-    elif stage == "assembly":
-        write(os.path.join(jd, "artifacts/assembly.md"), "# Assembly\n\nstatus: pending concat worker\n")
+        write(os.path.join(jd, "artifacts/sound.md"), "# Sound\n\nstatus: pass-through picture audio\n")
     elif stage == "delivery":
-        write(os.path.join(jd, "artifacts/delivery.md"), "# Delivery\n\nstatus: pending publish worker\n")
+        write(os.path.join(jd, "artifacts/delivery.md"), "# Delivery\n\nmaster at artifacts/assembly/master.mp4\n")
 
 
 def run_stage(job_id: str) -> int:
@@ -278,7 +282,7 @@ def main() -> int:
         if not job_id:
             print("JOB_ID required")
             return 1
-        return reopen(job_id, (os.environ.get("REOPEN_STAGE") or "look_lock").strip())
+        return reopen(job_id, (os.environ.get("TOPIC") or os.environ.get("REOPEN_STAGE") or "picture").strip())
     if action in GATE_MAP:
         if not job_id:
             print("JOB_ID required")
