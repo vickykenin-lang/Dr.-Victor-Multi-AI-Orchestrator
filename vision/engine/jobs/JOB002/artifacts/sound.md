@@ -1,4 +1,3 @@
 # Sound
 
-lines_source: screenplay
-status: pending worker
+status: pending tts worker
