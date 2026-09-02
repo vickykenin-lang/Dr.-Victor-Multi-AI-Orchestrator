@@ -1,18 +1,19 @@
 {
   "job_id": "JOB002",
-  "stage": "keyframes",
+  "stage": "picture",
   "owner_gates": {
     "topic_ok": true,
     "look_ok": true,
     "master_ok": false
   },
   "retries": {
-    "look_lock": 0
+    "look_lock": 0,
+    "keyframes": 0
   },
   "last_director": {
     "pass": true,
-    "reason": "look_lock artifacts present",
+    "reason": "keyframes artifacts present",
     "must_fix": []
   },
-  "updated": "2026-09-02T22:48:15.425571+05:30"
+  "updated": "2026-09-02T22:54:05.013116+05:30"
 }

@@ -1,7 +1,7 @@
 {
   "continue": true,
-  "gap_sec": 60,
-  "stage": "look_lock",
-  "reason": "advanced to keyframes",
-  "updated": "2026-09-02T22:48:15.425473+05:30"
+  "gap_sec": 90,
+  "stage": "keyframes",
+  "reason": "advanced to picture",
+  "updated": "2026-09-02T22:54:05.013045+05:30"
 }
