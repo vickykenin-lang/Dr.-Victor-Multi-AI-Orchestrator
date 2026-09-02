@@ -1,5 +1,6 @@
 import { buildFounderRequest } from './founder_request.mjs';
 import { classifyFactRequest } from './fact_runtime.mjs';
+import { buildExecutionPlan } from './execution_plan.mjs';
 
 function unique(values = []) {
   return [...new Set(values.filter(Boolean))];
@@ -13,20 +14,23 @@ export function buildRuntimeFounderRequest(text = '', session = {}) {
     parent_task_id: session?.parent_task_id || null,
     unresolved_question: session?.unresolved_question || null,
   };
-  const request = buildFounderRequest(text, activeThread);
-  const explicitEntities = Array.isArray(request.entities) ? request.entities : [];
+  const baseRequest = buildFounderRequest(text, activeThread);
+  const explicitEntities = Array.isArray(baseRequest.entities) ? baseRequest.entities : [];
   const priorTarget = session?.last_target || null;
   const explicitPrimary = explicitEntities[0] || null;
   const topicSwitched = Boolean(explicitPrimary && priorTarget && explicitPrimary !== priorTarget);
-
-  return {
-    ...request,
+  const request = {
+    ...baseRequest,
     runtime: {
       explicit_primary_target: explicitPrimary,
       prior_target: priorTarget,
       topic_switched: topicSwitched,
       clear_stale_task_lineage: topicSwitched,
     },
+  };
+  return {
+    ...request,
+    execution_plan: buildExecutionPlan(request),
   };
 }
 
@@ -44,6 +48,7 @@ export function buildSessionPatchForRequest(request = {}) {
       requested_actions: unique(request?.requested_actions || []),
       evidence_required: request?.evidence_required === true,
       success_condition: request?.success_condition || null,
+      execution_plan: request?.execution_plan || null,
     },
   };
 
