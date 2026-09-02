@@ -7,7 +7,7 @@
     "master_ok": false
   },
   "retries": {
-    "picture": 1
+    "picture": 2
   },
   "last_director": {
     "pass": false,
@@ -16,5 +16,5 @@
       "picture"
     ]
   },
-  "updated": "2026-09-02T23:53:34.414246+05:30"
+  "updated": "2026-09-02T23:59:33.324127+05:30"
 }
