@@ -1,7 +1,7 @@
 {
-  "continue": true,
-  "gap_sec": 300,
+  "continue": false,
+  "gap_sec": 0,
   "stage": "picture",
   "reason": "worker fail",
-  "updated": "2026-09-02T22:59:06.867286+05:30"
+  "updated": "2026-09-02T23:05:29.152253+05:30"
 }

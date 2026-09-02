@@ -9,7 +9,7 @@
   "retries": {
     "look_lock": 0,
     "keyframes": 0,
-    "picture": 1
+    "picture": 2
   },
   "last_director": {
     "pass": false,
@@ -18,5 +18,5 @@
       "picture"
     ]
   },
-  "updated": "2026-09-02T22:59:06.867087+05:30"
+  "updated": "2026-09-02T23:05:29.152143+05:30"
 }
