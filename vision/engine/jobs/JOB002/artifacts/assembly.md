@@ -1,5 +1,3 @@
 # Assembly
 
-cut: pending
-subs: pending
-master: pending
+status: pending concat worker
