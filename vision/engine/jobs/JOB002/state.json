@@ -8,12 +8,15 @@
   },
   "retries": {
     "look_lock": 0,
-    "keyframes": 0
+    "keyframes": 0,
+    "picture": 1
   },
   "last_director": {
-    "pass": true,
-    "reason": "keyframes artifacts present",
-    "must_fix": []
+    "pass": false,
+    "reason": "{\"message\": \"You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.\", \"type\": \"insufficient_quota\", \"param\": null, \"code\": \"credit_balance_exhausted\"}",
+    "must_fix": [
+      "picture"
+    ]
   },
-  "updated": "2026-09-02T22:54:05.013116+05:30"
+  "updated": "2026-09-02T22:59:06.867087+05:30"
 }

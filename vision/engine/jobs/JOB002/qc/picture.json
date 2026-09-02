@@ -1,7 +1,9 @@
 {
   "stage": "picture",
-  "checked_at": "2026-09-01T11:57:45.407465+05:30",
-  "pass": true,
-  "reason": "picture artifacts present",
-  "must_fix": []
+  "checked_at": "2026-09-02T22:59:06.866826+05:30",
+  "pass": false,
+  "reason": "{\"message\": \"You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.\", \"type\": \"insufficient_quota\", \"param\": null, \"code\": \"credit_balance_exhausted\"}",
+  "must_fix": [
+    "picture"
+  ]
 }
