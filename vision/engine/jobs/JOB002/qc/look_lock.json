@@ -1,6 +1,6 @@
 {
   "stage": "look_lock",
-  "checked_at": "2026-09-02T04:57:30.265419+05:30",
+  "checked_at": "2026-09-02T06:39:59.677413+05:30",
   "pass": false,
   "reason": "gemini-2.5-flash-image HTTP 429 {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai",
   "must_fix": [
