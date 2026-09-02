@@ -47,6 +47,9 @@ jobs:
           LENGTH: ${{ inputs.length }}
           LANGUAGE: ${{ inputs.language }}
           PLATFORM: ${{ inputs.platform }}
+          GITHUB_SHA: ${{ github.sha }}
+          KEI_I2V_KEY: ${{ secrets.KEI_I2V_KEY }}
+          KIE_API_KEY: ${{ secrets.KIE_API_KEY }}
           SORA2_API: ${{ secrets.SORA2_API }}
           SORA2_API_KEY: ${{ secrets.SORA2_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -76,14 +79,13 @@ jobs:
           queued=set()
           for p in glob.glob("vision/engine/jobs/*/run_signal.json"):
               sig=json.load(open(p))
-              if not sig.get("continue"): persist=False
-              else:
-                  job=p.split("/")[3]
-                  if job in queued: continue
-                  gap=min(int(sig.get("gap_sec") or 60), 300)
-                  print("queue", job, "gap", gap)
-                  time.sleep(gap)
-                  subprocess.check_call(["gh","workflow","run","vision_engine.yml","-r","main","-f","action=auto","-f",f"job_id={job}"])
-                  queued.add(job)
+              if not sig.get("continue"): continue
+              job=p.split("/")[3]
+              if job in queued: continue
+              gap=min(int(sig.get("gap_sec") or 60), 300)
+              print("queue", job, "gap", gap)
+              time.sleep(gap)
+              subprocess.check_call(["gh","workflow","run","vision_engine.yml","-r","main","-f","action=auto","-f",f"job_id={job}"])
+              queued.add(job)
           if not queued: print("no continue")
           PY
