@@ -1,3 +1,3 @@
 # Delivery
 
-status: pending publish worker
+master at artifacts/assembly/master.mp4
