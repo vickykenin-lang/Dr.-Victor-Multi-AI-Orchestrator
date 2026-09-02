@@ -1,20 +1,12 @@
 {
   "job_id": "JOB002",
-  "stage": "picture",
+  "stage": "assembly",
   "owner_gates": {
     "topic_ok": true,
     "look_ok": true,
     "master_ok": false
   },
-  "retries": {
-    "picture": 2
-  },
-  "last_director": {
-    "pass": false,
-    "reason": "{\"message\": \"You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.\", \"type\": \"insufficient_quota\", \"param\": null, \"code\": \"credit_balance_exhausted\"}",
-    "must_fix": [
-      "picture"
-    ]
-  },
-  "updated": "2026-09-02T23:59:33.324127+05:30"
+  "retries": {},
+  "last_director": null,
+  "updated": "2026-09-03T00:17:57.252467+05:30"
 }
