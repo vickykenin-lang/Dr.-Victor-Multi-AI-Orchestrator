@@ -1,0 +1,75 @@
+name: Victor Production Probe V2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/victor_production_probe_v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TELEGRAM_BOT_TOKEN_VICTOR: ${{ secrets.TELEGRAM_BOT_TOKEN_VICTOR }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe webhook target
+        run: |
+          python - <<'PY'
+          import json, os, urllib.parse, urllib.request, urllib.error
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          token=(os.getenv('TELEGRAM_BOT_TOKEN_VICTOR') or '').strip()
+          out={'checked_at_utc':datetime.now(timezone.utc).isoformat(),'token_present':bool(token),'webhook':{},'endpoints':{},'secrets_exposed':False}
+
+          def request_json(url):
+              req=urllib.request.Request(url,headers={'User-Agent':'Victor-Production-Probe/2.0'})
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      raw=r.read().decode('utf-8',errors='replace')
+                      try: body=json.loads(raw)
+                      except Exception: body={'non_json':True,'body_prefix':raw[:120]}
+                      return {'http_status':r.status,'body':body}
+              except urllib.error.HTTPError as e:
+                  raw=e.read().decode('utf-8',errors='replace')
+                  try: body=json.loads(raw)
+                  except Exception: body={'non_json':True,'body_prefix':raw[:120]}
+                  return {'http_status':e.code,'body':body}
+              except Exception as e:
+                  return {'error':type(e).__name__}
+
+          if token:
+              hook=request_json(f'https://api.telegram.org/bot{token}/getWebhookInfo')
+              result=(hook.get('body') or {}).get('result') or {}
+              url=str(result.get('url') or '')
+              out['webhook']={
+                  'api_http_status':hook.get('http_status'),
+                  'configured':bool(url),
+                  'pending_update_count':result.get('pending_update_count'),
+                  'last_error_date':result.get('last_error_date'),
+                  'last_error_message':str(result.get('last_error_message') or '')[:300],
+              }
+              if url:
+                  p=urllib.parse.urlparse(url)
+                  origin=f'{p.scheme}://{p.netloc}'
+                  out['webhook']['telegram_path']=p.path
+                  for ep in ['/health','/core-health','/aura3-bridge-health','/tony-bridge-health']:
+                      out['endpoints'][ep]=request_json(origin+ep)
+          Path('data/production_probe_v2.json').write_text(json.dumps(out,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps({'webhook':out['webhook'],'endpoint_statuses':{k:v.get('http_status',v.get('error')) for k,v in out['endpoints'].items()},'secrets_exposed':False}))
+          PY
+      - name: Persist probe
+        run: |
+          git config user.name "victor-production-probe"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/production_probe_v2.json
+          git diff --cached --quiet && exit 0
+          git commit -m "evidence: detailed Victor production probe"
+          git pull --rebase --autostash
+          git push
