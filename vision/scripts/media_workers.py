@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared still + Sora helpers. One Gemini image model, long timeout."""
+"""Stills via Gemini, fallback Sora T2V first-frame. Picture via Sora I2V."""
 from __future__ import annotations
 
 import base64
@@ -22,10 +22,6 @@ def _env(*names: str) -> str:
         if v:
             return v
     return ""
-
-
-def nvidia_key() -> str:
-    return _env("NVIDIA_VICTOR_VISION_KEY", "NVIDIA_API_KEY")
 
 
 def gemini_key() -> str:
@@ -54,63 +50,33 @@ def gemini_still(prompt: str) -> bytes:
         url = f"{GEMINI}/models/{model}:generateContent"
         body = {
             "contents": [{"role": "user", "parts": [{"text": prompt[:900]}]}],
-            "generationConfig": {
-                "responseModalities": ["IMAGE"],
-                "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"},
-            },
+            "generationConfig": {"responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": "1:1", "imageSize": "1K"}},
         }
         try:
-            out = _http_json("POST", url, headers, body, timeout=300)
+            out = _http_json("POST", url, headers, body, timeout=90)
         except urllib.error.HTTPError as e:
-            err = e.read().decode("utf-8", "ignore")[:180]
-            last = f"{model} HTTP {e.code} {err}"
+            last = f"{model} HTTP {e.code}"
             print(last)
+            if e.code == 429:
+                raise RuntimeError("gemini 429")
             continue
         except Exception as e:
-            last = f"{model} {e}"
-            print(last)
+            last = str(e)
             continue
         for cand in out.get("candidates") or []:
             for part in (cand.get("content") or {}).get("parts") or []:
                 inline = part.get("inlineData") or part.get("inline_data") or {}
-                data = inline.get("data")
-                if data:
-                    print("still ok", model)
-                    return base64.b64decode(data)
-        last = f"{model} empty {json.dumps(out)[:180]}"
+                if inline.get("data"):
+                    return base64.b64decode(inline["data"])
+        last = f"{model} empty"
     raise RuntimeError(last)
 
 
-def make_still(prompt: str) -> bytes:
-    if not gemini_key():
-        raise RuntimeError("GEMINI_API_KEY missing")
-    return gemini_still(prompt)
-
-
-def resize_png(src: str, w: int, h: int) -> str:
-    out = os.path.join(tempfile.gettempdir(), f"sz_{w}x{h}.png")
-    subprocess.check_call(
-        ["ffmpeg", "-y", "-i", src, "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}", out],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    return out
-
-
-def sora_i2v(prompt: str, png_path: str) -> bytes:
+def _sora_create(fields: list) -> bytes:
     key = sora_key()
     if not key:
         raise RuntimeError("no sora key")
-    sized = resize_png(png_path, 1280, 720)
-    cmd = [
-        "curl", "-sS", "-X", "POST", f"{OPENAI}/videos",
-        "-H", f"Authorization: Bearer {key}",
-        "-F", "model=sora-2",
-        "-F", f"prompt={prompt[:1000]}",
-        "-F", "seconds=4",
-        "-F", "size=1280x720",
-        "-F", f"input_reference=@{sized};type=image/png",
-    ]
+    cmd = ["curl", "-sS", "-X", "POST", f"{OPENAI}/videos", "-H", f"Authorization: Bearer {key}"] + fields
     raw = subprocess.check_output(cmd, timeout=120)
     created = json.loads(raw.decode("utf-8"))
     if created.get("error"):
@@ -136,3 +102,59 @@ def sora_i2v(prompt: str, png_path: str) -> bytes:
                 raise RuntimeError("sora empty mp4")
             return data
     raise RuntimeError("sora timeout")
+
+
+def sora_t2v(prompt: str) -> bytes:
+    return _sora_create([
+        "-F", "model=sora-2",
+        "-F", f"prompt={prompt[:1000]}",
+        "-F", "seconds=4",
+        "-F", "size=1280x720",
+    ])
+
+
+def resize_png(src: str, w: int, h: int) -> str:
+    out = os.path.join(tempfile.gettempdir(), f"sz_{w}x{h}.png")
+    subprocess.check_call(
+        ["ffmpeg", "-y", "-i", src, "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}", out],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return out
+
+
+def sora_i2v(prompt: str, png_path: str) -> bytes:
+    sized = resize_png(png_path, 1280, 720)
+    return _sora_create([
+        "-F", "model=sora-2",
+        "-F", f"prompt={prompt[:1000]}",
+        "-F", "seconds=4",
+        "-F", "size=1280x720",
+        "-F", f"input_reference=@{sized};type=image/png",
+    ])
+
+
+def first_frame_png(mp4: bytes) -> bytes:
+    tmp = tempfile.mkdtemp()
+    src = os.path.join(tmp, "in.mp4")
+    dst = os.path.join(tmp, "out.png")
+    open(src, "wb").write(mp4)
+    subprocess.check_call(
+        ["ffmpeg", "-y", "-i", src, "-frames:v", "1", dst],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return open(dst, "rb").read()
+
+
+def make_still(prompt: str) -> bytes:
+    try:
+        if gemini_key():
+            return gemini_still(prompt)
+    except Exception as e:
+        print("gemini skip", e)
+    if not sora_key():
+        raise RuntimeError("no still provider")
+    print("still via sora t2v frame")
+    mp4 = sora_t2v("Locked character sheet, almost still camera. " + prompt[:800])
+    return first_frame_png(mp4)
