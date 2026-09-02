@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "checked_at_utc": "2026-09-02T01:43:04.326900+00:00",
+  "repository_sha_under_test": "7890b04b41713457f8b2eb4ffc5aa4514ff7fe24",
+  "production_verification": {
+    "telegram_webhook": {
+      "configured": true,
+      "pending_update_count": 0,
+      "last_error_date_present": true,
+      "last_error_message_present": true
+    },
+    "worker_host_present": true,
+    "health": {
+      "error": "HTTPError"
+    },
+    "core_health": {
+      "error": "HTTPError"
+    },
+    "aura3_bridge": {
+      "error": "HTTPError"
+    },
+    "tony_bridge": {
+      "error": "HTTPError"
+    },
+    "runtime_feature_parity": {
+      "status": false,
+      "founder_request_gateway": false,
+      "fact_evidence_runtime": false,
+      "founder_conversation_layer": false
+    }
+  },
+  "live_acceptance": {
+    "synthetic_webhook_possible": false
+  },
+  "critical_blockers": [
+    "AURA3_BRIDGE_PROBE_FAILED",
+    "CORE_HEALTH_PROBE_FAILED",
+    "DEPLOYED_WORKER_FEATURE_PARITY_FAILED",
+    "DURABLE_CONVERSATION_STATE_NOT_ACTIVE",
+    "GITHUB_SECRET_TELEGRAM_WEBHOOK_SECRET_MISSING",
+    "HEALTH_AI_INFERENCE_ENABLED_NOT_TRUE",
+    "HEALTH_AURA3_BRIDGE_CONFIGURED_NOT_TRUE",
+    "HEALTH_FOUNDER_CHAT_CONFIGURED_NOT_TRUE",
+    "HEALTH_PROBE_FAILED",
+    "HEALTH_RIO_BRIDGE_CONFIGURED_NOT_TRUE",
+    "HEALTH_TELEGRAM_TOKEN_CONFIGURED_NOT_TRUE",
+    "HEALTH_TONY_BRIDGE_CONFIGURED_NOT_TRUE",
+    "HEALTH_WEBHOOK_SECRET_CONFIGURED_NOT_TRUE",
+    "TONY_BRIDGE_PROBE_FAILED"
+  ],
+  "ready_for_founder_test": false,
+  "secrets_exposed": false
+}
