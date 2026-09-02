@@ -5,23 +5,15 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 581,
+      "attempts": 583,
       "last_target": "tony_stark",
       "recommended_department": "tony_stark",
       "last_status": "READ_ONLY_AUDIT_COMPLETED",
       "last_next_action": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
-      "last_attempt_at_utc": "2026-09-02T06:16:56.953Z",
-      "last_verified_progress_at_utc": "2026-09-02T06:16:56.953Z",
+      "last_attempt_at_utc": "2026-09-02T06:31:41.568Z",
+      "last_verified_progress_at_utc": "2026-09-02T06:31:41.568Z",
       "goal_achieved_at_utc": null,
       "evidence": [
-        "integration/results/tasks/victor-tony-1788323478756-goal-auto.json",
-        "OBJECTIVE.md",
-        "integration/results/audits/victor-tony-1788323478756-goal-auto.json",
-        "integration/results/plans/victor-tony-1788323478756-goal-auto.json",
-        "integration/results/tasks/victor-tony-1788324351125-goal-auto.json",
-        "SOUL.md",
-        "integration/results/audits/victor-tony-1788324351125-goal-auto.json",
-        "integration/results/tasks/victor-tony-1788324378846-goal-auto.json",
         "config/authority.json",
         "integration/results/audits/victor-tony-1788324378846-goal-auto.json",
         "integration/results/tasks/victor-tony-1788325251328-goal-auto.json",
@@ -63,21 +55,29 @@
         "integration/results/tasks/victor-tony-1788329794378-goal-auto.json",
         "integration/results/audits/victor-tony-1788329794378-goal-auto.json",
         ".github/workflows/victor_goal_bridge_trial.yml",
-        "tests/test_economics.py"
+        "tests/test_economics.py",
+        "integration/results/tasks/victor-tony-1788330651354-goal-auto.json",
+        "integration/results/audits/victor-tony-1788330651354-goal-auto.json",
+        "tests/test_telegram_management_reply.py",
+        "tests/test_workflow_governance.py",
+        "integration/results/plans/victor-tony-1788330651354-goal-auto.json",
+        "integration/results/tasks/victor-tony-1788330679256-goal-auto.json",
+        "OBJECTIVE.md",
+        "integration/results/audits/victor-tony-1788330679256-goal-auto.json"
       ],
       "failure_fingerprint": null,
-      "brain_required_mode": "FIVE_WHYS_BEFORE_NEXT_DISPATCH",
+      "brain_required_mode": "NORMAL_EXECUTION",
       "brain_review": {
-        "expected": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
+        "expected": "VICTOR_REVIEW_FIVE_WHYS_AND_DISPATCH_CORRECTIVE_ACTION",
         "actual": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
-        "matched": true,
-        "previous_action": "READ_ONLY_AUDIT_COMPLETED",
-        "repeat_loop_detected": true,
-        "learning_candidate": "REPEATED_MEANING_FAILURE_PATTERN",
-        "required_next_mode": "FIVE_WHYS_BEFORE_NEXT_DISPATCH"
+        "matched": false,
+        "previous_action": "FIVE_WHYS_DIAGNOSIS_COMPLETED",
+        "repeat_loop_detected": false,
+        "learning_candidate": "MISMATCH_OR_FAILURE_PATTERN_CANDIDATE",
+        "required_next_mode": "NORMAL_REPLAN"
       },
       "same_failure_count": 0,
-      "same_recommendation_count": 2
+      "same_recommendation_count": 1
     }
   },
   "note": "Runtime state records progress and routing. It does not redefine the Goal Contract."
