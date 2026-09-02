@@ -50,6 +50,16 @@ This file is evidence-based. READY_FOR_FOUNDER_TEST is prohibited until every cr
 - CI #46 (`33569261368`) completed **SUCCESS** for the initial receipt bridge.
 - CI #48 (`33569394355`) completed **SUCCESS** after external-outcome hardening: runtime integration, all registered core/regression tests, syntax checks, backlog validation, persistence, and final job completion all passed.
 
+### Wave 3 — end-to-end owned outcome acceptance harness
+- Added `brain/owned_outcome_acceptance.mjs`, which drives the production outcome evaluator across a sequence of verified department result fixtures rather than testing isolated predicates only.
+- The trace preserves dispatch attempt lineage, verified result stages, recovery/replan decisions, repeated-failure detection, external-proof requirements, Founder-only boundaries, and final objective state.
+- Acceptance trace proves an Instagram publish problem can progress `TASK_SENT -> RESULT_VERIFIED -> recovery/replan -> RESULT_VERIFIED -> recovery/replan -> OBJECTIVE_ACHIEVED`, and the last promotion occurs only when explicit external Instagram verification carries platform evidence.
+- Repeated identical blocker + next-action fingerprints trigger Five Whys and change-route on the second recovery replan instead of repeating the same action.
+- A routine internal validator/state blocker produces automatic recovery and does not become a Founder-only escalation.
+- A credential replacement requirement stops recovery immediately as `FOUNDER_ONLY_BLOCKER`.
+- The harness is registered in the core CI and syntax checks.
+- CI #49 (`33573715556`) completed **SUCCESS**: runtime integration, all core/regression tests including the multi-attempt acceptance harness, syntax checks, backlog validation, persistence, and final job completion passed.
+
 ### Integration reliability repair
 - Legacy patchers continue to expose exact-anchor assumptions as consolidation progresses. Repaired continuity, natural-conversation and request-gateway patchers to detect semantic end-state rather than reinsert obsolete cache-era structure.
 - Diagnostic CI #40 failed at the old continuity anchor; #41 progressed and exposed the old natural-conversation helper anchor; #42 progressed and exposed the old request-gateway classification anchor. Each failure was used as integration evidence and repaired at the semantic level.
@@ -57,6 +67,7 @@ This file is evidence-based. READY_FOR_FOUNDER_TEST is prohibited until every cr
 - CI #44 (`33564118904`) completed **SUCCESS** after adding the Wave 3 outcome-state integration.
 - CI #46 (`33569261368`) completed **SUCCESS** after result-truth receipt integration.
 - CI #48 (`33569394355`) completed **SUCCESS** after external-result objective gating.
+- CI #49 (`33573715556`) completed **SUCCESS** after the owned-outcome chain-level acceptance harness was registered.
 
 ## Evidence
 - Truth resolver module: `e63a61147aacdd108f68d2dd3531474762ba5ab1`
@@ -74,6 +85,9 @@ This file is evidence-based. READY_FOR_FOUNDER_TEST is prohibited until every cr
 - External-outcome hardening: `e50414ba418cd44ed61b65e776fe3b91ff33616c`
 - External-outcome regression tests: `095efb4443bfc8c3a60cc7a6dfadfe7b1c66e642`
 - CI registration for result truth receipts: `ba52bb519e5634088d40c0fec1c32965aba1fe85`
+- Owned outcome acceptance harness: `239ca9f7cdc38a4d4fbae2954ea97cd7f1caef96`
+- Owned outcome acceptance tests: `37fbc58077fc381b83cb22bab8b2ae863a7c9027`
+- CI registration for acceptance harness: `904ebd35210dfa245908504aa69765d0cd6a15bb`
 - CI #40 run `33558627207`: diagnostic failure at legacy continuity anchor.
 - CI #41 run `33558678773`: diagnostic failure at legacy natural-conversation anchor.
 - CI #42 run `33558760484`: diagnostic failure at legacy request-gateway anchor.
@@ -81,13 +95,13 @@ This file is evidence-based. READY_FOR_FOUNDER_TEST is prohibited until every cr
 - CI #44 run `33564118904`: completed `success`; all apply/test/syntax/validation/persistence steps passed.
 - CI #46 run `33569261368`: completed `success`; result-truth tests and all core integration steps passed.
 - CI #48 run `33569394355`: completed `success`; external-outcome gating tests and all core integration steps passed.
+- CI #49 run `33573715556`: completed `success`; owned-outcome acceptance harness and all registered integration checks passed.
 
 ## Remaining P0 gaps
 1. **Actual durable conversation binding is not configured/verified in production.** The abstraction is truthful but production remains best-effort cache-backed until deployment wiring exists.
-2. Live department bridges still need to emit richer `external_verification` evidence consistently for real publish/payment/platform outcomes; Victor will now refuse to call those external objectives achieved until such proof exists.
-3. Wave 3 has deterministic bounded self-healing runtime and unit/regression proof, but a real or fixture-backed end-to-end acceptance trace still needs to demonstrate an owned problem progressing across multiple attempts to either `OBJECTIVE_ACHIEVED` or a genuine `FOUNDER_ONLY_BLOCKER`.
-4. Natural response synthesis still coexists with acknowledgement templates; the 20-scenario adversarial acceptance suite is incomplete.
-5. Multi-department action decomposition still needs one deterministic execution-plan object rather than legacy single-target planner fallback.
+2. Live department bridges still need to emit richer `external_verification` evidence consistently for real publish/payment/platform outcomes; Victor will refuse to call those external objectives achieved until such proof exists.
+3. Natural response synthesis still coexists with acknowledgement templates; the 20-scenario adversarial acceptance suite is incomplete.
+4. Multi-department action decomposition still needs one deterministic execution-plan object rather than legacy single-target planner fallback.
 
 ## Next priority
-Build the Wave 3 end-to-end owned-problem acceptance harness using verified result fixtures: prove `TASK_SENT -> RESULT_VERIFIED -> automatic recovery/replan -> OBJECTIVE_ACHIEVED`, prove repeated identical failure triggers Five Whys/change-route, and prove routine internal blockers never escalate to Founder. Then move to the Wave 4 adversarial natural-conversation suite.
+Wave 3 chain-level acceptance proof is now complete. Next highest-priority code gap is the deterministic multi-department execution-plan object, because the structured request already retains multiple requested actions but legacy execution still collapses to one target. After that, complete the Wave 4 adversarial natural-conversation acceptance suite. Production durable-state wiring remains a separate deployment/configuration P0 and must not be claimed complete until the binding itself is verified.
