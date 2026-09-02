@@ -1,6 +1,6 @@
 {
   "job_id": "JOB002",
-  "stage": "delivery",
+  "stage": "done",
   "owner_gates": {
     "topic_ok": true,
     "look_ok": true,
@@ -11,12 +11,13 @@
     "keyframes": 0,
     "picture": 0,
     "sound": 0,
-    "assembly": 0
+    "assembly": 0,
+    "delivery": 0
   },
   "last_director": {
     "pass": true,
-    "reason": "assembly artifacts present",
+    "reason": "delivery artifacts present",
     "must_fix": []
   },
-  "updated": "2026-09-02T23:30:21.509432+05:30"
+  "updated": "2026-09-02T23:31:34.637834+05:30"
 }
