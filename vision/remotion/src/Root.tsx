@@ -1,5 +1,5 @@
 import React from "react";
-import { Composition } from "remotion";
+import { Composition, staticFile } from "remotion";
 import { getVideoMetadata } from "@remotion/media-utils";
 import { Master, type MasterProps } from "./Master";
 
@@ -19,13 +19,13 @@ export const RemotionRoot: React.FC = () => {
         let frames = 0;
         for (const clip of props.clips || []) {
           try {
-            const meta = await getVideoMetadata(`/public/${clip}`);
+            const meta = await getVideoMetadata(staticFile(clip));
             frames += Math.max(1, Math.round((meta.durationInSeconds || 4) * FPS));
           } catch {
             frames += FPS * 5;
           }
         }
-        return { durationInFrames: Math.max(FPS, frames), fps: FPS, width: 1280, height: 720 };
+        return { durationInFrames: Math.max(FPS, frames + 15), fps: FPS, width: 1280, height: 720 };
       }}
     />
   );

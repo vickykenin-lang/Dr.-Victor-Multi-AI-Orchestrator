@@ -37,6 +37,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Run production engine
@@ -82,7 +85,7 @@ jobs:
               if not sig.get("continue"): continue
               job=p.split("/")[3]
               if job in queued: continue
-              gap=min(int(sig.get("gap_sec") or 60), 300)
+              gap=min(int(sig.get("gap_sec") or 60), 180)
               print("queue", job, "gap", gap)
               time.sleep(gap)
               subprocess.check_call(["gh","workflow","run","vision_engine.yml","-r","main","-f","action=auto","-f",f"job_id={job}"])
