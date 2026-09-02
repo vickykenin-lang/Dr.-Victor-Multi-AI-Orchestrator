@@ -1,7 +1,7 @@
 {
-  "continue": false,
-  "gap_sec": 0,
-  "stage": "delivery",
-  "reason": "advanced to done",
-  "updated": "2026-09-02T23:31:34.637747+05:30"
+  "continue": true,
+  "gap_sec": 300,
+  "stage": "picture",
+  "reason": "reopen at picture",
+  "updated": "2026-09-02T23:48:00.177762+05:30"
 }

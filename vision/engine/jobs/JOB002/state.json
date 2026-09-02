@@ -1,23 +1,12 @@
 {
   "job_id": "JOB002",
-  "stage": "done",
+  "stage": "picture",
   "owner_gates": {
     "topic_ok": true,
     "look_ok": true,
     "master_ok": false
   },
-  "retries": {
-    "look_lock": 0,
-    "keyframes": 0,
-    "picture": 0,
-    "sound": 0,
-    "assembly": 0,
-    "delivery": 0
-  },
-  "last_director": {
-    "pass": true,
-    "reason": "delivery artifacts present",
-    "must_fix": []
-  },
-  "updated": "2026-09-02T23:31:34.637834+05:30"
+  "retries": {},
+  "last_director": null,
+  "updated": "2026-09-02T23:48:00.177625+05:30"
 }
