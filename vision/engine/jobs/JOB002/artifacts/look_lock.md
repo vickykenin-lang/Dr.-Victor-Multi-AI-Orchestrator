@@ -1,4 +1,4 @@
 # Look lock
 
-sheets: pending
-wardrobe_lock: pending
+frozen: yes
+sheets: L1 L2 L3

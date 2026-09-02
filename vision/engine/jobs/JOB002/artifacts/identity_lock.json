@@ -1,5 +1,21 @@
 {
   "frozen": true,
-  "rule": "later stages cannot add a new face",
-  "updated": "2026-09-01T11:54:53.699103+05:30"
+  "topic": "Festival Bonus: name missing from Diwali bonus list. Guard says the list was edited before the printer. Office CCTV shows not HR but an intern.",
+  "sheets": [
+    {
+      "id": "L1",
+      "file": "artifacts/look/L1.png",
+      "desc": "lead office worker whose name is missing from a bonus list, Indian adult, tired, formal shirt, waist-up, studio light"
+    },
+    {
+      "id": "L2",
+      "file": "artifacts/look/L2.png",
+      "desc": "young office intern, Indian adult, slightly nervous, casual formal, waist-up, studio light"
+    },
+    {
+      "id": "L3",
+      "file": "artifacts/look/L3.png",
+      "desc": "building security guard, Indian adult, uniform, calm, waist-up, studio light"
+    }
+  ]
 }
