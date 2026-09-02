@@ -36,6 +36,8 @@ on:
       - 'brain/problem_ownership.test.mjs'
       - 'brain/outcome_state.mjs'
       - 'brain/outcome_state.test.mjs'
+      - 'brain/owned_outcome_acceptance.mjs'
+      - 'brain/owned_outcome_acceptance.test.mjs'
       - 'brain/result_truth_receipts.mjs'
       - 'brain/result_truth_receipts.test.mjs'
       - 'brain/fact_runtime.mjs'
@@ -87,7 +89,7 @@ jobs:
           python scripts/apply_truth_resolver.py
           python scripts/apply_outcome_state.py
       - name: Run core tests
-        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs brain/founder_conversation.test.mjs brain/problem_ownership.test.mjs brain/outcome_state.test.mjs brain/result_truth_receipts.test.mjs brain/fact_runtime.test.mjs brain/truth_resolver.test.mjs brain/founder_request.test.mjs brain/request_gateway.test.mjs brain/conversation_state_store.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
+        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs brain/founder_conversation.test.mjs brain/problem_ownership.test.mjs brain/outcome_state.test.mjs brain/owned_outcome_acceptance.test.mjs brain/result_truth_receipts.test.mjs brain/fact_runtime.test.mjs brain/truth_resolver.test.mjs brain/founder_request.test.mjs brain/request_gateway.test.mjs brain/conversation_state_store.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
       - name: Syntax checks
         run: |
           node --check brain/runtime.mjs
@@ -98,6 +100,7 @@ jobs:
           node --check brain/founder_conversation.mjs
           node --check brain/problem_ownership.mjs
           node --check brain/outcome_state.mjs
+          node --check brain/owned_outcome_acceptance.mjs
           node --check brain/result_truth_receipts.mjs
           node --check brain/fact_runtime.mjs
           node --check brain/fact_evidence_resolver.mjs
