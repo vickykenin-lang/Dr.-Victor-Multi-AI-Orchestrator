@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assembly: Remotion Master from existing picture clips. ffmpeg fallback."""
+"""Assembly: Remotion Master from existing picture clips. No burned title. ffmpeg fallback."""
 from __future__ import annotations
 
 import json
@@ -41,7 +41,7 @@ def _remotion(job_dir: str, names: list[str], title: str, master: str) -> None:
         subprocess.check_call(["npm", "install", "--omit=dev"], cwd=REMOTION)
     props = os.path.join(out_dir, "props.json")
     with open(props, "w", encoding="utf-8") as f:
-        json.dump({"clips": names, "title": title or "JOB"}, f)
+        json.dump({"clips": names, "title": ""}, f)
     dest = os.path.join(out_dir, "master.mp4")
     subprocess.check_call(
         ["npx", "remotion", "render", "Master", dest, f"--props={props}"],
@@ -59,9 +59,8 @@ def run(job_dir: str, topic: str) -> str:
     out_dir = os.path.join(job_dir, "artifacts", "assembly")
     os.makedirs(out_dir, exist_ok=True)
     master = os.path.join(out_dir, "master.mp4")
-    title = topic or "Festival Bonus"
     try:
-        _remotion(job_dir, names, title, master)
+        _remotion(job_dir, names, topic or "", master)
         how = "remotion"
     except Exception as e:
         print("remotion fail, ffmpeg", e)
@@ -70,7 +69,7 @@ def run(job_dir: str, topic: str) -> str:
     if not os.path.isfile(master) or os.path.getsize(master) < 1000:
         raise RuntimeError("master empty")
     with open(os.path.join(job_dir, "artifacts", "assembly.md"), "w", encoding="utf-8") as f:
-        f.write(f"# Assembly\n\nengine: {how}\nclips: {','.join(names)}\nmaster: artifacts/assembly/master.mp4\n")
+        f.write(f"# Assembly\n\nlanguage: Hindi\noverlay: none\nengine: {how}\nclips: {','.join(names)}\n")
     print("master", how, os.path.getsize(master))
     return master
 
