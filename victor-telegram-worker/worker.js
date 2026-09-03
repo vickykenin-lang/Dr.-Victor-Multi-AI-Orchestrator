@@ -369,6 +369,22 @@ export default {
         return json({ ok: true, mode: ownedProblem.mode, target: ownedProblem.target, task_id: dispatch.taskId });
       }
 
+      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_EXPLANATION') {
+        const previousReply = String(sessionWithFounderTurn?.last_victor_reply || '').trim();
+        let reply = previousReply
+          ? 'Previous verified update ke context se explain kar raha hoon: ' + previousReply.slice(0, 1200)
+          : 'Is follow-up ka reliable previous context available nahi hai; main guess nahi karunga.';
+        if (previousReply && env.ENABLE_AI_INFERENCE === 'true' && env.API_VICTOR) {
+          reply = await askModel(
+            env,
+            'Answer the Founder short follow-up using ONLY the immediately previous verified Victor reply and active thread. Do not dispatch a task. Do not claim new evidence. Explain naturally and concisely in the Founder language.',
+            'Previous verified Victor reply:\n' + previousReply + '\n\nFounder follow-up: ' + text,
+          );
+        }
+        await sendTelegramMessage(env, chatId, reply, message.message_id);
+        return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, dispatch: 'NOT_REQUIRED' });
+      }
+
       if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {
         const investigationText = buildInvestigationTaskText(contextualFollowUp, sessionWithFounderTurn);
         const dispatch = await dispatchContextualInvestigation(env, contextualFollowUp.target, investigationText, { messageId: message.message_id });
