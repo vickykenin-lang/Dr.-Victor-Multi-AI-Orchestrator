@@ -10,7 +10,7 @@
     "intake": 0,
     "development": 0,
     "screenplay": 0,
-    "look_lock": 1
+    "look_lock": 2
   },
   "last_director": {
     "pass": false,
@@ -19,5 +19,5 @@
       "look_lock"
     ]
   },
-  "updated": "2026-09-03T11:14:15.654197+05:30"
+  "updated": "2026-09-03T11:15:53.301081+05:30"
 }
