@@ -1,0 +1,43 @@
+name: Bootstrap Victor Release Lockfile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/bootstrap_release_lock.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  generate-lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate npm lockfile from exact pinned toolchain
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify exact Wrangler lock
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          if (lock?.packages?.['']?.devDependencies?.wrangler !== '4.128.0') throw new Error('ROOT_LOCK_WRANGLER_MISMATCH');
+          if (lock?.packages?.['node_modules/wrangler']?.version !== '4.128.0') throw new Error('LOCKED_WRANGLER_VERSION_MISMATCH');
+          console.log('WRANGLER_LOCKFILE_VERIFIED');
+          NODE
+      - name: Persist lockfile and remove bootstrap workflow
+        run: |
+          set -euo pipefail
+          git config user.name "victor-release-bootstrap"
+          git config user.email "actions@users.noreply.github.com"
+          git add package-lock.json
+          git rm .github/workflows/bootstrap_release_lock.yml
+          git commit -m "release: lock Victor Worker deploy dependencies"
+          git pull --rebase --autostash
+          git push
