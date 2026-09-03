@@ -1,0 +1,69 @@
+name: Fix Victor Contextual Why
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'brain/conversation_runtime.mjs'
+      - '.github/workflows/fix-victor-contextual-why.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch worker contextual explanation path
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('victor-telegram-worker/worker.js')
+          s=p.read_text()
+          anchor="""      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {\n"""
+          block="""      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_EXPLANATION') {
+        const previousReply = String(sessionWithFounderTurn?.last_victor_reply || '').trim();
+        let reply = previousReply
+          ? `Previous update ka reason wahi evidence hai jo abhi verify hua tha: ${previousReply.slice(0, 1200)}`
+          : 'Is follow-up ka reliable previous context available nahi hai; main guess nahi karunga.';
+        if (previousReply && env.ENABLE_AI_INFERENCE === 'true' && env.API_VICTOR) {
+          reply = await askModel(
+            env,
+            'Answer the Founder short follow-up using ONLY the immediately previous verified Victor reply and active thread. Do not dispatch a task. Do not claim new evidence. Explain naturally and concisely in the Founder language.',
+            `Previous verified Victor reply:\n${previousReply}\n\nFounder follow-up: ${text}`,
+          );
+        }
+        await sendTelegramMessage(env, chatId, reply, message.message_id);
+        return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, dispatch: 'NOT_REQUIRED' });
+      }
+
+"""
+          if block not in s:
+              if anchor not in s:
+                  raise SystemExit('anchor missing')
+              s=s.replace(anchor, block+anchor,1)
+          p.write_text(s)
+          PY
+      - name: Syntax verify
+        run: |
+          node --check victor-telegram-worker/worker.js
+          node --check brain/conversation_runtime.mjs
+      - name: Behavioral regression
+        run: |
+          node --input-type=module <<'NODE'
+          import { classifyConversationFollowUp } from './brain/conversation_runtime.mjs';
+          const s={last_target:'rio',last_task_id:'t1',last_victor_reply:'RIO ka koi active blocker nahi hai. Instagram post successful hua.'};
+          const r=classifyConversationFollowUp('kyu?',s);
+          if(r.mode!=='CONTEXTUAL_EXPLANATION') throw new Error(JSON.stringify(r));
+          console.log(r);
+          NODE
+      - name: Persist repair
+        run: |
+          git config user.name 'victor-governed-runtime'
+          git config user.email 'actions@users.noreply.github.com'
+          git add victor-telegram-worker/worker.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: keep why follow-ups conversational'
+          git pull --rebase --autostash
+          git push
