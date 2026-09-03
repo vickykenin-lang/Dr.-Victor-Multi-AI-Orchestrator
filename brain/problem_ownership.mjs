@@ -12,14 +12,27 @@ export function classifyOwnedProblem(text, session = {}) {
   if (!['rio', 'tony_stark', 'aura3'].includes(target)) return { matched: false, target: null, reason: 'NO_SUPPORTED_TARGET' };
 
   const blockerQuestion = /(kaha(?:an)?\s+atka|kyu\s+(?:nahi|nhi)\s+(?:hua|bana|develop|publish)|kyon\s+(?:nahi|nhi)|pareshani|problem|issue|blocker|what.*blocking|why.*not|stuck)/i.test(value);
-  const ownershipAction = /(khud|apne\s+aap|automatically|auto|fix|thik|theek|repair|resolve|recover|continue|aage\s+badh|publish|post\s+kar|live\s+kar|develop)/i.test(value);
-  const operationalOutcome = /(instagram|post|creative|publish|website|campaign|content|revenue|conversion|operation|kaam)/i.test(value);
+  const ownershipAction = /(khud|apne\s+aap|automatically|auto|fix|thik|theek|repair|resolve|recover|continue|aage\s+badh|publish|post\s+kar|live\s+kar|develop|final\s+result|outcome)/i.test(value);
+  const operationalOutcome = /(instagram|post|creative|publish|website|campaign|content|revenue|conversion|operation|kaam|result|outcome)/i.test(value);
+
+  const threadText = normalizeProblemText([
+    session?.active_issue,
+    session?.unresolved_question,
+    session?.last_founder_text,
+    session?.last_victor_reply,
+  ].filter(Boolean).join(' '));
+  const threadOperational = /(instagram|post|creative|publish|website|campaign|content|revenue|conversion|operation|kaam|blocker|issue|problem|stuck|result|outcome)/i.test(threadText);
+  const explicitOwnershipFollowUp = /^(isko|ise|usko|usse|ye|this|that)?\s*(khud|apne\s+aap)?\s*(fix|thik|theek|repair|resolve|recover|continue|aage\s+badh|publish|post\s+kar|live\s+kar|develop).*(final\s+result|result|outcome|batao|do)?/i.test(value)
+    || /(khud|apne\s+aap).*(fix|resolve|recover|continue|publish|develop)/i.test(value);
 
   if (blockerQuestion && (ownershipAction || operationalOutcome)) {
     return { matched: true, target, mode: 'OWNED_PROBLEM_RECOVERY', reason: 'BLOCKER_OR_DELAY_REQUIRES_DIAGNOSE_FIX_CONTINUE' };
   }
   if (ownershipAction && operationalOutcome) {
     return { matched: true, target, mode: 'OWNED_PROBLEM_RECOVERY', reason: 'FOUNDER_REQUESTS_OUTCOME_OWNERSHIP' };
+  }
+  if (!explicitTarget && explicitOwnershipFollowUp && threadOperational) {
+    return { matched: true, target, mode: 'OWNED_PROBLEM_RECOVERY', reason: 'OWNERSHIP_FOLLOWUP_BOUND_TO_ACTIVE_OPERATIONAL_THREAD' };
   }
   return { matched: false, target, reason: 'STATUS_OR_ACTION_NOT_OWNERSHIP_CLASS' };
 }
@@ -43,5 +56,5 @@ export function buildOwnedProblemPrompt(target, founderRequest, previous = null)
 
 export function naturalOwnedProblemAck(target) {
   const name = target === 'rio' ? 'RIO' : target === 'tony_stark' ? 'Tony' : target === 'aura3' ? 'AURA3' : 'Department';
-  return `${name} kaha atka hai aur kyu outcome nahi aaya, dono trace kar raha hoon. Jo internal issue meri authority ke andar hoga usko sirf report nahi karunga—fix karke aage continue karunga. Sirf genuine Founder-only blocker hua to aapko involve karunga.`;
+  return `${name} ka issue own kar liya hai. Fresh evidence se root cause verify karke jo corrective action meri authority ke andar hai wo execute karunga, phir final outcome verify karke update dunga. Sirf genuine Founder-only boundary par aapko involve karunga.`;
 }
