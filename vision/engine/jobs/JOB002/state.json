@@ -1,19 +1,12 @@
 {
   "job_id": "JOB002",
-  "stage": "done",
+  "stage": "assembly",
   "owner_gates": {
     "topic_ok": true,
     "look_ok": true,
     "master_ok": false
   },
-  "retries": {
-    "assembly": 0,
-    "delivery": 0
-  },
-  "last_director": {
-    "pass": true,
-    "reason": "delivery artifacts present",
-    "must_fix": []
-  },
-  "updated": "2026-09-03T00:22:07.171096+05:30"
+  "retries": {},
+  "last_director": null,
+  "updated": "2026-09-03T10:41:09.596950+05:30"
 }

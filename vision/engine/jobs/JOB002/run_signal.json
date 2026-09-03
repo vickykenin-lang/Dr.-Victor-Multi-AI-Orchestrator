@@ -1,7 +1,7 @@
 {
-  "continue": false,
-  "gap_sec": 0,
-  "stage": "done",
-  "reason": "complete",
-  "updated": "2026-09-03T10:31:27.715065+05:30"
+  "continue": true,
+  "gap_sec": 60,
+  "stage": "assembly",
+  "reason": "reopen at assembly",
+  "updated": "2026-09-03T10:41:09.597169+05:30"
 }
