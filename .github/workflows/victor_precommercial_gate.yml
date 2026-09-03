@@ -1,0 +1,87 @@
+name: Victor Pre-Commercial Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'brain/**'
+      - 'victor-telegram-worker/**'
+      - '.github/workflows/victor_precommercial_gate.yml'
+  pull_request:
+    paths:
+      - 'brain/**'
+      - 'victor-telegram-worker/**'
+      - '.github/workflows/victor_precommercial_gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check runtime JavaScript
+        run: |
+          set -euo pipefail
+          find brain victor-telegram-worker -type f \( -name '*.mjs' -o -name '*.js' \) -print0 | xargs -0 -n1 node --check
+
+      - name: Run brain regression suite
+        run: |
+          set -euo pipefail
+          node --test brain/*.test.mjs
+
+      - name: Commercial invariants
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { classifyConversationFollowUp } from './brain/conversation_runtime.mjs';
+          import { classifyOwnedProblem } from './brain/problem_ownership.mjs';
+          import { buildFactReceipts } from './brain/fact_evidence_resolver.mjs';
+
+          const session = {
+            last_target: 'rio',
+            active_issue: 'RIO ka current blocker fresh evidence ke saath batao',
+            last_victor_reply: 'RIO ka blocker null hai; Instagram posted hai aur metrics collection next action hai.',
+          };
+          const why = classifyConversationFollowUp('kyu?', session);
+          if (why.mode !== 'CONTEXTUAL_EXPLANATION') throw new Error('WHY_FOLLOWUP_MISROUTED');
+
+          const own = classifyOwnedProblem('isko khud fix karo aur final result batao', session);
+          if (!own.matched || own.mode !== 'OWNED_PROBLEM_RECOVERY') throw new Error('OWNERSHIP_FOLLOWUP_MISROUTED');
+
+          const fetched = '2026-09-03T16:30:00.000Z';
+          const receipts = buildFactReceipts({
+            fetched_at_utc: fetched,
+            rio: {
+              control: { instagram_auto_publish: true, kill_switch: false, resumed_at: '2026-08-23T10:32:00.000Z' },
+              production_control: { production_state: 'ACTIVE', activated_at: '2026-08-27T10:00:00.000Z' },
+            },
+          });
+          for (const fact of ['rio.instagram_auto_publish', 'rio.kill_switch', 'rio.production_state']) {
+            const receipt = receipts.find(x => x.fact === fact);
+            if (!receipt || receipt.stale) throw new Error(`CURRENT_CONFIG_FALSE_STALE:${fact}`);
+          }
+          console.log('COMMERCIAL_INVARIANTS_OK');
+          NODE
+
+      - name: Guard against emergency source-repair workflows
+        run: |
+          set -euo pipefail
+          if find .github/workflows -maxdepth 1 -type f -name 'fix-victor-*.yml' | grep -q .; then
+            echo 'One-shot source-repair workflow found. Commercial gate refuses self-mutating emergency patch workflows.'
+            find .github/workflows -maxdepth 1 -type f -name 'fix-victor-*.yml'
+            exit 1
+          fi
+
+      - name: Verify no secret values are embedded in runtime source
+        run: |
+          set -euo pipefail
+          if grep -RInE --exclude='*.md' --exclude='*.json' '(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|EA[A-Za-z0-9]{30,})' brain victor-telegram-worker; then
+            echo 'Potential credential literal detected in runtime source.'
+            exit 1
+          fi
+          echo 'NO_OBVIOUS_SECRET_LITERALS'
