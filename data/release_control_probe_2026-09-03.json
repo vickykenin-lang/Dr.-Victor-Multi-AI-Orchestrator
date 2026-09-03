@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "purpose": "Phase 1 state-only Cloudflare build-watch acceptance probe",
+  "expected_cloudflare_behavior": "NO_PRODUCTION_BUILD_OR_DEPLOY",
+  "reason": "data/** is excluded from Cloudflare Build Watch Paths and is not part of runtime include paths",
+  "created_at_utc": "2026-09-03T17:25:00Z",
+  "safe_to_delete_after_verification": true
+}
