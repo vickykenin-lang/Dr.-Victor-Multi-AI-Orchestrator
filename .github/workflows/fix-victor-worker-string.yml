@@ -1,0 +1,50 @@
+name: Fix Victor Worker String
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-victor-worker-string.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Repair malformed join string
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('victor-telegram-worker/worker.js')
+          s = p.read_text(encoding='utf-8')
+          broken = "].join('\n\n');"
+          fixed = "].join('\\n\\n');"
+          count = s.count(broken)
+          print('broken_occurrences=', count)
+          if count < 1:
+              raise SystemExit('Expected malformed multiline join string not found')
+          s = s.replace(broken, fixed)
+          p.write_text(s, encoding='utf-8')
+          print('remaining_broken_occurrences=', s.count(broken))
+          PY
+
+      - name: Syntax verify
+        run: |
+          node --check victor-telegram-worker/worker.js
+
+      - name: Persist repair
+        run: |
+          git config user.name "victor-governed-runtime"
+          git config user.email "actions@users.noreply.github.com"
+          git add victor-telegram-worker/worker.js
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: repair Victor worker multiline string"
+          git pull --rebase --autostash
+          git push
