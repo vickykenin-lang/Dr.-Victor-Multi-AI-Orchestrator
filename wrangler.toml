@@ -3,6 +3,9 @@ main = "victor-telegram-worker/worker.js"
 compatibility_date = "2026-08-27"
 keep_vars = true
 
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
 [triggers]
 crons = [ "*/15 * * * *", "30 16 * * *" ]
 
