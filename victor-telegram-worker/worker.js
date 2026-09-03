@@ -658,9 +658,7 @@ async function maybeContinueOwnedOutcome(env, chatId, target, dispatch, rawResul
   const continuationText = [
     buildOwnedProblemPrompt(target, founderRequest, rawResult),
     buildOwnedRecoveryDirective(assessed),
-  ].join('
-
-');
+  ].join('\n\n');
   const nextDispatch = await dispatchContextualInvestigation(env, target, continuationText, { messageId: 'owned-recovery' });
   const nextOutcome = createOwnedOutcomeState({
     target,
