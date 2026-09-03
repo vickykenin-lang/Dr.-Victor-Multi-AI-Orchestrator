@@ -19,9 +19,20 @@ export function classifyConversationFollowUp(text, session = {}) {
   const taskStatus = /(iska|uska|task ka|task).*status|status.*(iska|uska|task)|kab pata chalega|kab result milega|result kab|revert kab/i.test(value);
   const problemFollowUp = /^(kya pareshani hai abhi|kaha atka hua hai|kahaan atka hua hai|kahan atka hai|what is the issue now|what is blocking it)$/i.test(value);
   const nextStepFollowUp = /^(to |toh |ab |then |so )?(ab )?(kya karna chahiye|kya kare|kya karen|next kya|aage kya|what should we do|what next|what should i do|what should victor do)\??$/i.test(value);
+  const explanationFollowUp = /^(kyu|kyun|kyon|why|aisa kyu|aisa kyun|aisa kyon|why so|why is that|kaise|how so)\??$/i.test(value);
   const investigationVerb = /(iska|iske|uska|ye|this|that).{0,35}(pata karo|verify karo|check karo|confirm karo|investigate karo|find out|verify this|check this|investigate this|confirm this)|(pata karo|verify karo|check karo|confirm karo|investigate karo|find out).{0,50}(iska|iske|uska|ye|this|that)/i.test(value);
   const explicitGapReference = looksLikeEvidenceGap(value);
   const previousGap = looksLikeEvidenceGap(previousVictor);
+
+  if (hasTarget && explanationFollowUp && previousVictor.trim()) {
+    return {
+      mode: 'CONTEXTUAL_EXPLANATION',
+      target,
+      task_id: taskId,
+      query: String(text || '').trim(),
+      reason: 'WHY_OR_HOW_BOUND_TO_PREVIOUS_VERIFIED_REPLY',
+    };
+  }
 
   // A request to investigate a specific unknown/unverified point is new evidence work,
   // not a request to replay the previous task result.
