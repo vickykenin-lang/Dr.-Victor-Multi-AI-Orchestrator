@@ -14,6 +14,18 @@ test('plain RIO status question is not automatically converted to recovery', () 
   assert.equal(result.matched, false);
 });
 
+test('short ownership follow-up inherits active RIO operational thread', () => {
+  const session = {
+    last_target: 'rio',
+    active_issue: 'RIO ka current blocker fresh evidence ke saath batao',
+    last_victor_reply: 'RIO ka blocker null hai; Instagram posted hai aur metrics collection next action hai.',
+  };
+  const result = classifyOwnedProblem('isko khud fix karo aur final result batao', session);
+  assert.equal(result.matched, true);
+  assert.equal(result.target, 'rio');
+  assert.equal(result.mode, 'OWNED_PROBLEM_RECOVERY');
+});
+
 test('owned recovery prompt requires fix-and-continue instead of report-only', () => {
   const prompt = buildOwnedProblemPrompt('rio', 'post kyu nahi hua, fix karo');
   assert.match(prompt, /own the problem to the verified outcome/i);
