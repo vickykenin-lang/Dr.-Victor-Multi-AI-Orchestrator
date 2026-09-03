@@ -138,6 +138,8 @@ export function buildFactAnswerPrompt(founderText, evidence) {
     'Answer every part of the Founder question. Do not ignore a second department or second sub-question.',
     'Give exact numbers/timestamps/commit dates when present. If a requested number is not supported by the fetched scope, say exactly what was counted and what remains unknown.',
     'Use resolved_truth as the authoritative reconciliation output. If it reports a conflict, explain which receipt won and why using truth precedence/freshness. If status is RESOLVED_STALE_ONLY, label the fact stale instead of presenting it as current.',
+    'Never invent or mentally recalculate freshness ages or thresholds. If you mention staleness math, copy age_ms and stale_after_ms exactly from the selected receipt; otherwise simply say stale/current per the receipt. Do not write approximate ages that are not explicitly supported.',
+    'For freshly fetched configuration receipts whose metadata.semantics is CURRENT_CONFIGURATION_FROM_FRESH_GITHUB_READ, report the configured value as current at fetched_at_utc; last_change_at is historical metadata, not proof that the current value is stale.',
     'Do not replace facts with reassurance, status templates, or phrases like “trace kar raha hoon”.',
     'If current canonical data conflicts with an older alert/message, explicitly distinguish OLD ALERT from CURRENT STATE and cite the current field/value in plain language.',
     'For heartbeat counts, preserve the runtime note: workflow-run conclusion is not necessarily identical to heartbeat-job conclusion.',
