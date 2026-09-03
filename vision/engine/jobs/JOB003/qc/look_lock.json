@@ -1,0 +1,9 @@
+{
+  "stage": "look_lock",
+  "checked_at": "2026-09-03T11:14:15.654003+05:30",
+  "pass": false,
+  "reason": "gemini 429",
+  "must_fix": [
+    "look_lock"
+  ]
+}
