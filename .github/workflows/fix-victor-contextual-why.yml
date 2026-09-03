@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - 'brain/conversation_runtime.mjs'
       - '.github/workflows/fix-victor-contextual-why.yml'
 
 permissions:
@@ -15,53 +14,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch worker contextual explanation path
+      - name: Patch worker
+        env:
+          BLOCK_B64: "ICAgICAgaWYgKCFtZW1vcnlEaXJlY3RpdmUgJiYgY29udGV4dHVhbEZvbGxvd1VwLm1vZGUgPT09ICdDT05URVhUVUFMX0VYUExBTkFUSU9OJykgewogICAgICAgIGNvbnN0IHByZXZpb3VzUmVwbHkgPSBTdHJpbmcoc2Vzc2lvbldpdGhGb3VuZGVyVHVybj8ubGFzdF92aWN0b3JfcmVwbHkgfHwgJycpLnRyaW0oKTsKICAgICAgICBsZXQgcmVwbHkgPSBwcmV2aW91c1JlcGx5CiAgICAgICAgICA/ICdQcmV2aW91cyB2ZXJpZmllZCB1cGRhdGUga2UgY29udGV4dCBzZSBleHBsYWluIGthciByYWhhIGhvb246ICcgKyBwcmV2aW91c1JlcGx5LnNsaWNlKDAsIDEyMDApCiAgICAgICAgICA6ICdJcyBmb2xsb3ctdXAga2EgcmVsaWFibGUgcHJldmlvdXMgY29udGV4dCBhdmFpbGFibGUgbmFoaSBoYWk7IG1haW4gZ3Vlc3MgbmFoaSBrYXJ1bmdhLic7CiAgICAgICAgaWYgKHByZXZpb3VzUmVwbHkgJiYgZW52LkVOQUJMRV9BSV9JTkZFUkVOQ0UgPT09ICd0cnVlJyAmJiBlbnYuQVBJX1ZJQ1RPUikgewogICAgICAgICAgcmVwbHkgPSBhd2FpdCBhc2tNb2RlbCgKICAgICAgICAgICAgZW52LAogICAgICAgICAgICAnQW5zd2VyIHRoZSBGb3VuZGVyIHNob3J0IGZvbGxvdy11cCB1c2luZyBPTkxZIHRoZSBpbW1lZGlhdGVseSBwcmV2aW91cyB2ZXJpZmllZCBWaWN0b3IgcmVwbHkgYW5kIGFjdGl2ZSB0aHJlYWQuIERvIG5vdCBkaXNwYXRjaCBhIHRhc2suIERvIG5vdCBjbGFpbSBuZXcgZXZpZGVuY2UuIEV4cGxhaW4gbmF0dXJhbGx5IGFuZCBjb25jaXNlbHkgaW4gdGhlIEZvdW5kZXIgbGFuZ3VhZ2UuJywKICAgICAgICAgICAgJ1ByZXZpb3VzIHZlcmlmaWVkIFZpY3RvciByZXBseTpcbicgKyBwcmV2aW91c1JlcGx5ICsgJ1xuXG5Gb3VuZGVyIGZvbGxvdy11cDogJyArIHRleHQsCiAgICAgICAgICApOwogICAgICAgIH0KICAgICAgICBhd2FpdCBzZW5kVGVsZWdyYW1NZXNzYWdlKGVudiwgY2hhdElkLCByZXBseSwgbWVzc2FnZS5tZXNzYWdlX2lkKTsKICAgICAgICByZXR1cm4ganNvbih7IG9rOiB0cnVlLCBtb2RlOiBjb250ZXh0dWFsRm9sbG93VXAubW9kZSwgdGFyZ2V0OiBjb250ZXh0dWFsRm9sbG93VXAudGFyZ2V0LCBkaXNwYXRjaDogJ05PVF9SRVFVSVJFRCcgfSk7CiAgICAgIH0KCg=="
         run: |
           python - <<'PY'
+          import base64, os
           from pathlib import Path
           p=Path('victor-telegram-worker/worker.js')
           s=p.read_text()
-          anchor="""      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {\n"""
-          block="""      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_EXPLANATION') {
-        const previousReply = String(sessionWithFounderTurn?.last_victor_reply || '').trim();
-        let reply = previousReply
-          ? `Previous update ka reason wahi evidence hai jo abhi verify hua tha: ${previousReply.slice(0, 1200)}`
-          : 'Is follow-up ka reliable previous context available nahi hai; main guess nahi karunga.';
-        if (previousReply && env.ENABLE_AI_INFERENCE === 'true' && env.API_VICTOR) {
-          reply = await askModel(
-            env,
-            'Answer the Founder short follow-up using ONLY the immediately previous verified Victor reply and active thread. Do not dispatch a task. Do not claim new evidence. Explain naturally and concisely in the Founder language.',
-            `Previous verified Victor reply:\n${previousReply}\n\nFounder follow-up: ${text}`,
-          );
-        }
-        await sendTelegramMessage(env, chatId, reply, message.message_id);
-        return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, dispatch: 'NOT_REQUIRED' });
-      }
-
-"""
-          if block not in s:
+          anchor="      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {\n"
+          block=base64.b64decode(os.environ['BLOCK_B64']).decode()
+          if "contextualFollowUp.mode === 'CONTEXTUAL_EXPLANATION'" not in s:
               if anchor not in s:
                   raise SystemExit('anchor missing')
               s=s.replace(anchor, block+anchor,1)
           p.write_text(s)
           PY
-      - name: Syntax verify
+      - name: Verify
         run: |
           node --check victor-telegram-worker/worker.js
           node --check brain/conversation_runtime.mjs
-      - name: Behavioral regression
+          node --input-type=module -e "import('./brain/conversation_runtime.mjs').then(m=>{const r=m.classifyConversationFollowUp('kyu?',{last_target:'rio',last_task_id:'t1',last_victor_reply:'verified'}); if(r.mode!=='CONTEXTUAL_EXPLANATION') process.exit(1);})"
+      - name: Persist
         run: |
-          node --input-type=module <<'NODE'
-          import { classifyConversationFollowUp } from './brain/conversation_runtime.mjs';
-          const s={last_target:'rio',last_task_id:'t1',last_victor_reply:'RIO ka koi active blocker nahi hai. Instagram post successful hua.'};
-          const r=classifyConversationFollowUp('kyu?',s);
-          if(r.mode!=='CONTEXTUAL_EXPLANATION') throw new Error(JSON.stringify(r));
-          console.log(r);
-          NODE
-      - name: Persist repair
-        run: |
-          git config user.name 'victor-governed-runtime'
-          git config user.email 'actions@users.noreply.github.com'
+          git config user.name victor-governed-runtime
+          git config user.email actions@users.noreply.github.com
           git add victor-telegram-worker/worker.js
           git diff --cached --quiet && exit 0
           git commit -m 'fix: keep why follow-ups conversational'
