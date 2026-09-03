@@ -1,7 +1,7 @@
 {
   "continue": true,
-  "gap_sec": 60,
-  "stage": "inbox",
-  "reason": "gate topic_ok set",
-  "updated": "2026-09-03T11:08:02.289369+05:30"
+  "gap_sec": 45,
+  "stage": "intake",
+  "reason": "advanced to development",
+  "updated": "2026-09-03T11:09:38.827553+05:30"
 }

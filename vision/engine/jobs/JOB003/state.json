@@ -1,12 +1,18 @@
 {
   "job_id": "JOB003",
-  "stage": "inbox",
+  "stage": "development",
   "owner_gates": {
     "topic_ok": true,
     "look_ok": false,
     "master_ok": false
   },
-  "retries": {},
-  "last_director": null,
-  "updated": "2026-09-03T11:08:02.289163+05:30"
+  "retries": {
+    "intake": 0
+  },
+  "last_director": {
+    "pass": true,
+    "reason": "intake artifacts present",
+    "must_fix": []
+  },
+  "updated": "2026-09-03T11:09:38.827699+05:30"
 }

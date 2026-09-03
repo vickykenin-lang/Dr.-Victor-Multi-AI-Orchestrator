@@ -1,0 +1,7 @@
+{
+  "stage": "intake",
+  "checked_at": "2026-09-03T11:09:38.827325+05:30",
+  "pass": true,
+  "reason": "intake artifacts present",
+  "must_fix": []
+}
