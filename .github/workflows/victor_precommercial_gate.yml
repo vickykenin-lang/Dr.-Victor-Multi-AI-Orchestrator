@@ -80,13 +80,22 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
           if (pkg?.devDependencies?.wrangler !== '4.128.0') throw new Error('WRANGLER_VERSION_NOT_EXACTLY_PINNED');
+          if (lock?.packages?.['']?.devDependencies?.wrangler !== '4.128.0') throw new Error('ROOT_LOCK_WRANGLER_MISMATCH');
+          if (lock?.packages?.['node_modules/wrangler']?.version !== '4.128.0') throw new Error('LOCKED_WRANGLER_VERSION_MISMATCH');
           if (!String(pkg?.scripts?.deploy || '').includes('VICTOR_DEPLOY_GIT_SHA:$WORKERS_CI_COMMIT_SHA')) throw new Error('DEPLOY_SHA_NOT_INJECTED');
           if (!String(pkg?.scripts?.deploy || '').includes('VICTOR_BUILD_UUID:$WORKERS_CI_BUILD_UUID')) throw new Error('BUILD_UUID_NOT_INJECTED');
           const wrangler = fs.readFileSync('wrangler.toml', 'utf8');
           if (!/\[version_metadata\][\s\S]*binding\s*=\s*"CF_VERSION_METADATA"/.test(wrangler)) throw new Error('CF_VERSION_METADATA_BINDING_MISSING');
           console.log('RELEASE_CONTROL_INVARIANTS_OK');
           NODE
+
+      - name: Verify npm lockfile installability
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx --no-install wrangler --version | grep -F '4.128.0'
 
       - name: Guard against emergency source-repair workflows
         run: |
