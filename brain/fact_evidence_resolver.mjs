@@ -26,15 +26,26 @@ export function buildFactReceipts(evidence = {}) {
   const work = rio.work_status || {};
   const igRun = rio.instagram_run_status || {};
 
+  // Event/operational records age from their actual observation timestamps.
   push(receipts, 'rio.heartbeat.runner_state', runner.state, 'github://vickykenin-lang/rio-affiliate-engine/data/heartbeat_runner_status.json', fetchedAt, runner.finished_at_utc || runner.started_at_utc, { staleAfterMs: 20 * 60 * 1000 });
   push(receipts, 'rio.heartbeat.finished_at_utc', runner.finished_at_utc, 'github://vickykenin-lang/rio-affiliate-engine/data/heartbeat_runner_status.json', fetchedAt, runner.finished_at_utc, { staleAfterMs: 20 * 60 * 1000 });
-  push(receipts, 'rio.instagram_auto_publish', control.instagram_auto_publish, 'github://vickykenin-lang/rio-affiliate-engine/data/control.json', fetchedAt, control.resumed_at || null, { staleAfterMs: 24 * 60 * 60 * 1000 });
-  push(receipts, 'rio.instagram_pause_reason', control.instagram_pause_reason, 'github://vickykenin-lang/rio-affiliate-engine/data/control.json', fetchedAt, control.maintenance_pause_set_at || control.resumed_at || null, { staleAfterMs: 24 * 60 * 60 * 1000 });
-  push(receipts, 'rio.kill_switch', control.kill_switch, 'github://vickykenin-lang/rio-affiliate-engine/data/control.json', fetchedAt, control.resumed_at || null, { staleAfterMs: 24 * 60 * 60 * 1000 });
-  push(receipts, 'rio.production_state', production.production_state, 'github://vickykenin-lang/rio-affiliate-engine/data/production_control.json', fetchedAt, production.activated_at || null, { staleAfterMs: 7 * 24 * 60 * 60 * 1000 });
   push(receipts, 'rio.work.status', work.status, 'github://vickykenin-lang/rio-affiliate-engine/data/rio_work_status.json', fetchedAt, work.updated_at || null, { staleAfterMs: 30 * 60 * 1000 });
   push(receipts, 'rio.work.blocker', work.blocker, 'github://vickykenin-lang/rio-affiliate-engine/data/rio_work_status.json', fetchedAt, work.updated_at || null, { staleAfterMs: 30 * 60 * 1000 });
   push(receipts, 'rio.instagram.last_run_status', igRun.status, 'github://vickykenin-lang/rio-affiliate-engine/data/instagram_run_status.json', fetchedAt, igRun.updated_at || null, { staleAfterMs: 24 * 60 * 60 * 1000 });
+
+  // Freshly fetched configuration/state files prove the current configured value.
+  // Their last-change timestamp is audit metadata, not an expiry timer for the value.
+  const controlMeta = {
+    last_change_at: control.maintenance_pause_set_at || control.resumed_at || null,
+    semantics: 'CURRENT_CONFIGURATION_FROM_FRESH_GITHUB_READ',
+  };
+  push(receipts, 'rio.instagram_auto_publish', control.instagram_auto_publish, 'github://vickykenin-lang/rio-affiliate-engine/data/control.json', fetchedAt, fetchedAt, { staleAfterMs: 5 * 60 * 1000, metadata: controlMeta });
+  push(receipts, 'rio.instagram_pause_reason', control.instagram_pause_reason, 'github://vickykenin-lang/rio-affiliate-engine/data/control.json', fetchedAt, fetchedAt, { staleAfterMs: 5 * 60 * 1000, metadata: controlMeta });
+  push(receipts, 'rio.kill_switch', control.kill_switch, 'github://vickykenin-lang/rio-affiliate-engine/data/control.json', fetchedAt, fetchedAt, { staleAfterMs: 5 * 60 * 1000, metadata: controlMeta });
+  push(receipts, 'rio.production_state', production.production_state, 'github://vickykenin-lang/rio-affiliate-engine/data/production_control.json', fetchedAt, fetchedAt, {
+    staleAfterMs: 5 * 60 * 1000,
+    metadata: { last_change_at: production.activated_at || null, semantics: 'CURRENT_CONFIGURATION_FROM_FRESH_GITHUB_READ' },
+  });
 
   if (rio.workflow_counts) {
     push(receipts, 'rio.workflow.counts', rio.workflow_counts.counts, 'github://vickykenin-lang/rio-affiliate-engine/actions/runs', fetchedAt, rio.workflow_counts.latest?.updated_at || rio.workflow_counts.latest?.created_at || null, {
