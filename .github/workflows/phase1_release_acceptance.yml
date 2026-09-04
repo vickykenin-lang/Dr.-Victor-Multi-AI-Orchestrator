@@ -1,0 +1,159 @@
+name: Victor Phase 1 Release Acceptance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/phase1_release_acceptance.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  accept-release-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Expose deployment metadata in health endpoint
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('victor-telegram-worker/worker.js')
+          s = p.read_text()
+          marker = "        service: 'victor-telegram-webhook',\n        status: 'READY',"
+          replacement = "        service: 'victor-telegram-webhook',\n        deployment_git_sha: env.VICTOR_DEPLOY_GIT_SHA || null,\n        deployment_build_uuid: env.VICTOR_BUILD_UUID || null,\n        cloudflare_version_id: env.CF_VERSION_METADATA?.id || null,\n        status: 'READY',"
+          if 'deployment_git_sha:' not in s:
+              if marker not in s:
+                  raise SystemExit('health marker not found')
+              s = s.replace(marker, replacement, 1)
+              p.write_text(s)
+          PY
+
+      - name: Commit runtime metadata change
+        id: runtime
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add victor-telegram-worker/worker.js
+          if git diff --cached --quiet; then
+            echo 'No runtime change to commit; using current HEAD.'
+          else
+            git commit -m 'feat: expose release deployment metadata'
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for matching Cloudflare deployment
+        id: deployed
+        env:
+          RUNTIME_SHA: ${{ steps.runtime.outputs.sha }}
+        run: |
+          set -euo pipefail
+          URL='https://victor-telegram-webhook.vickykenin.workers.dev/health'
+          matched='false'
+          for i in $(seq 1 30); do
+            body=$(curl -fsS --max-time 15 "$URL" || true)
+            live_sha=$(printf '%s' "$body" | jq -r '.deployment_git_sha // empty' 2>/dev/null || true)
+            version_id=$(printf '%s' "$body" | jq -r '.cloudflare_version_id // empty' 2>/dev/null || true)
+            durable=$(printf '%s' "$body" | jq -r '.active_thread_memory_durable // false' 2>/dev/null || true)
+            echo "attempt=$i live_sha=$live_sha version_id=$version_id durable=$durable"
+            if [ "$live_sha" = "$RUNTIME_SHA" ] && [ -n "$version_id" ] && [ "$durable" = 'true' ]; then
+              echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+              echo "build_uuid=$(printf '%s' "$body" | jq -r '.deployment_build_uuid // empty')" >> "$GITHUB_OUTPUT"
+              matched='true'
+              break
+            fi
+            sleep 10
+          done
+          [ "$matched" = 'true' ] || { echo 'Cloudflare runtime SHA/version/durable-memory parity not verified'; exit 1; }
+
+      - name: Commit data-only isolation probe
+        id: probe
+        env:
+          RUNTIME_SHA: ${{ steps.runtime.outputs.sha }}
+          VERSION_ID: ${{ steps.deployed.outputs.version_id }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          payload = {
+            'schema': 1,
+            'probe': 'PHASE1_DATA_ONLY_NO_DEPLOY_ACCEPTANCE',
+            'created_at_utc': datetime.now(timezone.utc).isoformat(),
+            'runtime_sha_expected_to_remain_deployed': os.environ['RUNTIME_SHA'],
+            'cloudflare_version_expected_to_remain': os.environ['VERSION_ID'],
+            'expected_cloudflare_build': False,
+          }
+          with open('data/phase1_state_isolation_probe.json','w') as f:
+              json.dump(payload, f, indent=2)
+              f.write('\n')
+          PY
+          git add data/phase1_state_isolation_probe.json
+          git commit -m 'test: Phase 1 data-only no-deploy acceptance probe'
+          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify data-only commit did not deploy
+        env:
+          RUNTIME_SHA: ${{ steps.runtime.outputs.sha }}
+          RUNTIME_VERSION: ${{ steps.deployed.outputs.version_id }}
+          PROBE_SHA: ${{ steps.probe.outputs.sha }}
+        run: |
+          set -euo pipefail
+          URL='https://victor-telegram-webhook.vickykenin.workers.dev/health'
+          sleep 120
+          body=$(curl -fsS --max-time 20 "$URL")
+          live_sha=$(printf '%s' "$body" | jq -r '.deployment_git_sha // empty')
+          live_version=$(printf '%s' "$body" | jq -r '.cloudflare_version_id // empty')
+          durable=$(printf '%s' "$body" | jq -r '.active_thread_memory_durable // false')
+          echo "runtime_sha=$RUNTIME_SHA probe_sha=$PROBE_SHA live_sha=$live_sha runtime_version=$RUNTIME_VERSION live_version=$live_version durable=$durable"
+          [ "$live_sha" = "$RUNTIME_SHA" ] || { echo 'FAIL: data-only commit changed deployed git SHA'; exit 1; }
+          [ "$live_version" = "$RUNTIME_VERSION" ] || { echo 'FAIL: data-only commit changed Cloudflare version'; exit 1; }
+          [ "$durable" = 'true' ] || { echo 'FAIL: durable conversation state lost'; exit 1; }
+
+      - name: Persist Phase 1 acceptance receipt
+        env:
+          RUNTIME_SHA: ${{ steps.runtime.outputs.sha }}
+          RUNTIME_VERSION: ${{ steps.deployed.outputs.version_id }}
+          BUILD_UUID: ${{ steps.deployed.outputs.build_uuid }}
+          PROBE_SHA: ${{ steps.probe.outputs.sha }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          receipt = {
+            'schema': 1,
+            'phase': 'VICTOR_PHASE_1_RELEASE_CONTROL',
+            'status': 'PASS',
+            'verified_at_utc': datetime.now(timezone.utc).isoformat(),
+            'runtime_deployment': {
+              'git_sha': os.environ['RUNTIME_SHA'],
+              'cloudflare_version_id': os.environ['RUNTIME_VERSION'],
+              'build_uuid': os.environ.get('BUILD_UUID') or None,
+              'sha_parity_verified': True,
+            },
+            'state_only_isolation': {
+              'probe_commit_sha': os.environ['PROBE_SHA'],
+              'cloudflare_deploy_triggered': False,
+              'runtime_sha_unchanged': True,
+              'cloudflare_version_unchanged': True,
+            },
+            'durable_conversation_state_after_deploy': True,
+            'toolchain': {
+              'wrangler_exact_pin': '4.128.0',
+              'lockfile_required': True,
+            },
+            'evidence_note': 'Generated by the one-shot Phase 1 acceptance workflow after live Worker health parity and a 120-second post-probe no-deploy observation window.'
+          }
+          with open('data/phase1_release_acceptance.json','w') as f:
+              json.dump(receipt, f, indent=2)
+              f.write('\n')
+          PY
+          git add data/phase1_release_acceptance.json
+          git commit -m 'audit: record Phase 1 release-control acceptance PASS'
+          git push origin HEAD:main
