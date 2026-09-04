@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "probe": "PHASE1_FINAL_STATE_ONLY_NO_CLOUDFLARE_DEPLOY",
+  "created_at_utc": "2026-09-04T15:17:30Z",
+  "expected_runtime_git_sha": "3f4367a4bc90122255b26caf1ed0e1d64cb8bdf8",
+  "expected_cloudflare_version_id": "aa9f011c-3fca-4070-a535-2e7a44e25053",
+  "expected_cloudflare_build": false
+}
