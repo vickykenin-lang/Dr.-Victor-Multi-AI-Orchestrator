@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "probe": "PHASE1_POST_SAVE_STATE_ONLY_NO_DEPLOY",
+  "created_at_ist": "2026-09-04T20:22:00+05:30",
+  "expected_cloudflare_build": false,
+  "scope": "data-only release-control acceptance probe"
+}
