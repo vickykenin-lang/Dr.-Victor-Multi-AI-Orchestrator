@@ -108,6 +108,9 @@ export default {
     if (request.method === 'GET' && url.pathname === '/health') {
       return json({
         service: 'victor-telegram-webhook',
+        deployment_git_sha: env.VICTOR_DEPLOY_GIT_SHA || null,
+        deployment_build_uuid: env.VICTOR_BUILD_UUID || null,
+        cloudflare_version_id: env.CF_VERSION_METADATA?.id || null,
         status: 'READY',
         core_mode: 'GOVERNED_CANONICAL_CONTEXT',
         precedence_mode: PRECEDENCE_VERSION,
