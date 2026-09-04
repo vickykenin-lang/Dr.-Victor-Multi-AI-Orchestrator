@@ -84,10 +84,13 @@ jobs:
           if (pkg?.devDependencies?.wrangler !== '4.128.0') throw new Error('WRANGLER_VERSION_NOT_EXACTLY_PINNED');
           if (lock?.packages?.['']?.devDependencies?.wrangler !== '4.128.0') throw new Error('ROOT_LOCK_WRANGLER_MISMATCH');
           if (lock?.packages?.['node_modules/wrangler']?.version !== '4.128.0') throw new Error('LOCKED_WRANGLER_VERSION_MISMATCH');
-          if (!String(pkg?.scripts?.deploy || '').includes('VICTOR_DEPLOY_GIT_SHA:$WORKERS_CI_COMMIT_SHA')) throw new Error('DEPLOY_SHA_NOT_INJECTED');
-          if (!String(pkg?.scripts?.deploy || '').includes('VICTOR_BUILD_UUID:$WORKERS_CI_BUILD_UUID')) throw new Error('BUILD_UUID_NOT_INJECTED');
+          const deploy = String(pkg?.scripts?.deploy || '');
+          if (!deploy.includes('wrangler deploy --strict')) throw new Error('STRICT_REMOTE_CONFIG_GUARD_MISSING');
+          if (!deploy.includes('VICTOR_DEPLOY_GIT_SHA:$WORKERS_CI_COMMIT_SHA')) throw new Error('DEPLOY_SHA_NOT_INJECTED');
+          if (!deploy.includes('VICTOR_BUILD_UUID:$WORKERS_CI_BUILD_UUID')) throw new Error('BUILD_UUID_NOT_INJECTED');
           const wrangler = fs.readFileSync('wrangler.toml', 'utf8');
           if (!/\[version_metadata\][\s\S]*binding\s*=\s*"CF_VERSION_METADATA"/.test(wrangler)) throw new Error('CF_VERSION_METADATA_BINDING_MISSING');
+          if (!/\[\[kv_namespaces\]\][\s\S]*binding\s*=\s*"VICTOR_CONVERSATION_STATE"/.test(wrangler)) throw new Error('DURABLE_CONVERSATION_KV_BINDING_MISSING');
           console.log('RELEASE_CONTROL_INVARIANTS_OK');
           NODE
 
