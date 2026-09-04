@@ -29,4 +29,4 @@ jobs:
           git add data/phase1_live_health_diagnostic.json
           git commit -m 'audit: capture Phase 1 live health diagnostic'
           git push origin HEAD:main
-          # Rerun marker: durable-binding recovery verification.
+          # Rerun marker: post-state-only isolation verification.
