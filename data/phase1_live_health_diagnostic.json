@@ -1,12 +1,12 @@
 {
   "service": "victor-telegram-webhook",
   "status": "READY",
-  "deployment_git_sha": "24feacb88d55a8341620c376e0207477ada5f4d9",
-  "deployment_build_uuid": "35f29634-9883-4a0c-90d0-7188d95de2cf",
-  "cloudflare_version_id": "bc4269ab-6fb9-4d38-a328-fc503ff1d752",
-  "active_thread_memory": "BEST_EFFORT_WORKING_CONTEXT_V1",
-  "active_thread_memory_durable": false,
-  "active_thread_memory_reason": "NO_DURABLE_CONVERSATION_BINDING_CONFIGURED",
+  "deployment_git_sha": "3f4367a4bc90122255b26caf1ed0e1d64cb8bdf8",
+  "deployment_build_uuid": "bac9b6b7-ef6c-4a60-888b-8f4bbcd7f0fd",
+  "cloudflare_version_id": "aa9f011c-3fca-4070-a535-2e7a44e25053",
+  "active_thread_memory": "DURABLE_CONVERSATION_STATE_V1",
+  "active_thread_memory_durable": true,
+  "active_thread_memory_reason": "KV_LIKE_GET_PUT_BINDING_AVAILABLE",
   "direct_consequential_department_execution": false,
   "governed_diagnostic_department_bridge": true
 }
