@@ -1,20 +1,18 @@
 {
   "job_id": "JOB003",
-  "stage": "look_lock",
+  "stage": "keyframes",
   "owner_gates": {
     "topic_ok": true,
-    "look_ok": false,
+    "look_ok": true,
     "master_ok": false
   },
   "retries": {
-    "look_lock": 20
+    "look_lock": 0
   },
   "last_director": {
-    "pass": false,
-    "reason": "gemini 429",
-    "must_fix": [
-      "look_lock"
-    ]
+    "pass": true,
+    "reason": "look_lock artifacts present",
+    "must_fix": []
   },
-  "updated": "2026-09-05T20:38:44.712316+05:30"
+  "updated": "2026-09-05T22:48:29.979311+05:30"
 }

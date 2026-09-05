@@ -1,0 +1,22 @@
+{
+  "frozen": true,
+  "topic": "Night shift biometric fail. Lead ka entry machine pe nahi. Guard kehta hai intern ne device reset kiya.",
+  "language": "Hindi",
+  "sheets": [
+    {
+      "id": "L1",
+      "file": "artifacts/look/L1.png",
+      "desc": "Hindi film lead, Indian adult office worker, tired face, light blue formal shirt, waist-up studio sheet, no text"
+    },
+    {
+      "id": "L2",
+      "file": "artifacts/look/L2.png",
+      "desc": "Hindi film intern, Indian young adult, nervous, casual formal shirt, waist-up studio sheet, no text"
+    },
+    {
+      "id": "L3",
+      "file": "artifacts/look/L3.png",
+      "desc": "Hindi film security guard, Indian adult, uniform, calm, waist-up studio sheet, no text"
+    }
+  ]
+}
