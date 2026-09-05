@@ -1,0 +1,36 @@
+name: Deploy Victor Telegram Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'victor-telegram-worker/**'
+      - 'wrangler.toml'
+      - '.github/workflows/deploy_victor_telegram_worker.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: victor-telegram-webhook-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run deterministic Victor truth-guard tests
+        run: node --test victor-telegram-worker/core_rules.test.mjs
+
+      - name: Syntax-check Worker
+        run: node --check victor-telegram-worker/worker.js
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
