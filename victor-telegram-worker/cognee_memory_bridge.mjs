@@ -6,7 +6,7 @@ function cfg(env) {
   return {
     enabled: String(env.COGNEE_MEMORY_ENABLED || '').toLowerCase() === 'true',
     base,
-    apiKey: env.COGNEE_API_KEY || '',
+    apiKey: env.COGNEE_API_KEY || env.VICTOR_COGNEE_API || '',
     dataset: env.COGNEE_DATASET || 'victor_long_term_memory',
     inferenceApiKey: env.VICTOR_COGNEE_API || '',
     inferenceModel: env.VICTOR_COGNEE_MODEL || 'AUTO_OPENAI',
@@ -17,7 +17,7 @@ function headers(apiKey) {
   return {
     'Content-Type': 'application/json',
     Accept: 'application/json',
-    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
   };
 }
 
@@ -53,19 +53,26 @@ export async function cogneeRemember(env, text, metadata = {}) {
   const c = cfg(env);
   const status = cogneeMemoryStatus(env);
   if (status.status !== 'CONFIGURED') return status;
-  const body = {
-    data: JSON.stringify({
-      authority: metadata.authority || 'VICTOR',
-      source: metadata.source || 'victor',
-      observed_at: metadata.observedAt || new Date().toISOString(),
-      text: String(text || '').trim(),
-      metadata,
-    }),
-    dataset_name: c.dataset,
-    self_improvement: true,
-  };
+
+  const record = JSON.stringify({
+    authority: metadata.authority || 'VICTOR',
+    source: metadata.source || 'victor',
+    observed_at: metadata.observedAt || new Date().toISOString(),
+    text: String(text || '').trim(),
+    metadata,
+  });
+  const form = new FormData();
+  form.append('data', new Blob([record], { type: 'application/json' }), 'victor-memory.json');
+  form.append('datasetName', c.dataset);
+  form.append('run_in_background', 'false');
+
   const res = await fetch(`${c.base}/api/v1/remember`, {
-    method: 'POST', headers: headers(c.apiKey), body: JSON.stringify(body),
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'X-Api-Key': c.apiKey,
+    },
+    body: form,
   });
   if (!res.ok) return { status: 'FAILED', stage: 'COGNEE_REMEMBER', http_status: res.status };
   return { status: 'REMEMBERED', dataset: c.dataset };

@@ -214,25 +214,28 @@ export async function callVictorModel(env, system, userMessage, options = {}) {
 }
 
 export async function resolveCogneeOpenAIModel(env = {}) {
-  const apiKey = env.VICTOR_COGNEE_API || '';
+  // Compatibility shim retained for callers/tests that imported the old name.
+  // Cognee is not an LLM model provider; no Bedrock model discovery is performed.
+  const apiKey = env.VICTOR_COGNEE_API || env.COGNEE_API_KEY || '';
   if (!apiKey) return { status: 'CREDENTIAL_MISSING', model: null };
-  const discovery = await discoverBedrockModels(env, { apiKey });
-  const openAiModels = discovery.models.filter(id => /(^|[.\-_])(openai|gpt)([.\-_]|$)/i.test(id));
-  const configured = norm(env.VICTOR_COGNEE_MODEL);
-  if (configured && (!openAiModels.length || openAiModels.includes(configured))) {
-    return { status: 'RESOLVED', model: configured, discovery_status: discovery.status, discovery_http_status: discovery.http_status || null, base: discovery.base };
-  }
-  const ranked = openAiModels
-    .map(id => ({ id, score: scoreModel(id, 'chat') + (/gpt/i.test(id) ? 20 : 0) }))
-    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
-  return ranked.length
-    ? { status: 'RESOLVED', model: ranked[0].id, discovery_status: discovery.status, discovery_http_status: discovery.http_status || null, base: discovery.base }
-    : { status: 'OPENAI_MODEL_NOT_VERIFIED', model: null, discovery_status: discovery.status, discovery_http_status: discovery.http_status || null, base: discovery.base };
+  return {
+    status: 'COGNEE_CLOUD_MEMORY_API',
+    model: null,
+    discovery_status: 'NOT_APPLICABLE',
+    base: String(env.COGNEE_SERVICE_URL || 'https://api.cognee.ai').replace(/\/$/, ''),
+  };
 }
 
 export async function callCogneeInference(env = {}, system = '', userMessage = '', options = {}) {
-  const apiKey = env.VICTOR_COGNEE_API || '';
-  if (!apiKey) throw Object.assign(new Error('VICTOR_COGNEE_API is not configured'), { code: 'COGNEE_INFERENCE_CREDENTIAL_MISSING' });
+  // Legacy function name kept to avoid a breaking import in worker.js.
+  // It now performs a real Cognee Cloud authenticated API probe instead of
+  // misusing the Cognee key against AWS Bedrock /models or /chat/completions.
+  const apiKey = env.VICTOR_COGNEE_API || env.COGNEE_API_KEY || '';
+  if (!apiKey) {
+    throw Object.assign(new Error('Cognee API credential is not configured'), {
+      code: 'COGNEE_API_CREDENTIAL_MISSING',
+    });
+  }
 
   const fingerprint = await credentialFingerprint(apiKey);
   const breaker = await readCogneeAuthBreaker(env);
@@ -243,41 +246,20 @@ export async function callCogneeInference(env = {}, system = '', userMessage = '
     await writeCogneeAuthBreaker(env, null);
   }
 
-  const resolved = await resolveCogneeOpenAIModel(env);
-  if (resolved.status !== 'RESOLVED' || !resolved.model) {
-    if ([401, 403].includes(Number(resolved.discovery_http_status))) {
-      await writeCogneeAuthBreaker(env, {
-        status: 'COGNEE_AUTH_BLOCKED',
-        credential_fingerprint: fingerprint,
-        http_status: Number(resolved.discovery_http_status),
-        blocked_at_utc: new Date().toISOString(),
-        stage: 'MODEL_DISCOVERY',
-      });
-      throw cogneeAuthBlockedError(Number(resolved.discovery_http_status), false);
-    }
-    throw Object.assign(new Error('No verified OpenAI model available for Cognee inference'), {
-      code: 'COGNEE_OPENAI_MODEL_NOT_VERIFIED',
-      discoveryStatus: resolved.discovery_status || null,
-    });
-  }
-
-  const base = norm(options.base || resolved.base || env.VICTOR_BEDROCK_BASE || DEFAULT_BEDROCK_BASE).replace(/\/$/, '');
+  const base = String(options.base || env.COGNEE_SERVICE_URL || 'https://api.cognee.ai').replace(/\/$/, '');
   let response;
   try {
-    response = await fetch(`${base}/chat/completions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: resolved.model,
-        messages: [{ role: 'system', content: system }, { role: 'user', content: userMessage }],
-        temperature: Number(options.temperature ?? 0.1),
-        max_tokens: Number(options.maxTokens ?? 300),
-      }),
+    response = await fetch(`${base}/api/v1/datasets/`, {
+      method: 'GET',
+      headers: {
+        'X-Api-Key': apiKey,
+        Accept: 'application/json',
+      },
       signal: AbortSignal.timeout(Number(env.VICTOR_COGNEE_AI_TIMEOUT_MS || env.VICTOR_AI_TIMEOUT_MS || 25000)),
     });
   } catch (error) {
-    throw Object.assign(new Error('Cognee inference request could not reach Bedrock'), {
-      code: 'COGNEE_INFERENCE_UNREACHABLE',
+    throw Object.assign(new Error('Cognee Cloud API request could not be reached'), {
+      code: 'COGNEE_API_UNREACHABLE',
       causeName: error?.name || 'FetchError',
     });
   }
@@ -289,30 +271,32 @@ export async function callCogneeInference(env = {}, system = '', userMessage = '
         credential_fingerprint: fingerprint,
         http_status: response.status,
         blocked_at_utc: new Date().toISOString(),
-        stage: 'INFERENCE',
+        stage: 'COGNEE_DATASETS_AUTH_CHECK',
       });
       throw cogneeAuthBlockedError(response.status, false);
     }
-    throw Object.assign(new Error('Cognee inference request returned non-success status'), {
-      code: 'COGNEE_INFERENCE_HTTP_ERROR',
+    throw Object.assign(new Error('Cognee Cloud API returned non-success status'), {
+      code: 'COGNEE_API_HTTP_ERROR',
       httpStatus: response.status,
     });
   }
 
   let payload;
   try { payload = await response.json(); } catch {
-    throw Object.assign(new Error('Cognee inference response was not valid JSON'), { code: 'COGNEE_INFERENCE_INVALID_JSON' });
-  }
-  const content = payload?.choices?.[0]?.message?.content;
-  if (typeof content !== 'string' || !content.trim()) {
-    throw Object.assign(new Error('Cognee inference response was empty'), { code: 'COGNEE_INFERENCE_EMPTY_RESPONSE' });
+    throw Object.assign(new Error('Cognee Cloud datasets response was not valid JSON'), {
+      code: 'COGNEE_API_INVALID_JSON',
+    });
   }
 
+  const datasets = Array.isArray(payload) ? payload : (payload?.data || payload?.datasets || payload?.items || []);
   await writeCogneeAuthBreaker(env, null);
   return {
-    content: content.trim(),
-    model: resolved.model,
-    discovery_status: resolved.discovery_status || null,
-    credential_source: 'VICTOR_COGNEE_API',
+    content: `Cognee Cloud API authenticated successfully; accessible datasets: ${Array.isArray(datasets) ? datasets.length : 0}.`,
+    model: null,
+    discovery_status: 'COGNEE_DATASETS_VERIFIED',
+    credential_source: env.VICTOR_COGNEE_API ? 'VICTOR_COGNEE_API' : 'COGNEE_API_KEY',
+    provider: 'COGNEE_CLOUD',
+    endpoint: '/api/v1/datasets/',
+    dataset_count: Array.isArray(datasets) ? datasets.length : 0,
   };
 }

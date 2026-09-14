@@ -142,8 +142,8 @@ export default {
         ai_inference_enabled: env.ENABLE_AI_INFERENCE === 'true',
         ai_credential_configured: Boolean(env.API_VICTOR),
         cognee_inference_credential_configured: Boolean(env.VICTOR_COGNEE_API),
-        cognee_inference_runtime: 'DEDICATED_OPENAI_PATH_V1',
-        cognee_auth_circuit_breaker: 'AUTH_401_403_HOLD_UNTIL_CREDENTIAL_CHANGE_V1',
+        cognee_inference_runtime: 'COGNEE_CLOUD_MEMORY_API_V2',
+        cognee_auth_circuit_breaker: 'COGNEE_CLOUD_AUTH_401_403_HOLD_V2',
         telegram_webhook_ack_policy: 'HANDLED_ERRORS_HTTP_200_V1',
         model_router: 'BEDROCK_DISCOVERY_SPECIALIST_V1',
         anti_bogus_runtime: 'DEAD_END_RECOVERY_V1',
@@ -462,65 +462,67 @@ export default {
 
       const explicitCogneeInferenceDiagnostic = /\b(cognee inference|cognee smoke|victor_cognee_api|cognee api|test cognee)\b/i.test(text);
       if (!memoryDirective && explicitCogneeInferenceDiagnostic) {
-        processingStage = 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC';
-        if (!env.VICTOR_COGNEE_API) {
-          await sendTelegramMessage(env, chatId, 'Cognee live inference blocked hai: VICTOR_COGNEE_API runtime credential configured nahi hai.', message.message_id);
-          return json({ ok: false, mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC', status: 'CREDENTIAL_MISSING', credential_source: 'VICTOR_COGNEE_API', acknowledged: true }, 200);
+        processingStage = 'LIVE_COGNEE_API_DIAGNOSTIC';
+        if (!env.VICTOR_COGNEE_API && !env.COGNEE_API_KEY) {
+          await sendTelegramMessage(env, chatId, 'Cognee API check blocked hai: Cognee runtime credential configured nahi hai.', message.message_id);
+          return json({ ok: false, mode: 'LIVE_COGNEE_API_DIAGNOSTIC', status: 'CREDENTIAL_MISSING', acknowledged: true }, 200);
         }
         try {
           console.log(JSON.stringify({
             event: 'VICTOR_COGNEE_DIAGNOSTIC_MATCHED',
             trace_id: traceId,
-            credential_source: 'VICTOR_COGNEE_API',
+            provider: 'COGNEE_CLOUD',
             api_victor_fallback: false,
             secrets_exposed: false,
           }));
-          const result = await callCogneeInference(
-            env,
-            'You are the dedicated Cognee inference diagnostic. Return one short harmless confirmation sentence only. Never reveal credentials, tokens, secrets, or keys.',
-            'Reply briefly confirming this response came from the dedicated Cognee inference path.'
-          );
+          const result = await callCogneeInference(env, '', '');
           const safeContent = String(result.content || '').trim().slice(0, 500);
           const reply = [
-            'Cognee live inference: VERIFIED',
-            `Credential path: ${result.credential_source || 'VICTOR_COGNEE_API'}`,
-            `Selected model: ${result.model || 'unknown'}`,
-            `Bedrock model discovery: ${result.discovery_status || 'unknown'}`,
-            `Live response: ${safeContent}`,
+            'Cognee Cloud API: VERIFIED',
+            `Credential path: ${result.credential_source || 'Cognee API secret'}`,
+            `Provider: ${result.provider || 'COGNEE_CLOUD'}`,
+            `API endpoint: ${result.endpoint || '/api/v1/datasets/'}`,
+            `Accessible datasets: ${Number(result.dataset_count || 0)}`,
+            `Auth/data read status: ${result.discovery_status || 'COGNEE_DATASETS_VERIFIED'}`,
+            `Result: ${safeContent}`,
+            'Bedrock used for Cognee: no',
             'API_VICTOR fallback: no',
             'Secrets exposed: no',
           ].join('\n');
           console.log(JSON.stringify({
-            event: 'VICTOR_COGNEE_MODEL_ROUTE',
-            model: result.model || null,
-            discovery_status: result.discovery_status || null,
-            credential_source: 'VICTOR_COGNEE_API',
+            event: 'VICTOR_COGNEE_API_VERIFIED',
+            trace_id: traceId,
+            provider: result.provider || 'COGNEE_CLOUD',
+            endpoint: result.endpoint || '/api/v1/datasets/',
+            dataset_count: Number(result.dataset_count || 0),
+            credential_source: result.credential_source || null,
             api_victor_fallback: false,
             secrets_exposed: false,
           }));
           await sendTelegramMessage(env, chatId, reply, message.message_id);
           return json({
             ok: true,
-            mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC',
+            mode: 'LIVE_COGNEE_API_DIAGNOSTIC',
             status: 'VERIFIED',
-            model: result.model || null,
-            discovery_status: result.discovery_status || null,
-            credential_source: 'VICTOR_COGNEE_API',
+            provider: result.provider || 'COGNEE_CLOUD',
+            endpoint: result.endpoint || '/api/v1/datasets/',
+            dataset_count: Number(result.dataset_count || 0),
+            credential_source: result.credential_source || null,
             api_victor_fallback: false,
             secrets_exposed: false,
           });
         } catch (error) {
-          const code = error?.code || 'COGNEE_INFERENCE_FAILED';
+          const code = error?.code || 'COGNEE_API_FAILED';
           const detail = error?.httpStatus ? ` HTTP ${error.httpStatus}.` : '';
           const suppressed = Boolean(error?.suppressNotification);
           if (!suppressed) {
             const messageText = code === 'COGNEE_AUTH_BLOCKED'
-              ? `Cognee auth blocked.${detail} Same credential par retries hold kar diye gaye hain; VICTOR_COGNEE_API change hone ke baad automatically retry allow hoga. API_VICTOR fallback nahi kiya gaya.`
-              : `Cognee live inference FAILED. Runtime code: ${code}.${detail} API_VICTOR fallback nahi kiya gaya.`;
+              ? `Cognee Cloud auth blocked.${detail} Same credential par retries hold hain; credential change ke baad retry allow hoga.`
+              : `Cognee Cloud API check FAILED. Runtime code: ${code}.${detail}`;
             await sendTelegramMessage(env, chatId, messageText, message.message_id);
           }
           console.log(JSON.stringify({
-            event: 'VICTOR_COGNEE_INFERENCE_BLOCKED',
+            event: 'VICTOR_COGNEE_API_BLOCKED',
             trace_id: traceId,
             code,
             http_status: error?.httpStatus || null,
@@ -531,13 +533,10 @@ export default {
           }));
           return json({
             ok: false,
-            mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC',
+            mode: 'LIVE_COGNEE_API_DIAGNOSTIC',
             status: code === 'COGNEE_AUTH_BLOCKED' ? 'AUTH_BLOCKED' : 'FAILED',
             code,
             http_status: error?.httpStatus || null,
-            discovery_status: error?.discoveryStatus || null,
-            credential_source: 'VICTOR_COGNEE_API',
-            api_victor_fallback: false,
             notification_suppressed: suppressed,
             credential_change_required: Boolean(error?.credentialChangeRequired),
             acknowledged: true,
