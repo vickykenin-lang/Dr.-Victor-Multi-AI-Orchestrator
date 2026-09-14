@@ -144,6 +144,7 @@ export default {
         cognee_inference_credential_configured: Boolean(env.VICTOR_COGNEE_API),
         cognee_inference_runtime: 'DEDICATED_OPENAI_PATH_V1',
         cognee_auth_circuit_breaker: 'AUTH_401_403_HOLD_UNTIL_CREDENTIAL_CHANGE_V1',
+        telegram_webhook_ack_policy: 'HANDLED_ERRORS_HTTP_200_V1',
         model_router: 'BEDROCK_DISCOVERY_SPECIALIST_V1',
         anti_bogus_runtime: 'DEAD_END_RECOVERY_V1',
         response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1',
@@ -257,6 +258,13 @@ export default {
     if (!text) return json({ ok: true, ignored: true });
 
     const traceId = buildTraceId(update?.update_id, message.message_id);
+    console.log(JSON.stringify({
+      event: 'VICTOR_TELEGRAM_MESSAGE_ACCEPTED',
+      trace_id: traceId,
+      message_id: message.message_id,
+      chat_authorized: true,
+      secrets_exposed: false,
+    }));
     const emergencyCommand = parseEmergencyCommand(text);
     if (emergencyCommand) {
       try {
@@ -343,11 +351,11 @@ export default {
         processingStage = 'LIVE_AI_INFERENCE_DIAGNOSTIC';
         if (env.ENABLE_AI_INFERENCE !== 'true') {
           await sendTelegramMessage(env, chatId, 'Live AI inference disabled hai: ENABLE_AI_INFERENCE=true required.', message.message_id);
-          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'INFERENCE_DISABLED' }, 503);
+          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'INFERENCE_DISABLED', acknowledged: true }, 200);
         }
         if (!env.API_VICTOR) {
           await sendTelegramMessage(env, chatId, 'Live AI inference blocked hai: API_VICTOR runtime credential configured nahi hai.', message.message_id);
-          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'CREDENTIAL_MISSING' }, 503);
+          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'CREDENTIAL_MISSING', acknowledged: true }, 200);
         }
         try {
           const result = await callVictorModel(
@@ -379,7 +387,7 @@ export default {
         } catch (error) {
           const code = error?.code || 'AI_MODEL_ROUTER_EXHAUSTED';
           await sendTelegramMessage(env, chatId, `Live AI inference FAILED. Runtime code: ${code}. Main generic GitHub status se is failure ko cover nahi karunga.`, message.message_id);
-          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'FAILED', code, secrets_exposed: false }, 503);
+          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'FAILED', code, acknowledged: true, secrets_exposed: false }, 200);
         }
       }
 
@@ -388,9 +396,16 @@ export default {
         processingStage = 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC';
         if (!env.VICTOR_COGNEE_API) {
           await sendTelegramMessage(env, chatId, 'Cognee live inference blocked hai: VICTOR_COGNEE_API runtime credential configured nahi hai.', message.message_id);
-          return json({ ok: false, mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC', status: 'CREDENTIAL_MISSING', credential_source: 'VICTOR_COGNEE_API' }, 503);
+          return json({ ok: false, mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC', status: 'CREDENTIAL_MISSING', credential_source: 'VICTOR_COGNEE_API', acknowledged: true }, 200);
         }
         try {
+          console.log(JSON.stringify({
+            event: 'VICTOR_COGNEE_DIAGNOSTIC_MATCHED',
+            trace_id: traceId,
+            credential_source: 'VICTOR_COGNEE_API',
+            api_victor_fallback: false,
+            secrets_exposed: false,
+          }));
           const result = await callCogneeInference(
             env,
             'You are the dedicated Cognee inference diagnostic. Return one short harmless confirmation sentence only. Never reveal credentials, tokens, secrets, or keys.',
@@ -437,10 +452,12 @@ export default {
           }
           console.log(JSON.stringify({
             event: 'VICTOR_COGNEE_INFERENCE_BLOCKED',
+            trace_id: traceId,
             code,
             http_status: error?.httpStatus || null,
             notification_suppressed: suppressed,
             credential_change_required: Boolean(error?.credentialChangeRequired),
+            acknowledged: true,
             secrets_exposed: false,
           }));
           return json({
