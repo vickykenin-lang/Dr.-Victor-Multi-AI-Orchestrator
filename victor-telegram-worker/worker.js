@@ -163,6 +163,75 @@ export default {
       });
     }
 
+    if (request.method === 'GET' && ['/telegram-webhook-health', '/telegram-webhook-health/'].includes(url.pathname)) {
+      if (!env.TELEGRAM_BOT_TOKEN_VICTOR) {
+        return json({
+          service: 'telegram-webhook-health',
+          status: 'TOKEN_NOT_CONFIGURED',
+          bot_token_configured: false,
+          secrets_exposed: false,
+        }, 503);
+      }
+      try {
+        const response = await fetch(`${TELEGRAM_API}/bot${env.TELEGRAM_BOT_TOKEN_VICTOR}/getWebhookInfo`, {
+          method: 'GET',
+          headers: { 'User-Agent': 'Dr-Victor-Telegram-Webhook-Health/1.0' },
+        });
+        const body = await response.json().catch(() => null);
+        const info = body?.result || {};
+        const configuredUrl = typeof info.url === 'string' ? info.url : '';
+        const expectedUrl = `${url.origin}/telegram`;
+        const urlMatches = Boolean(configuredUrl) && configuredUrl === expectedUrl;
+        const telegramOk = response.ok && body?.ok === true;
+        const status = !telegramOk
+          ? 'TELEGRAM_API_ERROR'
+          : !configuredUrl
+            ? 'WEBHOOK_NOT_SET'
+            : urlMatches
+              ? 'WEBHOOK_CONFIGURED_MATCHING'
+              : 'WEBHOOK_URL_MISMATCH';
+        console.log(JSON.stringify({
+          event: 'VICTOR_TELEGRAM_WEBHOOK_HEALTH',
+          status,
+          telegram_http_status: response.status,
+          webhook_url_matches_expected: urlMatches,
+          pending_update_count: Number(info.pending_update_count || 0),
+          last_error_date: info.last_error_date || null,
+          secrets_exposed: false,
+        }));
+        return json({
+          service: 'telegram-webhook-health',
+          status,
+          telegram_api_ok: telegramOk,
+          telegram_http_status: response.status,
+          webhook_configured: Boolean(configuredUrl),
+          webhook_url: configuredUrl || null,
+          expected_webhook_url: expectedUrl,
+          webhook_url_matches_expected: urlMatches,
+          pending_update_count: Number(info.pending_update_count || 0),
+          last_error_date: info.last_error_date || null,
+          last_error_message: info.last_error_message || null,
+          max_connections: info.max_connections || null,
+          ip_address: info.ip_address || null,
+          bot_token_configured: true,
+          secrets_exposed: false,
+        }, telegramOk && urlMatches ? 200 : 503);
+      } catch (error) {
+        console.error(JSON.stringify({
+          event: 'VICTOR_TELEGRAM_WEBHOOK_HEALTH_FAILED',
+          error_name: error?.name || 'Error',
+          error_message: String(error?.message || 'unknown').slice(0, 300),
+          secrets_exposed: false,
+        }));
+        return json({
+          service: 'telegram-webhook-health',
+          status: 'CHECK_FAILED',
+          bot_token_configured: true,
+          secrets_exposed: false,
+        }, 503);
+      }
+    }
+
     if (request.method === 'GET' && ['/aura3-bridge-health', '/aura3-bridge-health/', '/aura3-health', '/aura3-health/'].includes(url.pathname)) {
       if (!aura3BridgeConfigured(env)) {
         return json({ service: 'aura3-bridge', status: 'PENDING_CONFIGURATION', token_present: false }, 503);
@@ -471,6 +540,7 @@ export default {
             api_victor_fallback: false,
             notification_suppressed: suppressed,
             credential_change_required: Boolean(error?.credentialChangeRequired),
+            acknowledged: true,
             secrets_exposed: false,
           }, 200);
         }
