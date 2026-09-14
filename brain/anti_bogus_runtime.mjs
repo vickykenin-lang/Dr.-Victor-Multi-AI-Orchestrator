@@ -27,11 +27,12 @@ function victorTurns(session = {}) {
 export function detectDeadEndLoop(founderText = '', session = {}) {
   const turns = victorTurns(session);
   const last = String(session.last_victor_reply || turns.at(-1)?.text || '');
-  if (!last || !isUnresolvedVictorReply(last)) return { matched: false, reason: 'LAST_REPLY_NOT_UNRESOLVED' };
+  if (!last) return { matched: false, reason: 'NO_PRIOR_REPLY' };
   if (!ACTIONISH.test(String(founderText || ''))) return { matched: false, reason: 'FOUNDER_NOT_REQUESTING_RECOVERY' };
   if (isFounderOnlyDependency(last)) {
     return { matched: false, founder_only: true, reason: 'FOUNDER_ONLY_DEPENDENCY', dependency: last };
   }
+  if (!isUnresolvedVictorReply(last)) return { matched: false, reason: 'LAST_REPLY_NOT_UNRESOLVED' };
 
   const lastNorm = normalize(last);
   const unresolvedVictor = turns.filter(turn => isUnresolvedVictorReply(turn.text));
