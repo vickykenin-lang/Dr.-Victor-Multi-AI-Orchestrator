@@ -1,6 +1,6 @@
 const DEFAULT_BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
 const DEFAULT_FALLBACK_MODEL = 'qwen.qwen3-coder-next';
-const COGNEE_AUTH_BREAKER_KEY = 'victor:cognee:auth-breaker:v1';
+const COGNEE_AUTH_BREAKER_KEY = 'victor:cognee:auth-breaker:v2';
 
 function norm(value) {
   return String(value || '').trim();
@@ -51,7 +51,7 @@ async function writeCogneeAuthBreaker(env = {}, state = null) {
 }
 
 function cogneeAuthBlockedError(httpStatus, suppressNotification = false) {
-  return Object.assign(new Error('Cognee inference auth is blocked until VICTOR_COGNEE_API changes'), {
+  return Object.assign(new Error('Cognee auth is blocked for the current credential and tenant contract'), {
     code: 'COGNEE_AUTH_BLOCKED',
     httpStatus: httpStatus || 401,
     suppressNotification,

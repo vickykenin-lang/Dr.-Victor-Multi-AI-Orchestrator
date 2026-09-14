@@ -9,6 +9,7 @@ function cfg(env) {
     apiKey: env.COGNEE_API_KEY || env.VICTOR_COGNEE_API || '',
     dataset: env.COGNEE_DATASET || 'victor_long_term_memory',
     tenantId: String(env.COGNEE_TENANT_ID || '').trim(),
+    tenantId: String(env.COGNEE_TENANT_ID || '').trim(),
     inferenceApiKey: env.VICTOR_COGNEE_API || '',
     inferenceModel: env.VICTOR_COGNEE_MODEL || 'AUTO_OPENAI',
   };
@@ -28,6 +29,7 @@ export function cogneeMemoryStatus(env = {}) {
   if (!c.enabled) return { status: 'DISABLED' };
   if (!c.base) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_SERVICE_URL_NOT_CONFIGURED' };
   if (!c.apiKey) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_API_KEY_NOT_CONFIGURED' };
+  if (!c.tenantId) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_TENANT_ID_NOT_CONFIGURED' };
   if (!c.tenantId) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_TENANT_ID_NOT_CONFIGURED' };
   return {
     status: 'CONFIGURED',

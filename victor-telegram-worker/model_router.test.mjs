@@ -35,6 +35,7 @@ test('Cognee probe uses X-Api-Key against Cognee datasets endpoint and never API
       xApiKey: init?.headers?.['X-Api-Key'] || '',
       authorization: init?.headers?.Authorization || '',
       tenantId: init?.headers?.['X-Tenant-Id'] || '',
+      tenantId: init?.headers?.['X-Tenant-Id'] || '',
     });
     return new Response(JSON.stringify([{ id: '1', name: 'victor_long_term_memory' }]), {
       status: 200,
@@ -50,6 +51,7 @@ test('Cognee probe uses X-Api-Key against Cognee datasets endpoint and never API
     assert.match(seen[0].url, /\/api\/v1\/datasets\/$/);
     assert.equal(seen[0].xApiKey, 'cognee-key');
     assert.equal(seen[0].authorization, '');
+    assert.equal(seen[0].tenantId, 'tenant-test');
     assert.equal(seen[0].tenantId, 'tenant-test');
   } finally {
     globalThis.fetch = originalFetch;
