@@ -338,7 +338,7 @@ export default {
         return json({ ok: true, mode: 'DEAD_END_RECOVERY', target: deadEnd.target, task_id: dispatch.taskId });
       }
 
-      const explicitInferenceDiagnostic = /\b(live ai inference|ai inference test|inference test|bedrock model discovery|selected model|model discovery status|test bedrock|bedrock test)\b/i.test(text);
+      const explicitInferenceDiagnostic = !/\bcognee\b/i.test(text) && /\b(live ai inference|ai inference test|inference test|bedrock model discovery|selected model|model discovery status|test bedrock|bedrock test)\b/i.test(text);
       if (!memoryDirective && explicitInferenceDiagnostic) {
         processingStage = 'LIVE_AI_INFERENCE_DIAGNOSTIC';
         if (env.ENABLE_AI_INFERENCE !== 'true') {
