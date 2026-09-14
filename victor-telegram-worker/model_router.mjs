@@ -1,6 +1,6 @@
 const DEFAULT_BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
 const DEFAULT_FALLBACK_MODEL = 'qwen.qwen3-coder-next';
-const COGNEE_AUTH_BREAKER_KEY = 'victor:cognee:auth-breaker:v2';
+const COGNEE_AUTH_BREAKER_KEY = 'victor:cognee:auth-breaker:v3';
 
 function norm(value) {
   return String(value || '').trim();
@@ -51,7 +51,7 @@ async function writeCogneeAuthBreaker(env = {}, state = null) {
 }
 
 function cogneeAuthBlockedError(httpStatus, suppressNotification = false) {
-  return Object.assign(new Error('Cognee auth is blocked for the current credential and tenant contract'), {
+  return Object.assign(new Error('Cognee auth is blocked for the current dedicated Cognee credential and tenant contract'), {
     code: 'COGNEE_AUTH_BLOCKED',
     httpStatus: httpStatus || 401,
     suppressNotification,
@@ -216,7 +216,7 @@ export async function callVictorModel(env, system, userMessage, options = {}) {
 export async function resolveCogneeOpenAIModel(env = {}) {
   // Compatibility shim retained for callers/tests that imported the old name.
   // Cognee is not an LLM model provider; no Bedrock model discovery is performed.
-  const apiKey = env.VICTOR_COGNEE_API || env.COGNEE_API_KEY || '';
+  const apiKey = env.COGNEE_API_KEY || '';
   if (!apiKey) return { status: 'CREDENTIAL_MISSING', model: null };
   return {
     status: 'COGNEE_CLOUD_MEMORY_API',
@@ -230,7 +230,7 @@ export async function callCogneeInference(env = {}, system = '', userMessage = '
   // Legacy function name kept to avoid a breaking import in worker.js.
   // It now performs a real Cognee Cloud authenticated API probe instead of
   // misusing the Cognee key against AWS Bedrock /models or /chat/completions.
-  const apiKey = env.VICTOR_COGNEE_API || env.COGNEE_API_KEY || '';
+  const apiKey = env.COGNEE_API_KEY || '';
   if (!apiKey) {
     throw Object.assign(new Error('Cognee API credential is not configured'), {
       code: 'COGNEE_API_CREDENTIAL_MISSING',
@@ -302,7 +302,7 @@ export async function callCogneeInference(env = {}, system = '', userMessage = '
     content: `Cognee Cloud API authenticated successfully; accessible datasets: ${Array.isArray(datasets) ? datasets.length : 0}.`,
     model: null,
     discovery_status: 'COGNEE_DATASETS_VERIFIED',
-    credential_source: env.VICTOR_COGNEE_API ? 'VICTOR_COGNEE_API' : 'COGNEE_API_KEY',
+    credential_source: 'COGNEE_API_KEY',
     provider: 'COGNEE_CLOUD',
     endpoint: '/api/v1/datasets/',
     dataset_count: Array.isArray(datasets) ? datasets.length : 0,
