@@ -18,11 +18,12 @@ test('memory brain reports degraded when semantic provider is not configured', (
 
 test('semantic write uses Cognee and does not require GitHub for ordinary memory', async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (url, init) => {
-    assert.match(String(url), /\/api\/v1\/remember$/);
-    assert.equal(init.method, 'POST');
-    assert.equal(init.headers['X-Api-Key'], 'cognee-key');
-    assert.equal(init.headers['X-Tenant-Id'], 'tenant-test');
+  const seen = {};
+  globalThis.fetch = async (url, init = {}) => {
+    seen.url = String(url);
+    seen.method = init.method;
+    seen.apiKey = init.headers?.['X-Api-Key'] || '';
+    seen.tenantId = init.headers?.['X-Tenant-Id'] || '';
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
   };
   try {
@@ -40,6 +41,10 @@ test('semantic write uses Cognee and does not require GitHub for ordinary memory
     assert.equal(result.semantic.status, 'REMEMBERED');
     assert.equal(result.canonical.status, 'NOT_REQUIRED');
     assert.equal(canonicalCalls, 0);
+    assert.match(seen.url, /\/api\/v1\/remember$/);
+    assert.equal(seen.method, 'POST');
+    assert.equal(seen.apiKey, 'cognee-key');
+    assert.equal(seen.tenantId, 'tenant-test');
   } finally {
     globalThis.fetch = originalFetch;
   }
