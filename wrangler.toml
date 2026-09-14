@@ -6,6 +6,10 @@ keep_vars = true
 [version_metadata]
 binding = "CF_VERSION_METADATA"
 
+[vars]
+COGNEE_SERVICE_URL = "https://tenant-0a6a1d31-b1ae-4ac6-97c2-ca7516939878.aws.cognee.ai"
+COGNEE_TENANT_ID = "0a6a1d31-b1ae-4ac6-97c2-ca7516939878"
+
 [[kv_namespaces]]
 binding = "VICTOR_CONVERSATION_STATE"
 
