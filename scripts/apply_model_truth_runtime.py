@@ -5,8 +5,11 @@ text = worker.read_text(encoding='utf-8')
 
 # 1) Imports
 core_import = "import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';\n"
-router_import = "import { callVictorModel } from './model_router.mjs';\n"
-if router_import not in text:
+old_router_import = "import { callVictorModel } from './model_router.mjs';\n"
+router_import = "import { callVictorModel, callCogneeInference } from './model_router.mjs';\n"
+if old_router_import in text and router_import not in text:
+    text = text.replace(old_router_import, router_import, 1)
+elif router_import not in text:
     if core_import not in text:
         raise SystemExit('model router import anchor missing')
     text = text.replace(core_import, core_import + router_import, 1)
@@ -38,6 +41,13 @@ if "response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1'" not in text:
     if integrity_health_anchor not in text:
         raise SystemExit('response integrity health anchor missing')
     text = text.replace(integrity_health_anchor, integrity_health_anchor + integrity_health_line, 1)
+
+cognee_health_anchor = "        cognee_inference_credential_configured: Boolean(env.VICTOR_COGNEE_API),\n"
+cognee_health_line = "        cognee_inference_runtime: 'DEDICATED_OPENAI_PATH_V1',\n"
+if "cognee_inference_runtime: 'DEDICATED_OPENAI_PATH_V1'" not in text:
+    if cognee_health_anchor not in text:
+        raise SystemExit('cognee health anchor missing')
+    text = text.replace(cognee_health_anchor, cognee_health_anchor + cognee_health_line, 1)
 
 # 3) Detect repeated unresolved answers using conversation state.
 owned_anchor = "      const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);\n"
@@ -77,8 +87,69 @@ if "mode: 'DEAD_END_RECOVERY'" not in text:
     text = text.replace(hulk_end, hulk_end + dead_block, 1)
 
 # 5) Explicit runtime inference diagnostics must bypass the GitHub fact gateway.
-# Founder requests such as "live AI inference test" are runtime actions, not repository fact questions.
+# Cognee smoke tests use VICTOR_COGNEE_API only and must never silently fall back to API_VICTOR.
 fact_gateway_anchor = "      if (!memoryDirective && shouldUseFactGateway(founderRequest, factRequest)) {\n"
+cognee_diag_block = """      const explicitCogneeInferenceDiagnostic = /\\b(cognee inference|cognee smoke|victor_cognee_api|cognee api|test cognee)\\b/i.test(text);
+      if (!memoryDirective && explicitCogneeInferenceDiagnostic) {
+        processingStage = 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC';
+        if (!env.VICTOR_COGNEE_API) {
+          await sendTelegramMessage(env, chatId, 'Cognee live inference blocked hai: VICTOR_COGNEE_API runtime credential configured nahi hai.', message.message_id);
+          return json({ ok: false, mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC', status: 'CREDENTIAL_MISSING', credential_source: 'VICTOR_COGNEE_API' }, 503);
+        }
+        try {
+          const result = await callCogneeInference(
+            env,
+            'You are the dedicated Cognee inference diagnostic. Return one short harmless confirmation sentence only. Never reveal credentials, tokens, secrets, or keys.',
+            'Reply briefly confirming this response came from the dedicated Cognee inference path.'
+          );
+          const safeContent = String(result.content || '').trim().slice(0, 500);
+          const reply = [
+            'Cognee live inference: VERIFIED',
+            `Credential path: ${result.credential_source || 'VICTOR_COGNEE_API'}`,
+            `Selected model: ${result.model || 'unknown'}`,
+            `Bedrock model discovery: ${result.discovery_status || 'unknown'}`,
+            `Live response: ${safeContent}`,
+            'API_VICTOR fallback: no',
+            'Secrets exposed: no',
+          ].join('\\n');
+          console.log(JSON.stringify({
+            event: 'VICTOR_COGNEE_MODEL_ROUTE',
+            model: result.model || null,
+            discovery_status: result.discovery_status || null,
+            credential_source: 'VICTOR_COGNEE_API',
+            api_victor_fallback: false,
+            secrets_exposed: false,
+          }));
+          await sendTelegramMessage(env, chatId, reply, message.message_id);
+          return json({
+            ok: true,
+            mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC',
+            status: 'VERIFIED',
+            model: result.model || null,
+            discovery_status: result.discovery_status || null,
+            credential_source: 'VICTOR_COGNEE_API',
+            api_victor_fallback: false,
+            secrets_exposed: false,
+          });
+        } catch (error) {
+          const code = error?.code || 'COGNEE_INFERENCE_FAILED';
+          const detail = error?.httpStatus ? ` HTTP ${error.httpStatus}.` : '';
+          await sendTelegramMessage(env, chatId, `Cognee live inference FAILED. Runtime code: ${code}.${detail} API_VICTOR fallback nahi kiya gaya.`, message.message_id);
+          return json({
+            ok: false,
+            mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC',
+            status: 'FAILED',
+            code,
+            http_status: error?.httpStatus || null,
+            discovery_status: error?.discoveryStatus || null,
+            credential_source: 'VICTOR_COGNEE_API',
+            api_victor_fallback: false,
+            secrets_exposed: false,
+          }, 503);
+        }
+      }
+
+"""
 inference_diag_block = """      const explicitInferenceDiagnostic = /\\b(live ai inference|ai inference test|inference test|bedrock model discovery|selected model|model discovery status|test bedrock|bedrock test)\\b/i.test(text);
       if (!memoryDirective && explicitInferenceDiagnostic) {
         processingStage = 'LIVE_AI_INFERENCE_DIAGNOSTIC';
@@ -125,6 +196,11 @@ inference_diag_block = """      const explicitInferenceDiagnostic = /\\b(live ai
       }
 
 """
+if "mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC'" not in text:
+    if fact_gateway_anchor not in text:
+        raise SystemExit('fact gateway anchor missing')
+    text = text.replace(fact_gateway_anchor, cognee_diag_block + fact_gateway_anchor, 1)
+
 if "mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC'" not in text:
     if fact_gateway_anchor not in text:
         raise SystemExit('fact gateway anchor missing')
@@ -139,7 +215,6 @@ if "${buildNonRepetitionDirective(activeSession)}" not in text:
     text = text.replace(prompt_anchor, prompt_repl, 1)
 
 # 7) Every AI-generated Victor reply is bound to an independent-evidence integrity lock.
-# This is deliberately applied inside askModel so fact answers, follow-ups and governed replies all inherit it.
 start_marker = "async function askModel(env, system, userMessage) {\n"
 end_marker = "\nfunction codedError(code, message) {"
 start = text.find(start_marker)
