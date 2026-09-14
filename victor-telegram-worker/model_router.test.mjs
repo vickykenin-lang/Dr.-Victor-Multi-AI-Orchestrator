@@ -65,3 +65,63 @@ test('Cognee inference uses dedicated credential and returns live model output',
     globalThis.fetch = originalFetch;
   }
 });
+
+test('Cognee 401 opens durable auth circuit breaker and suppresses repeated network calls', async () => {
+  const originalFetch = globalThis.fetch;
+  const state = new Map();
+  const store = {
+    async get(key) { return state.get(key) ?? null; },
+    async put(key, value) { state.set(key, value); },
+    async delete(key) { state.delete(key); },
+  };
+  let calls = 0;
+  globalThis.fetch = async (url) => {
+    calls += 1;
+    if (String(url).endsWith('/models')) {
+      return new Response(JSON.stringify({ data: [{ id: 'openai.gpt-oss-120b' }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'content-type': 'application/json' } });
+  };
+  const env = { VICTOR_COGNEE_API: 'bad-key', VICTOR_CONVERSATION_STATE: store };
+  try {
+    await assert.rejects(
+      () => callCogneeInference(env, 'diagnostic', 'first attempt'),
+      error => error?.code === 'COGNEE_AUTH_BLOCKED' && error?.httpStatus === 401 && error?.suppressNotification === false
+    );
+    assert.equal(calls, 2);
+
+    await assert.rejects(
+      () => callCogneeInference(env, 'diagnostic', 'repeat attempt'),
+      error => error?.code === 'COGNEE_AUTH_BLOCKED' && error?.suppressNotification === true
+    );
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Cognee auth breaker resets automatically when credential changes', async () => {
+  const originalFetch = globalThis.fetch;
+  const state = new Map();
+  const store = {
+    async get(key) { return state.get(key) ?? null; },
+    async put(key, value) { state.set(key, value); },
+    async delete(key) { state.delete(key); },
+  };
+  let mode = 'bad';
+  globalThis.fetch = async (url) => {
+    if (String(url).endsWith('/models')) {
+      return new Response(JSON.stringify({ data: [{ id: 'openai.gpt-oss-120b' }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (mode === 'bad') return new Response('{}', { status: 401 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'new-key-ok' } }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    await assert.rejects(() => callCogneeInference({ VICTOR_COGNEE_API: 'old-key', VICTOR_CONVERSATION_STATE: store }, 'd', 'x'));
+    mode = 'good';
+    const result = await callCogneeInference({ VICTOR_COGNEE_API: 'new-key', VICTOR_CONVERSATION_STATE: store }, 'd', 'x');
+    assert.equal(result.content, 'new-key-ok');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
