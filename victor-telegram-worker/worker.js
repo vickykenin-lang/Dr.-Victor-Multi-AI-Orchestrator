@@ -144,6 +144,7 @@ export default {
         cognee_inference_credential_configured: Boolean(env.VICTOR_COGNEE_API),
         cognee_inference_runtime: 'COGNEE_CLOUD_MEMORY_API_V2',
         cognee_inference_runtime: 'COGNEE_CLOUD_MEMORY_API_V2',
+        cognee_inference_runtime: 'COGNEE_CLOUD_MEMORY_API_V2',
         cognee_auth_circuit_breaker: 'COGNEE_CLOUD_AUTH_401_403_HOLD_V2',
         telegram_webhook_ack_policy: 'HANDLED_ERRORS_HTTP_200_V1',
         model_router: 'BEDROCK_DISCOVERY_SPECIALIST_V1',
