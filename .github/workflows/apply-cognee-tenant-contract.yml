@@ -1,0 +1,43 @@
+name: Apply Cognee Tenant Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply_cognee_tenant_contract.py'
+      - 'wrangler.toml'
+      - '.github/workflows/apply-cognee-tenant-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply Cognee tenant contract
+        run: python scripts/apply_cognee_tenant_contract.py
+      - name: Run Cognee tests
+        run: node --test victor-telegram-worker/model_router.test.mjs victor-telegram-worker/cognee_memory_bridge.test.mjs
+      - name: Syntax checks
+        run: |
+          node --check victor-telegram-worker/model_router.mjs
+          node --check victor-telegram-worker/cognee_memory_bridge.mjs
+          node --check victor-telegram-worker/worker.js
+      - name: Persist tenant integration if changed
+        run: |
+          git config user.name "victor-governed-runtime"
+          git config user.email "actions@users.noreply.github.com"
+          git add victor-telegram-worker/model_router.mjs victor-telegram-worker/model_router.test.mjs victor-telegram-worker/cognee_memory_bridge.mjs victor-telegram-worker/cognee_memory_bridge.test.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m "runtime: apply Cognee tenant contract"
+          git pull --rebase --autostash
+          git push
