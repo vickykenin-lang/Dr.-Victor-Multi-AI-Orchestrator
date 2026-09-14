@@ -216,13 +216,13 @@ export async function callVictorModel(env, system, userMessage, options = {}) {
 export async function resolveCogneeOpenAIModel(env = {}) {
   // Compatibility shim retained for callers/tests that imported the old name.
   // Cognee is not an LLM model provider; no Bedrock model discovery is performed.
-  const apiKey = env.COGNEE_API_KEY || '';
+  const apiKey = env.VICTOR_COGNEE_API || env.COGNEE_API_KEY || '';
   if (!apiKey) return { status: 'CREDENTIAL_MISSING', model: null };
   return {
     status: 'COGNEE_CLOUD_MEMORY_API',
     model: null,
     discovery_status: 'NOT_APPLICABLE',
-    base: String(env.COGNEE_SERVICE_URL || '').replace(/\/$/, ''),
+    base: String(env.COGNEE_SERVICE_URL || 'https://api.cognee.ai').replace(/\/$/, ''),
   };
 }
 
@@ -230,7 +230,7 @@ export async function callCogneeInference(env = {}, system = '', userMessage = '
   // Legacy function name kept to avoid a breaking import in worker.js.
   // It now performs a real Cognee Cloud authenticated API probe instead of
   // misusing the Cognee key against AWS Bedrock /models or /chat/completions.
-  const apiKey = env.COGNEE_API_KEY || '';
+  const apiKey = env.VICTOR_COGNEE_API || env.COGNEE_API_KEY || '';
   if (!apiKey) {
     throw Object.assign(new Error('Cognee API credential is not configured'), {
       code: 'COGNEE_API_CREDENTIAL_MISSING',
@@ -246,21 +246,13 @@ export async function callCogneeInference(env = {}, system = '', userMessage = '
     await writeCogneeAuthBreaker(env, null);
   }
 
-  const base = String(options.base || env.COGNEE_SERVICE_URL || '').replace(/\/$/, '');
-  const tenantId = String(env.COGNEE_TENANT_ID || '').trim();
-  if (!base) {
-    throw Object.assign(new Error('Cognee tenant service URL is not configured'), { code: 'COGNEE_SERVICE_URL_MISSING' });
-  }
-  if (!tenantId) {
-    throw Object.assign(new Error('Cognee tenant ID is not configured'), { code: 'COGNEE_TENANT_ID_MISSING' });
-  }
+  const base = String(options.base || env.COGNEE_SERVICE_URL || 'https://api.cognee.ai').replace(/\/$/, '');
   let response;
   try {
     response = await fetch(`${base}/api/v1/datasets/`, {
       method: 'GET',
       headers: {
         'X-Api-Key': apiKey,
-        'X-Tenant-Id': tenantId,
         Accept: 'application/json',
       },
       signal: AbortSignal.timeout(Number(env.VICTOR_COGNEE_AI_TIMEOUT_MS || env.VICTOR_AI_TIMEOUT_MS || 25000)),
@@ -302,7 +294,7 @@ export async function callCogneeInference(env = {}, system = '', userMessage = '
     content: `Cognee Cloud API authenticated successfully; accessible datasets: ${Array.isArray(datasets) ? datasets.length : 0}.`,
     model: null,
     discovery_status: 'COGNEE_DATASETS_VERIFIED',
-    credential_source: 'COGNEE_API_KEY',
+    credential_source: env.VICTOR_COGNEE_API ? 'VICTOR_COGNEE_API' : 'COGNEE_API_KEY',
     provider: 'COGNEE_CLOUD',
     endpoint: '/api/v1/datasets/',
     dataset_count: Array.isArray(datasets) ? datasets.length : 0,

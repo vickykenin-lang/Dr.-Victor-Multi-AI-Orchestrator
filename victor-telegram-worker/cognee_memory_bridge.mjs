@@ -6,7 +6,7 @@ function cfg(env) {
   return {
     enabled: String(env.COGNEE_MEMORY_ENABLED || '').toLowerCase() === 'true',
     base,
-    apiKey: env.COGNEE_API_KEY || '',
+    apiKey: env.COGNEE_API_KEY || env.VICTOR_COGNEE_API || '',
     dataset: env.COGNEE_DATASET || 'victor_long_term_memory',
     tenantId: String(env.COGNEE_TENANT_ID || '').trim(),
     rememberTimeoutMs: Number(env.COGNEE_REMEMBER_TIMEOUT_MS || 25000),
@@ -68,21 +68,14 @@ export async function cogneeRemember(env, text, metadata = {}) {
   form.append('datasetName', c.dataset);
   form.append('run_in_background', 'false');
 
-  let res;
-  try {
-    res = await fetch(`${c.base}/api/v1/remember`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'X-Api-Key': c.apiKey,
-        'X-Tenant-Id': c.tenantId,
-      },
-      body: form,
-      signal: signal(c.rememberTimeoutMs),
-    });
-  } catch (error) {
-    return { status: 'FAILED', stage: 'COGNEE_REMEMBER', reason: error?.name || 'FETCH_ERROR' };
-  }
+  const res = await fetch(`${c.base}/api/v1/remember`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'X-Api-Key': c.apiKey,
+    },
+    body: form,
+  });
   if (!res.ok) return { status: 'FAILED', stage: 'COGNEE_REMEMBER', http_status: res.status };
   return { status: 'REMEMBERED', dataset: c.dataset };
 }
