@@ -171,12 +171,69 @@ export async function resolveCogneeOpenAIModel(env = {}) {
   const openAiModels = discovery.models.filter(id => /(^|[.\-_])(openai|gpt)([.\-_]|$)/i.test(id));
   const configured = norm(env.VICTOR_COGNEE_MODEL);
   if (configured && (!openAiModels.length || openAiModels.includes(configured))) {
-    return { status: 'RESOLVED', model: configured, discovery_status: discovery.status };
+    return { status: 'RESOLVED', model: configured, discovery_status: discovery.status, base: discovery.base };
   }
   const ranked = openAiModels
     .map(id => ({ id, score: scoreModel(id, 'chat') + (/gpt/i.test(id) ? 20 : 0) }))
     .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
   return ranked.length
-    ? { status: 'RESOLVED', model: ranked[0].id, discovery_status: discovery.status }
-    : { status: 'OPENAI_MODEL_NOT_VERIFIED', model: null, discovery_status: discovery.status };
+    ? { status: 'RESOLVED', model: ranked[0].id, discovery_status: discovery.status, base: discovery.base }
+    : { status: 'OPENAI_MODEL_NOT_VERIFIED', model: null, discovery_status: discovery.status, base: discovery.base };
+}
+
+export async function callCogneeInference(env = {}, system = '', userMessage = '', options = {}) {
+  const apiKey = env.VICTOR_COGNEE_API || '';
+  if (!apiKey) throw Object.assign(new Error('VICTOR_COGNEE_API is not configured'), { code: 'COGNEE_INFERENCE_CREDENTIAL_MISSING' });
+
+  const resolved = await resolveCogneeOpenAIModel(env);
+  if (resolved.status !== 'RESOLVED' || !resolved.model) {
+    throw Object.assign(new Error('No verified OpenAI model available for Cognee inference'), {
+      code: 'COGNEE_OPENAI_MODEL_NOT_VERIFIED',
+      discoveryStatus: resolved.discovery_status || null,
+    });
+  }
+
+  const base = norm(options.base || resolved.base || env.VICTOR_BEDROCK_BASE || DEFAULT_BEDROCK_BASE).replace(/\/$/, '');
+  let response;
+  try {
+    response = await fetch(`${base}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: resolved.model,
+        messages: [{ role: 'system', content: system }, { role: 'user', content: userMessage }],
+        temperature: Number(options.temperature ?? 0.1),
+        max_tokens: Number(options.maxTokens ?? 300),
+      }),
+      signal: AbortSignal.timeout(Number(env.VICTOR_COGNEE_AI_TIMEOUT_MS || env.VICTOR_AI_TIMEOUT_MS || 25000)),
+    });
+  } catch (error) {
+    throw Object.assign(new Error('Cognee inference request could not reach Bedrock'), {
+      code: 'COGNEE_INFERENCE_UNREACHABLE',
+      causeName: error?.name || 'FetchError',
+    });
+  }
+
+  if (!response.ok) {
+    throw Object.assign(new Error('Cognee inference request returned non-success status'), {
+      code: 'COGNEE_INFERENCE_HTTP_ERROR',
+      httpStatus: response.status,
+    });
+  }
+
+  let payload;
+  try { payload = await response.json(); } catch {
+    throw Object.assign(new Error('Cognee inference response was not valid JSON'), { code: 'COGNEE_INFERENCE_INVALID_JSON' });
+  }
+  const content = payload?.choices?.[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    throw Object.assign(new Error('Cognee inference response was empty'), { code: 'COGNEE_INFERENCE_EMPTY_RESPONSE' });
+  }
+
+  return {
+    content: content.trim(),
+    model: resolved.model,
+    discovery_status: resolved.discovery_status || null,
+    credential_source: 'VICTOR_COGNEE_API',
+  };
 }
