@@ -11,9 +11,19 @@ bridge_test_path = Path('victor-telegram-worker/cognee_memory_bridge.test.mjs')
 # - X-Api-Key from existing Cognee secret
 # - X-Tenant-Id from COGNEE_TENANT_ID
 # - never route Cognee through Bedrock/API_VICTOR
+# - use a new auth-breaker namespace so stale failures from the old/wrong
+#   provider contract cannot suppress the first request on the corrected route
 # ---------------------------------------------------------------------------
 router = router_path.read_text(encoding='utf-8')
 
+router = router.replace(
+    "const COGNEE_AUTH_BREAKER_KEY = 'victor:cognee:auth-breaker:v1';",
+    "const COGNEE_AUTH_BREAKER_KEY = 'victor:cognee:auth-breaker:v2';",
+)
+router = router.replace(
+    "new Error('Cognee inference auth is blocked until VICTOR_COGNEE_API changes')",
+    "new Error('Cognee auth is blocked for the current credential and tenant contract')",
+)
 router = router.replace(
     "base: String(env.COGNEE_SERVICE_URL || 'https://api.cognee.ai').replace(/\\/$/, ''),",
     "base: String(env.COGNEE_SERVICE_URL || '').replace(/\\/$/, ''),",
