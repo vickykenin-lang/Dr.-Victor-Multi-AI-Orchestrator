@@ -6,7 +6,7 @@ function cfg(env) {
   return {
     enabled: String(env.COGNEE_MEMORY_ENABLED || '').toLowerCase() === 'true',
     base,
-    apiKey: env.COGNEE_API_KEY || env.VICTOR_COGNEE_API || '',
+    apiKey: env.COGNEE_API_KEY || '',
     dataset: env.COGNEE_DATASET || 'victor_long_term_memory',
     tenantId: String(env.COGNEE_TENANT_ID || '').trim(),
     rememberTimeoutMs: Number(env.COGNEE_REMEMBER_TIMEOUT_MS || 25000),

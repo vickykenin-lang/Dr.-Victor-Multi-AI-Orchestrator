@@ -37,6 +37,7 @@ import {
 
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
 import { callVictorModel, callCogneeInference } from './model_router.mjs';
+import { memoryBrainStatus, writeVictorMemory, recallVictorMemory } from './memory_brain.mjs';
 import { assessReplyNaturalness, buildNaturalReplyDirective } from './reply_integrity.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
@@ -129,6 +130,7 @@ export default {
         fact_evidence_runtime: 'FRESH_GITHUB_FACTS_V1',
         founder_request_gateway: 'STRUCTURED_REQUEST_GATEWAY_V1',
         memory_write_configured: Boolean(env.GITHUB_MEMORY_TOKEN),
+        memory_brain: memoryBrainStatus(env),
         aura3_bridge_configured: aura3BridgeConfigured(env),
         tony_bridge_configured: tonyBridgeConfigured(env),
         tony_task_request_supported: true,
@@ -141,7 +143,8 @@ export default {
         management_chat_configured: Boolean(env.TELEGRAM_MANAGEMENT_CHAT_ID),
         ai_inference_enabled: env.ENABLE_AI_INFERENCE === 'true',
         ai_credential_configured: Boolean(env.API_VICTOR),
-        cognee_inference_credential_configured: Boolean(env.VICTOR_COGNEE_API),
+        cognee_inference_credential_configured: Boolean(env.COGNEE_API_KEY),
+        cognee_inference_runtime: 'DEDICATED_OPENAI_PATH_V1',
         cognee_inference_runtime: 'COGNEE_CLOUD_MEMORY_API_V2',
         cognee_inference_runtime: 'COGNEE_CLOUD_MEMORY_API_V2',
         cognee_inference_runtime: 'COGNEE_CLOUD_MEMORY_API_V2',
@@ -358,10 +361,14 @@ export default {
       const memoryDirective = isExplicitMemoryDirective(text);
       if (memoryDirective) {
         try {
-          memoryWrite = await persistExplicitFounderMemory(env, text, {
+          memoryWrite = await writeVictorMemory(env, text, {
             chatId,
             messageId: message.message_id,
-          });
+            source: 'telegram',
+          }, () => persistExplicitFounderMemory(env, text, {
+            chatId,
+            messageId: message.message_id,
+          }));
         } catch (memoryError) {
           console.error('Victor memory persistence failed:', memoryError?.message || 'unknown');
           memoryWrite = { status: 'FAILED' };
@@ -544,6 +551,66 @@ export default {
             acknowledged: true,
             secrets_exposed: false,
           }, 200);
+        }
+      }
+
+      const explicitCogneeInferenceDiagnostic = /\b(cognee inference|cognee smoke|victor_cognee_api|cognee api|test cognee)\b/i.test(text);
+      if (!memoryDirective && explicitCogneeInferenceDiagnostic) {
+        processingStage = 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC';
+        if (!env.VICTOR_COGNEE_API) {
+          await sendTelegramMessage(env, chatId, 'Cognee live inference blocked hai: VICTOR_COGNEE_API runtime credential configured nahi hai.', message.message_id);
+          return json({ ok: false, mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC', status: 'CREDENTIAL_MISSING', credential_source: 'VICTOR_COGNEE_API' }, 503);
+        }
+        try {
+          const result = await callCogneeInference(
+            env,
+            'You are the dedicated Cognee inference diagnostic. Return one short harmless confirmation sentence only. Never reveal credentials, tokens, secrets, or keys.',
+            'Reply briefly confirming this response came from the dedicated Cognee inference path.'
+          );
+          const safeContent = String(result.content || '').trim().slice(0, 500);
+          const reply = [
+            'Cognee live inference: VERIFIED',
+            `Credential path: ${result.credential_source || 'VICTOR_COGNEE_API'}`,
+            `Selected model: ${result.model || 'unknown'}`,
+            `Bedrock model discovery: ${result.discovery_status || 'unknown'}`,
+            `Live response: ${safeContent}`,
+            'API_VICTOR fallback: no',
+            'Secrets exposed: no',
+          ].join('\n');
+          console.log(JSON.stringify({
+            event: 'VICTOR_COGNEE_MODEL_ROUTE',
+            model: result.model || null,
+            discovery_status: result.discovery_status || null,
+            credential_source: 'VICTOR_COGNEE_API',
+            api_victor_fallback: false,
+            secrets_exposed: false,
+          }));
+          await sendTelegramMessage(env, chatId, reply, message.message_id);
+          return json({
+            ok: true,
+            mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC',
+            status: 'VERIFIED',
+            model: result.model || null,
+            discovery_status: result.discovery_status || null,
+            credential_source: 'VICTOR_COGNEE_API',
+            api_victor_fallback: false,
+            secrets_exposed: false,
+          });
+        } catch (error) {
+          const code = error?.code || 'COGNEE_INFERENCE_FAILED';
+          const detail = error?.httpStatus ? ` HTTP ${error.httpStatus}.` : '';
+          await sendTelegramMessage(env, chatId, `Cognee live inference FAILED. Runtime code: ${code}.${detail} API_VICTOR fallback nahi kiya gaya.`, message.message_id);
+          return json({
+            ok: false,
+            mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC',
+            status: 'FAILED',
+            code,
+            http_status: error?.httpStatus || null,
+            discovery_status: error?.discoveryStatus || null,
+            credential_source: 'VICTOR_COGNEE_API',
+            api_victor_fallback: false,
+            secrets_exposed: false,
+          }, 503);
         }
       }
 
@@ -1195,7 +1262,8 @@ async function callVictorCore(env, userMessage, requestFacts, activeSession = {}
     entityResolutionReason: entity.reason,
   };
   const truthSnapshot = buildTruthSnapshot(core.sourceRecords, facts);
-  const memory = buildMemoryContext(userMessage, core.sourceRecords, 6);
+  let memory = buildMemoryContext(userMessage, core.sourceRecords, 6);
+  memory = await recallVictorMemory(env, userMessage, memory, { topK: 5 });
   const entityDirective = entity.matched
     ? `FOUNDER ENTITY RESOLUTION: The message target is ${entity.canonical_name} (${entity.entity_id}) because ${entity.reason}. Answer for this target only. If target is AURA3, do not mention AURA2 unless Founder explicitly asked for comparison.`
     : 'FOUNDER ENTITY RESOLUTION: no special alias matched.';
