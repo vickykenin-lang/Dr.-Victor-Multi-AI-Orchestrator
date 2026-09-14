@@ -333,6 +333,51 @@ export default {
         return json({ ok: true, mode: 'DEAD_END_RECOVERY', target: deadEnd.target, task_id: dispatch.taskId });
       }
 
+      const explicitInferenceDiagnostic = /\b(live ai inference|ai inference test|inference test|bedrock model discovery|selected model|model discovery status|test bedrock|bedrock test)\b/i.test(text);
+      if (!memoryDirective && explicitInferenceDiagnostic) {
+        processingStage = 'LIVE_AI_INFERENCE_DIAGNOSTIC';
+        if (env.ENABLE_AI_INFERENCE !== 'true') {
+          await sendTelegramMessage(env, chatId, 'Live AI inference disabled hai: ENABLE_AI_INFERENCE=true required.', message.message_id);
+          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'INFERENCE_DISABLED' }, 503);
+        }
+        if (!env.API_VICTOR) {
+          await sendTelegramMessage(env, chatId, 'Live AI inference blocked hai: API_VICTOR runtime credential configured nahi hai.', message.message_id);
+          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'CREDENTIAL_MISSING' }, 503);
+        }
+        try {
+          const result = await callVictorModel(
+            env,
+            'You are Victor runtime diagnostic. Return one short harmless confirmation sentence only. Do not mention or expose any credential, token, secret, or key.',
+            'Reply exactly with a brief confirmation that this is a live inference response.'
+          );
+          const safeContent = String(result.content || '').trim().slice(0, 500);
+          const reply = [
+            'Live AI inference: VERIFIED',
+            `Task type: ${result.task || 'unknown'}`,
+            `Selected model: ${result.model || 'unknown'}`,
+            `Bedrock model discovery: ${result.discovery_status || 'unknown'}`,
+            `Fallback attempts: ${result.failures?.length || 0}`,
+            `Live response: ${safeContent}`,
+            'Secrets exposed: no',
+          ].join('\n');
+          await sendTelegramMessage(env, chatId, reply, message.message_id);
+          return json({
+            ok: true,
+            mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC',
+            status: 'VERIFIED',
+            task: result.task || null,
+            model: result.model || null,
+            discovery_status: result.discovery_status || null,
+            fallback_attempts: result.failures?.length || 0,
+            secrets_exposed: false,
+          });
+        } catch (error) {
+          const code = error?.code || 'AI_MODEL_ROUTER_EXHAUSTED';
+          await sendTelegramMessage(env, chatId, `Live AI inference FAILED. Runtime code: ${code}. Main generic GitHub status se is failure ko cover nahi karunga.`, message.message_id);
+          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'FAILED', code, secrets_exposed: false }, 503);
+        }
+      }
+
       if (!memoryDirective && shouldUseFactGateway(founderRequest, factRequest)) {
         processingStage = 'FACT_RETRIEVAL';
         try {
