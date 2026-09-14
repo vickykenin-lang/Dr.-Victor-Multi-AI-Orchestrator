@@ -10,6 +10,16 @@ if "cognee_auth_circuit_breaker: 'AUTH_401_403_HOLD_UNTIL_CREDENTIAL_CHANGE_V1'"
         raise SystemExit('Cognee health anchor missing')
     text = text.replace(health_anchor, health_anchor + health_line, 1)
 
+# Cognee-specific smoke-test commands must never be consumed by the generic
+# inference diagnostic first. Keep the existing ordering safe by excluding any
+# message that explicitly names Cognee from the generic matcher.
+generic_old = "      const explicitInferenceDiagnostic = /\\b(live ai inference|ai inference test|inference test|bedrock model discovery|selected model|model discovery status|test bedrock|bedrock test)\\b/i.test(text);\n"
+generic_new = "      const explicitInferenceDiagnostic = !/\\bcognee\\b/i.test(text) && /\\b(live ai inference|ai inference test|inference test|bedrock model discovery|selected model|model discovery status|test bedrock|bedrock test)\\b/i.test(text);\n"
+if generic_old in text:
+    text = text.replace(generic_old, generic_new, 1)
+elif generic_new not in text:
+    raise SystemExit('Generic inference diagnostic anchor missing')
+
 old = """        } catch (error) {
           const code = error?.code || 'COGNEE_INFERENCE_FAILED';
           const detail = error?.httpStatus ? ` HTTP ${error.httpStatus}.` : '';
