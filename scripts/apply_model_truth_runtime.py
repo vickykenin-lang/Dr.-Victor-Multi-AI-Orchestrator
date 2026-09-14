@@ -69,7 +69,61 @@ if "mode: 'DEAD_END_RECOVERY'" not in text:
         raise SystemExit('dead-end insertion anchor missing')
     text = text.replace(hulk_end, hulk_end + dead_block, 1)
 
-# 5) Inject anti-repetition contract into governed system prompt.
+# 5) Explicit runtime inference diagnostics must bypass the GitHub fact gateway.
+# Founder requests such as "live AI inference test" are runtime actions, not repository fact questions.
+fact_gateway_anchor = "      if (!memoryDirective && shouldUseFactGateway(founderRequest, factRequest)) {\n"
+inference_diag_block = """      const explicitInferenceDiagnostic = /\\b(live ai inference|ai inference test|inference test|bedrock model discovery|selected model|model discovery status|test bedrock|bedrock test)\\b/i.test(text);
+      if (!memoryDirective && explicitInferenceDiagnostic) {
+        processingStage = 'LIVE_AI_INFERENCE_DIAGNOSTIC';
+        if (env.ENABLE_AI_INFERENCE !== 'true') {
+          await sendTelegramMessage(env, chatId, 'Live AI inference disabled hai: ENABLE_AI_INFERENCE=true required.', message.message_id);
+          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'INFERENCE_DISABLED' }, 503);
+        }
+        if (!env.API_VICTOR) {
+          await sendTelegramMessage(env, chatId, 'Live AI inference blocked hai: API_VICTOR runtime credential configured nahi hai.', message.message_id);
+          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'CREDENTIAL_MISSING' }, 503);
+        }
+        try {
+          const result = await callVictorModel(
+            env,
+            'You are Victor runtime diagnostic. Return one short harmless confirmation sentence only. Do not mention or expose any credential, token, secret, or key.',
+            'Reply exactly with a brief confirmation that this is a live inference response.'
+          );
+          const safeContent = String(result.content || '').trim().slice(0, 500);
+          const reply = [
+            'Live AI inference: VERIFIED',
+            `Task type: ${result.task || 'unknown'}`,
+            `Selected model: ${result.model || 'unknown'}`,
+            `Bedrock model discovery: ${result.discovery_status || 'unknown'}`,
+            `Fallback attempts: ${result.failures?.length || 0}`,
+            `Live response: ${safeContent}`,
+            'Secrets exposed: no',
+          ].join('\\n');
+          await sendTelegramMessage(env, chatId, reply, message.message_id);
+          return json({
+            ok: true,
+            mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC',
+            status: 'VERIFIED',
+            task: result.task || null,
+            model: result.model || null,
+            discovery_status: result.discovery_status || null,
+            fallback_attempts: result.failures?.length || 0,
+            secrets_exposed: false,
+          });
+        } catch (error) {
+          const code = error?.code || 'AI_MODEL_ROUTER_EXHAUSTED';
+          await sendTelegramMessage(env, chatId, `Live AI inference FAILED. Runtime code: ${code}. Main generic GitHub status se is failure ko cover nahi karunga.`, message.message_id);
+          return json({ ok: false, mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC', status: 'FAILED', code, secrets_exposed: false }, 503);
+        }
+      }
+
+"""
+if "mode: 'LIVE_AI_INFERENCE_DIAGNOSTIC'" not in text:
+    if fact_gateway_anchor not in text:
+        raise SystemExit('fact gateway anchor missing')
+    text = text.replace(fact_gateway_anchor, inference_diag_block + fact_gateway_anchor, 1)
+
+# 6) Inject anti-repetition contract into governed system prompt.
 prompt_anchor = "${memory.prompt}\n\nRUNTIME RULES:"
 prompt_repl = "${memory.prompt}\n\n${buildNonRepetitionDirective(activeSession)}\n\nRUNTIME RULES:"
 if "${buildNonRepetitionDirective(activeSession)}" not in text:
@@ -77,7 +131,7 @@ if "${buildNonRepetitionDirective(activeSession)}" not in text:
         raise SystemExit('non-repetition prompt anchor missing')
     text = text.replace(prompt_anchor, prompt_repl, 1)
 
-# 6) Replace single-model hard-coded inference with specialist router.
+# 7) Replace single-model hard-coded inference with specialist router.
 start_marker = "async function askModel(env, system, userMessage) {\n"
 end_marker = "\nfunction codedError(code, message) {"
 start = text.find(start_marker)
@@ -108,7 +162,7 @@ current = text[start:end]
 if "callVictorModel(env, system, userMessage)" not in current:
     text = text[:start] + new_ask + text[end:]
 
-# 7) Add user-facing error category for router exhaustion.
+# 8) Add user-facing error category for router exhaustion.
 msg_anchor = "    AI_UPSTREAM_EMPTY_RESPONSE: 'Victor ke AI provider se blank response mila.',\n"
 msg_repl = msg_anchor + "    AI_MODEL_ROUTER_EXHAUSTED: 'Victor ne available specialist models try kiye, lekin koi verified compatible response nahi mila.',\n"
 if "AI_MODEL_ROUTER_EXHAUSTED:" not in text:
