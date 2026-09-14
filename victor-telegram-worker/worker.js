@@ -36,10 +36,12 @@ import {
 } from './department_bridge.mjs';
 
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
+import { callVictorModel } from './model_router.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
 import { classifyConversationFollowUp, buildInvestigationTaskText, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';
 import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } from '../brain/active_context.mjs';
+import { detectDeadEndLoop, buildDeadEndRecoveryPrompt, buildNonRepetitionDirective } from '../brain/anti_bogus_runtime.mjs';
 import { naturalDispatchAcknowledgement, naturalInvestigationAcknowledgement, naturalPendingReply, buildNaturalResultPrompt, naturalResultFallback } from '../brain/founder_conversation.mjs';
 import { classifyOwnedProblem, buildOwnedProblemPrompt, naturalOwnedProblemAck } from '../brain/problem_ownership.mjs';
 import { createOwnedOutcomeState, assessVerifiedDepartmentResult, shouldContinueOwnedRecovery, buildOwnedRecoveryDirective } from '../brain/outcome_state.mjs';
@@ -137,6 +139,10 @@ export default {
         founder_chat_configured: Boolean(env.VICTOR_FOUNDER_CHAT_ID),
         management_chat_configured: Boolean(env.TELEGRAM_MANAGEMENT_CHAT_ID),
         ai_inference_enabled: env.ENABLE_AI_INFERENCE === 'true',
+        ai_credential_configured: Boolean(env.API_VICTOR),
+        cognee_inference_credential_configured: Boolean(env.VICTOR_COGNEE_API),
+        model_router: 'BEDROCK_DISCOVERY_SPECIALIST_V1',
+        anti_bogus_runtime: 'DEAD_END_RECOVERY_V1',
         autonomy_requested_mode: 'AUTONOMOUS_MANAGED_ORCHESTRATOR',
         autonomy_runtime_configured: autonomyConfigured(env),
         autonomy_scheduler_bound: true,
@@ -290,6 +296,7 @@ export default {
       const deterministicIntent = resolveFounderIntent(text, replyContext);
       const contextualFollowUp = classifyConversationFollowUp(text, sessionWithFounderTurn);
       const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);
+      const deadEnd = detectDeadEndLoop(text, sessionWithFounderTurn);
       const factRequest = buildFactRequestFromFounderRequest(founderRequest, text);
       const hulkRequest = classifyHulkRequest(text);
 
@@ -303,6 +310,27 @@ export default {
         const reply = hulkRequest.mode === 'HULK_ACTION' ? hulkActionBlockedReply() : hulkStatusReply();
         await sendTelegramMessage(env, chatId, reply, message.message_id);
         return json({ ok: true, mode: hulkRequest.mode, target: 'hulk', dispatch: 'NOT_ATTEMPTED_BRIDGE_UNVERIFIED' });
+      }
+
+      if (!memoryDirective && deadEnd.matched && ['rio', 'tony_stark', 'aura3'].includes(deadEnd.target)) {
+        processingStage = 'DEAD_END_RECOVERY';
+        const recoveryText = buildDeadEndRecoveryPrompt(deadEnd, text);
+        const dispatch = await dispatchContextualInvestigation(env, deadEnd.target, recoveryText, { messageId: message.message_id });
+        await writeConversationSession(chatId, {
+          last_target: deadEnd.target,
+          last_task_id: dispatch.taskId,
+          last_task_type: 'DEAD_END_RECOVERY',
+          active_issue: text,
+          unresolved_question: text,
+          task_state: 'DEAD_END_RECOVERY_RUNNING',
+          dead_end_reason: deadEnd.reason,
+          dead_end_repeat_count: deadEnd.repeated_count || 1,
+        }, env);
+        await sendTelegramMessage(env, chatId, 'Same unresolved answer repeat nahi karunga. Fresh diagnosis/recovery task start kar diya hai; next update fresh evidence ya exact Founder-only blocker ke saath hoga.', message.message_id);
+        if (deadEnd.target === 'rio') ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
+        else if (deadEnd.target === 'tony_stark') ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
+        else if (deadEnd.target === 'aura3') ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
+        return json({ ok: true, mode: 'DEAD_END_RECOVERY', target: deadEnd.target, task_id: dispatch.taskId });
       }
 
       if (!memoryDirective && shouldUseFactGateway(founderRequest, factRequest)) {
@@ -983,6 +1011,8 @@ MEMORY CONTRACT:
 - Never expose credentials, secrets, tokens or hidden sensitive values from memory.
 ${memory.prompt}
 
+${buildNonRepetitionDirective(activeSession)}
+
 RUNTIME RULES:
 1. Founder authority is supreme. Never silently expand authority.
 2. Truth before appearance. Never claim LIVE, completed, connected, revenue, health or external success without verified evidence.
@@ -1088,38 +1118,23 @@ ${registry.slice(0, 14000)}
 }
 
 async function askModel(env, system, userMessage) {
-  const model = env.VICTOR_MODEL || DEFAULT_MODEL;
-  let response;
   try {
-    response = await fetch(`${BEDROCK_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${env.API_VICTOR}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'system', content: system }, { role: 'user', content: userMessage }],
-        temperature: 0.15,
-        max_tokens: 700,
-      }),
-      signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
-    });
+    const result = await callVictorModel(env, system, userMessage);
+    console.log(JSON.stringify({
+      event: 'VICTOR_MODEL_ROUTE',
+      task: result.task,
+      model: result.model,
+      discovery_status: result.discovery_status,
+      fallback_attempts: result.failures?.length || 0,
+      secrets_exposed: false,
+    }));
+    return result.content;
   } catch (error) {
-    const code = error?.name === 'TimeoutError' ? 'AI_UPSTREAM_TIMEOUT' : 'AI_UPSTREAM_UNREACHABLE';
-    throw codedError(code, `Victor AI request failed: ${error?.name || 'FetchError'}`);
+    if (error?.code === 'AI_CREDENTIAL_MISSING') throw codedError('AI_CREDENTIAL_MISSING', 'API_VICTOR is not configured');
+    const routed = codedError(error?.code || 'AI_MODEL_ROUTER_EXHAUSTED', 'Victor specialist model router could not obtain a verified response');
+    if (Array.isArray(error?.modelFailures)) routed.modelFailures = error.modelFailures;
+    throw routed;
   }
-  if (!response.ok) {
-    const error = codedError('AI_UPSTREAM_HTTP_ERROR', `Victor AI upstream HTTP ${response.status}`);
-    error.upstreamHttpStatus = response.status;
-    throw error;
-  }
-  let payload;
-  try {
-    payload = await response.json();
-  } catch (_) {
-    throw codedError('AI_UPSTREAM_INVALID_RESPONSE', 'Victor AI returned invalid JSON');
-  }
-  const content = payload?.choices?.[0]?.message?.content;
-  if (typeof content !== 'string' || !content.trim()) throw codedError('AI_UPSTREAM_EMPTY_RESPONSE', 'Victor AI returned no text');
-  return content.trim();
 }
 
 function codedError(code, message) {
@@ -1150,6 +1165,7 @@ export function classifyProcessingError(error, stage = 'UNKNOWN') {
     AI_UPSTREAM_HTTP_ERROR: `Victor ke AI provider ne request reject ki${error?.upstreamHttpStatus ? ` (HTTP ${error.upstreamHttpStatus})` : ''}.`,
     AI_UPSTREAM_INVALID_RESPONSE: 'Victor ke AI provider se invalid response mila.',
     AI_UPSTREAM_EMPTY_RESPONSE: 'Victor ke AI provider se blank response mila.',
+    AI_MODEL_ROUTER_EXHAUSTED: 'Victor ne available specialist models try kiye, lekin koi verified compatible response nahi mila.',
     TRUTH_GUARD_REJECTED: 'Victor ka generated reply truth verification pass nahi kar saka.',
     TELEGRAM_DELIVERY_FAILED: 'Victor reply bana chuka tha, lekin Telegram delivery fail hui.',
     MEMORY_PROCESSING_FAILED: 'Victor memory processing stage par error aaya.',
