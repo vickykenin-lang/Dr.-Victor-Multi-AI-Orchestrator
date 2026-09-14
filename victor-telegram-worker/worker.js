@@ -143,6 +143,7 @@ export default {
         cognee_inference_credential_configured: Boolean(env.VICTOR_COGNEE_API),
         model_router: 'BEDROCK_DISCOVERY_SPECIALIST_V1',
         anti_bogus_runtime: 'DEAD_END_RECOVERY_V1',
+        response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1',
         autonomy_requested_mode: 'AUTONOMOUS_MANAGED_ORCHESTRATOR',
         autonomy_runtime_configured: autonomyConfigured(env),
         autonomy_scheduler_bound: true,
@@ -1163,19 +1164,43 @@ ${registry.slice(0, 14000)}
 }
 
 async function askModel(env, system, userMessage) {
+  const integritySystem = `${system}
+
+INDEPENDENT RESPONSE INTEGRITY LOCK — MANDATORY:
+- Report evidence exactly as observed; never change, soften, amplify, or reframe evidence to make an outcome look better or worse.
+- Never turn an assumption, absence of an error, configured credential, empty target list, cached state, historical record, or model-generated statement into PASS/SUCCESS/ACTIVE/VERIFIED.
+- If a requested fact was not independently observed, say UNVERIFIED / NOT OBSERVED / UNKNOWN.
+- Keep raw evidence and interpretation separate. If they conflict, raw fresh evidence wins.
+- Never invent a selected model, response, 2xx status, timestamp, target, receipt, heartbeat, deployment state, or business outcome.
+- A self-report by Victor, a department, memory, or another model is not independent proof of external runtime state.
+- If something is wrong, state what is wrong; do not cosmetically rewrite the result. Fixing happens as a separate action, never by manipulating the report.
+- Never expose credentials or secrets.`;
   try {
-    const result = await callVictorModel(env, system, userMessage);
+    const result = await callVictorModel(env, integritySystem, userMessage);
+    const content = String(result.content || '').trim();
+    const claimsSuccess = /\b(pass|passed|success|successful|verified|active|healthy|live)\b/i.test(content);
+    const assumptionEvidence = /\b(assum(?:e|ed|ing)|assume kiya|no error|error nahi|error not seen|error nahi dikh)\b/i.test(content);
+    const nullEvidence = /\b(?:selected model|model|result|inference result)\s*:\s*(?:null|unknown|not specified|none)\b/i.test(content);
+    if (claimsSuccess && (assumptionEvidence || nullEvidence)) {
+      throw Object.assign(new Error('Success claim is not independently supported by observed evidence'), {
+        code: 'INDEPENDENT_EVIDENCE_REQUIRED',
+      });
+    }
     console.log(JSON.stringify({
       event: 'VICTOR_MODEL_ROUTE',
       task: result.task,
       model: result.model,
       discovery_status: result.discovery_status,
       fallback_attempts: result.failures?.length || 0,
+      response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1',
       secrets_exposed: false,
     }));
-    return result.content;
+    return content;
   } catch (error) {
     if (error?.code === 'AI_CREDENTIAL_MISSING') throw codedError('AI_CREDENTIAL_MISSING', 'API_VICTOR is not configured');
+    if (error?.code === 'INDEPENDENT_EVIDENCE_REQUIRED') {
+      throw codedError('INDEPENDENT_EVIDENCE_REQUIRED', 'Victor draft blocked because the claimed outcome was not independently supported by observed evidence');
+    }
     const routed = codedError(error?.code || 'AI_MODEL_ROUTER_EXHAUSTED', 'Victor specialist model router could not obtain a verified response');
     if (Array.isArray(error?.modelFailures)) routed.modelFailures = error.modelFailures;
     throw routed;
@@ -1211,6 +1236,7 @@ export function classifyProcessingError(error, stage = 'UNKNOWN') {
     AI_UPSTREAM_INVALID_RESPONSE: 'Victor ke AI provider se invalid response mila.',
     AI_UPSTREAM_EMPTY_RESPONSE: 'Victor ke AI provider se blank response mila.',
     AI_MODEL_ROUTER_EXHAUSTED: 'Victor ne available specialist models try kiye, lekin koi verified compatible response nahi mila.',
+    INDEPENDENT_EVIDENCE_REQUIRED: 'Victor ka draft block hua kyunki claimed result independent fresh evidence se prove nahi tha.',
     TRUTH_GUARD_REJECTED: 'Victor ka generated reply truth verification pass nahi kar saka.',
     TELEGRAM_DELIVERY_FAILED: 'Victor reply bana chuka tha, lekin Telegram delivery fail hui.',
     MEMORY_PROCESSING_FAILED: 'Victor memory processing stage par error aaya.',
