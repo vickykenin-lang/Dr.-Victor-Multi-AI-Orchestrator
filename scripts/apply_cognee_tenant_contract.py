@@ -2,6 +2,7 @@ from pathlib import Path
 
 router_path = Path('victor-telegram-worker/model_router.mjs')
 bridge_path = Path('victor-telegram-worker/cognee_memory_bridge.mjs')
+worker_path = Path('victor-telegram-worker/worker.js')
 router_test_path = Path('victor-telegram-worker/model_router.test.mjs')
 bridge_test_path = Path('victor-telegram-worker/cognee_memory_bridge.test.mjs')
 
@@ -53,6 +54,7 @@ router = router.replace(
 )
 router_path.write_text(router, encoding='utf-8')
 
+# Keep the bridge on the dedicated Cognee credential only and clean legacy duplicates.
 bridge = bridge_path.read_text(encoding='utf-8')
 bridge = bridge.replace(
     "    apiKey: env.COGNEE_API_KEY || env.VICTOR_COGNEE_API || '',",
@@ -67,24 +69,6 @@ bridge = bridge.replace(
     "if (!c.inferenceApiKey) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_API_KEY_NOT_CONFIGURED' };",
 )
 bridge = bridge.replace(
-    "    dataset: env.COGNEE_DATASET || 'victor_long_term_memory',",
-    "    dataset: env.COGNEE_DATASET || 'victor_long_term_memory',\n    tenantId: String(env.COGNEE_TENANT_ID || '').trim(),",
-)
-bridge = bridge.replace(
-    "function headers(apiKey) {\n  return {\n    'Content-Type': 'application/json',\n    Accept: 'application/json',\n    ...(apiKey ? { 'X-Api-Key': apiKey } : {}),\n  };\n}",
-    "function headers(apiKey, tenantId) {\n  return {\n    'Content-Type': 'application/json',\n    Accept: 'application/json',\n    ...(apiKey ? { 'X-Api-Key': apiKey } : {}),\n    ...(tenantId ? { 'X-Tenant-Id': tenantId } : {}),\n  };\n}",
-)
-bridge = bridge.replace(
-    "  if (!c.apiKey) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_API_KEY_NOT_CONFIGURED' };",
-    "  if (!c.apiKey) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_API_KEY_NOT_CONFIGURED' };\n  if (!c.tenantId) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_TENANT_ID_NOT_CONFIGURED' };",
-)
-bridge = bridge.replace(
-    "      'X-Api-Key': c.apiKey,\n    },",
-    "      'X-Api-Key': c.apiKey,\n      'X-Tenant-Id': c.tenantId,\n    },",
-)
-bridge = bridge.replace("headers: headers(c.apiKey),", "headers: headers(c.apiKey, c.tenantId),")
-# Clean duplicate tenant lines created by earlier idempotent migrations.
-bridge = bridge.replace(
     "    tenantId: String(env.COGNEE_TENANT_ID || '').trim(),\n    tenantId: String(env.COGNEE_TENANT_ID || '').trim(),",
     "    tenantId: String(env.COGNEE_TENANT_ID || '').trim(),",
 )
@@ -94,13 +78,66 @@ bridge = bridge.replace(
 )
 bridge_path.write_text(bridge, encoding='utf-8')
 
+# ---------------------------------------------------------------------------
+# Memory Brain V1 runtime wiring
+# KV = active thread state, GitHub = canonical truth, Cognee = semantic LTM,
+# structured Cloudflare logs = observability. Semantic failures are fail-open
+# for normal conversation, but explicit remember commands never claim success
+# unless the requested write path succeeds.
+# ---------------------------------------------------------------------------
+worker = worker_path.read_text(encoding='utf-8')
+
+memory_import = "import { memoryBrainStatus, writeVictorMemory, recallVictorMemory } from './memory_brain.mjs';"
+if memory_import not in worker:
+    anchor = "import { callVictorModel, callCogneeInference } from './model_router.mjs';"
+    if anchor not in worker:
+        raise RuntimeError('WORKER_MODEL_ROUTER_IMPORT_ANCHOR_NOT_FOUND')
+    worker = worker.replace(anchor, f"{anchor}\n{memory_import}", 1)
+
+worker = worker.replace(
+    "cognee_inference_credential_configured: Boolean(env.VICTOR_COGNEE_API),",
+    "cognee_inference_credential_configured: Boolean(env.COGNEE_API_KEY),",
+)
+if "memory_brain: memoryBrainStatus(env)," not in worker:
+    anchor = "memory_write_configured: Boolean(env.GITHUB_MEMORY_TOKEN),"
+    if anchor not in worker:
+        raise RuntimeError('WORKER_HEALTH_MEMORY_ANCHOR_NOT_FOUND')
+    worker = worker.replace(anchor, f"{anchor}\n        memory_brain: memoryBrainStatus(env),", 1)
+
+old_memory_write = """          memoryWrite = await persistExplicitFounderMemory(env, text, {
+            chatId,
+            messageId: message.message_id,
+          });"""
+new_memory_write = """          memoryWrite = await writeVictorMemory(env, text, {
+            chatId,
+            messageId: message.message_id,
+            source: 'telegram',
+          }, () => persistExplicitFounderMemory(env, text, {
+            chatId,
+            messageId: message.message_id,
+          }));"""
+if old_memory_write in worker:
+    worker = worker.replace(old_memory_write, new_memory_write, 1)
+elif new_memory_write not in worker:
+    raise RuntimeError('WORKER_MEMORY_WRITE_ANCHOR_NOT_FOUND')
+
+old_memory_recall = "  const memory = buildMemoryContext(userMessage, core.sourceRecords, 6);"
+new_memory_recall = """  let memory = buildMemoryContext(userMessage, core.sourceRecords, 6);
+  memory = await recallVictorMemory(env, userMessage, memory, { topK: 5 });"""
+if old_memory_recall in worker:
+    worker = worker.replace(old_memory_recall, new_memory_recall, 1)
+elif new_memory_recall not in worker:
+    raise RuntimeError('WORKER_MEMORY_RECALL_ANCHOR_NOT_FOUND')
+
+worker_path.write_text(worker, encoding='utf-8')
+
+# Regression guards for dedicated Cognee credentials.
 router_test = router_test_path.read_text(encoding='utf-8')
 router_test = router_test.replace("VICTOR_COGNEE_API: 'test-key'", "COGNEE_API_KEY: 'test-key'")
 router_test = router_test.replace("VICTOR_COGNEE_API: 'cognee-key'", "COGNEE_API_KEY: 'cognee-key'")
 router_test = router_test.replace("VICTOR_COGNEE_API: 'bad-key'", "COGNEE_API_KEY: 'bad-key'")
 router_test = router_test.replace("VICTOR_COGNEE_API: 'old-key'", "COGNEE_API_KEY: 'old-key'")
 router_test = router_test.replace("VICTOR_COGNEE_API: 'new-key'", "COGNEE_API_KEY: 'new-key'")
-# Explicit regression guard: legacy/AWS-like VICTOR_COGNEE_API must never win over dedicated Cognee key.
 if "ignores legacy VICTOR_COGNEE_API" not in router_test:
     router_test += "\n\ntest('Cognee ignores legacy VICTOR_COGNEE_API and uses dedicated COGNEE_API_KEY', async () => {\n  const originalFetch = globalThis.fetch;\n  let seenKey = '';\n  globalThis.fetch = async (_url, init = {}) => {\n    seenKey = init?.headers?.['X-Api-Key'] || '';\n    return new Response(JSON.stringify([]), { status: 200, headers: { 'content-type': 'application/json' } });\n  };\n  try {\n    const result = await callCogneeInference({\n      COGNEE_API_KEY: 'dedicated-cognee-key',\n      VICTOR_COGNEE_API: 'legacy-backbone-key',\n      COGNEE_SERVICE_URL: 'https://tenant-test.aws.cognee.ai',\n      COGNEE_TENANT_ID: 'tenant-test',\n    });\n    assert.equal(result.credential_source, 'COGNEE_API_KEY');\n    assert.equal(seenKey, 'dedicated-cognee-key');\n  } finally {\n    globalThis.fetch = originalFetch;\n  }\n});\n"
 router_test_path.write_text(router_test, encoding='utf-8')
@@ -110,4 +147,4 @@ if "tenant id" not in bridge_test.lower():
     bridge_test += "\n\ntest('enabled bridge requires tenant id after URL and API key', () => {\n  const status = cogneeMemoryStatus({\n    COGNEE_MEMORY_ENABLED: 'true',\n    COGNEE_SERVICE_URL: 'https://tenant-test.aws.cognee.ai',\n    COGNEE_API_KEY: 'test-key',\n  });\n  assert.equal(status.reason, 'COGNEE_TENANT_ID_NOT_CONFIGURED');\n});\n"
 bridge_test_path.write_text(bridge_test, encoding='utf-8')
 
-print('COGNEE_TENANT_CONTRACT_APPLIED')
+print('COGNEE_MEMORY_BRAIN_CONTRACT_APPLIED')
