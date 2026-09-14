@@ -5,6 +5,13 @@ on:
     branches: [main]
     paths:
       - 'scripts/apply_cognee_tenant_contract.py'
+      - 'victor-telegram-worker/model_router.mjs'
+      - 'victor-telegram-worker/model_router.test.mjs'
+      - 'victor-telegram-worker/cognee_memory_bridge.mjs'
+      - 'victor-telegram-worker/cognee_memory_bridge.test.mjs'
+      - 'victor-telegram-worker/memory_brain.mjs'
+      - 'victor-telegram-worker/memory_brain.test.mjs'
+      - 'victor-telegram-worker/worker.js'
       - 'wrangler.toml'
       - '.github/workflows/apply-cognee-tenant-contract.yml'
   workflow_dispatch:
@@ -23,21 +30,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply Cognee tenant contract
+      - name: Apply Cognee memory contract
         run: python scripts/apply_cognee_tenant_contract.py
-      - name: Run Cognee tests
-        run: node --test victor-telegram-worker/model_router.test.mjs victor-telegram-worker/cognee_memory_bridge.test.mjs
+      - name: Run Cognee and Memory Brain tests
+        run: node --test victor-telegram-worker/model_router.test.mjs victor-telegram-worker/cognee_memory_bridge.test.mjs victor-telegram-worker/memory_brain.test.mjs
       - name: Syntax checks
         run: |
           node --check victor-telegram-worker/model_router.mjs
           node --check victor-telegram-worker/cognee_memory_bridge.mjs
+          node --check victor-telegram-worker/memory_brain.mjs
           node --check victor-telegram-worker/worker.js
-      - name: Persist tenant integration if changed
+      - name: Persist governed memory integration if changed
         run: |
           git config user.name "victor-governed-runtime"
           git config user.email "actions@users.noreply.github.com"
-          git add victor-telegram-worker/model_router.mjs victor-telegram-worker/model_router.test.mjs victor-telegram-worker/cognee_memory_bridge.mjs victor-telegram-worker/cognee_memory_bridge.test.mjs
+          git add victor-telegram-worker/model_router.mjs victor-telegram-worker/model_router.test.mjs victor-telegram-worker/cognee_memory_bridge.mjs victor-telegram-worker/cognee_memory_bridge.test.mjs victor-telegram-worker/memory_brain.mjs victor-telegram-worker/memory_brain.test.mjs victor-telegram-worker/worker.js
           git diff --cached --quiet && exit 0
-          git commit -m "runtime: apply Cognee tenant contract"
+          git commit -m "runtime: apply Victor Memory Brain contract"
           git pull --rebase --autostash
           git push
