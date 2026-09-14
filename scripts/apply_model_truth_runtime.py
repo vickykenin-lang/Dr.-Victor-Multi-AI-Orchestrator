@@ -32,6 +32,13 @@ if "model_router: 'BEDROCK_DISCOVERY_SPECIALIST_V1'" not in text:
         raise SystemExit('health anchor missing')
     text = text.replace(health_anchor, health_repl, 1)
 
+integrity_health_anchor = "        anti_bogus_runtime: 'DEAD_END_RECOVERY_V1',\n"
+integrity_health_line = "        response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1',\n"
+if "response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1'" not in text:
+    if integrity_health_anchor not in text:
+        raise SystemExit('response integrity health anchor missing')
+    text = text.replace(integrity_health_anchor, integrity_health_anchor + integrity_health_line, 1)
+
 # 3) Detect repeated unresolved answers using conversation state.
 owned_anchor = "      const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);\n"
 dead_line = "      const deadEnd = detectDeadEndLoop(text, sessionWithFounderTurn);\n"
@@ -131,7 +138,8 @@ if "${buildNonRepetitionDirective(activeSession)}" not in text:
         raise SystemExit('non-repetition prompt anchor missing')
     text = text.replace(prompt_anchor, prompt_repl, 1)
 
-# 7) Replace single-model hard-coded inference with specialist router.
+# 7) Every AI-generated Victor reply is bound to an independent-evidence integrity lock.
+# This is deliberately applied inside askModel so fact answers, follow-ups and governed replies all inherit it.
 start_marker = "async function askModel(env, system, userMessage) {\n"
 end_marker = "\nfunction codedError(code, message) {"
 start = text.find(start_marker)
@@ -139,36 +147,51 @@ end = text.find(end_marker, start if start >= 0 else 0)
 if start < 0 or end < 0:
     raise SystemExit('askModel replacement anchors missing')
 new_ask = """async function askModel(env, system, userMessage) {
+  const integritySystem = `${system}\n\nINDEPENDENT RESPONSE INTEGRITY LOCK — MANDATORY:\n- Report evidence exactly as observed; never change, soften, amplify, or reframe evidence to make an outcome look better or worse.\n- Never turn an assumption, absence of an error, configured credential, empty target list, cached state, historical record, or model-generated statement into PASS/SUCCESS/ACTIVE/VERIFIED.\n- If a requested fact was not independently observed, say UNVERIFIED / NOT OBSERVED / UNKNOWN.\n- Keep raw evidence and interpretation separate. If they conflict, raw fresh evidence wins.\n- Never invent a selected model, response, 2xx status, timestamp, target, receipt, heartbeat, deployment state, or business outcome.\n- A self-report by Victor, a department, memory, or another model is not independent proof of external runtime state.\n- If something is wrong, state what is wrong; do not cosmetically rewrite the result. Fixing happens as a separate action, never by manipulating the report.\n- Never expose credentials or secrets.`;
   try {
-    const result = await callVictorModel(env, system, userMessage);
+    const result = await callVictorModel(env, integritySystem, userMessage);
+    const content = String(result.content || '').trim();
+    const claimsSuccess = /\\b(pass|passed|success|successful|verified|active|healthy|live)\\b/i.test(content);
+    const assumptionEvidence = /\\b(assum(?:e|ed|ing)|assume kiya|no error|error nahi|error not seen|error nahi dikh)\\b/i.test(content);
+    const nullEvidence = /\\b(?:selected model|model|result|inference result)\\s*:\\s*(?:null|unknown|not specified|none)\\b/i.test(content);
+    if (claimsSuccess && (assumptionEvidence || nullEvidence)) {
+      throw Object.assign(new Error('Success claim is not independently supported by observed evidence'), {
+        code: 'INDEPENDENT_EVIDENCE_REQUIRED',
+      });
+    }
     console.log(JSON.stringify({
       event: 'VICTOR_MODEL_ROUTE',
       task: result.task,
       model: result.model,
       discovery_status: result.discovery_status,
       fallback_attempts: result.failures?.length || 0,
+      response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1',
       secrets_exposed: false,
     }));
-    return result.content;
+    return content;
   } catch (error) {
     if (error?.code === 'AI_CREDENTIAL_MISSING') throw codedError('AI_CREDENTIAL_MISSING', 'API_VICTOR is not configured');
+    if (error?.code === 'INDEPENDENT_EVIDENCE_REQUIRED') {
+      throw codedError('INDEPENDENT_EVIDENCE_REQUIRED', 'Victor draft blocked because the claimed outcome was not independently supported by observed evidence');
+    }
     const routed = codedError(error?.code || 'AI_MODEL_ROUTER_EXHAUSTED', 'Victor specialist model router could not obtain a verified response');
     if (Array.isArray(error?.modelFailures)) routed.modelFailures = error.modelFailures;
     throw routed;
   }
 }
 """
-current = text[start:end]
-if "callVictorModel(env, system, userMessage)" not in current:
-    text = text[:start] + new_ask + text[end:]
+text = text[:start] + new_ask + text[end:]
 
-# 8) Add user-facing error category for router exhaustion.
+# 8) Add user-facing error categories.
 msg_anchor = "    AI_UPSTREAM_EMPTY_RESPONSE: 'Victor ke AI provider se blank response mila.',\n"
-msg_repl = msg_anchor + "    AI_MODEL_ROUTER_EXHAUSTED: 'Victor ne available specialist models try kiye, lekin koi verified compatible response nahi mila.',\n"
-if "AI_MODEL_ROUTER_EXHAUSTED:" not in text:
+msg_repl = msg_anchor + "    AI_MODEL_ROUTER_EXHAUSTED: 'Victor ne available specialist models try kiye, lekin koi verified compatible response nahi mila.',\n" + "    INDEPENDENT_EVIDENCE_REQUIRED: 'Victor ka draft block hua kyunki claimed result independent fresh evidence se prove nahi tha.',\n"
+if "INDEPENDENT_EVIDENCE_REQUIRED:" not in text:
     if msg_anchor not in text:
         raise SystemExit('router error message anchor missing')
-    text = text.replace(msg_anchor, msg_repl, 1)
+    if "AI_MODEL_ROUTER_EXHAUSTED:" in text:
+        text = text.replace("    AI_MODEL_ROUTER_EXHAUSTED: 'Victor ne available specialist models try kiye, lekin koi verified compatible response nahi mila.',\n", "    AI_MODEL_ROUTER_EXHAUSTED: 'Victor ne available specialist models try kiye, lekin koi verified compatible response nahi mila.',\n    INDEPENDENT_EVIDENCE_REQUIRED: 'Victor ka draft block hua kyunki claimed result independent fresh evidence se prove nahi tha.',\n", 1)
+    else:
+        text = text.replace(msg_anchor, msg_repl, 1)
 
 worker.write_text(text, encoding='utf-8')
 print('MODEL_TRUTH_RUNTIME_APPLIED')
