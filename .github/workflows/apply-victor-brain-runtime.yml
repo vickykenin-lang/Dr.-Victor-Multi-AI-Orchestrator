@@ -21,6 +21,7 @@ on:
       - 'scripts/apply_truth_resolver.py'
       - 'scripts/apply_outcome_state.py'
       - 'scripts/apply_execution_plan.py'
+      - 'scripts/apply_model_truth_runtime.py'
       - 'brain/runtime.mjs'
       - 'brain/runtime.test.mjs'
       - 'brain/founder_intent.mjs'
@@ -35,6 +36,8 @@ on:
       - 'brain/founder_conversation.test.mjs'
       - 'brain/problem_ownership.mjs'
       - 'brain/problem_ownership.test.mjs'
+      - 'brain/anti_bogus_runtime.mjs'
+      - 'brain/anti_bogus_runtime.test.mjs'
       - 'brain/outcome_state.mjs'
       - 'brain/outcome_state.test.mjs'
       - 'brain/owned_outcome_acceptance.mjs'
@@ -54,6 +57,9 @@ on:
       - 'brain/execution_plan.test.mjs'
       - 'brain/conversation_state_store.mjs'
       - 'brain/conversation_state_store.test.mjs'
+      - 'victor-telegram-worker/model_router.mjs'
+      - 'victor-telegram-worker/model_router.test.mjs'
+      - 'victor-telegram-worker/cognee_memory_bridge.mjs'
       - 'docs/VICTOR_FINAL_CORRECTION_PLAN.md'
       - 'data/victor_correction_backlog.json'
       - '.github/workflows/apply-victor-brain-runtime.yml'
@@ -92,8 +98,9 @@ jobs:
           python scripts/apply_truth_resolver.py
           python scripts/apply_outcome_state.py
           python scripts/apply_execution_plan.py
+          python scripts/apply_model_truth_runtime.py
       - name: Run core tests
-        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs brain/founder_conversation.test.mjs brain/problem_ownership.test.mjs brain/outcome_state.test.mjs brain/owned_outcome_acceptance.test.mjs brain/result_truth_receipts.test.mjs brain/fact_runtime.test.mjs brain/truth_resolver.test.mjs brain/founder_request.test.mjs brain/request_gateway.test.mjs brain/execution_plan.test.mjs brain/conversation_state_store.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
+        run: node --test brain/runtime.test.mjs brain/founder_intent.test.mjs brain/conversation_runtime.test.mjs brain/hulk_guard.test.mjs brain/active_context.test.mjs brain/founder_conversation.test.mjs brain/problem_ownership.test.mjs brain/anti_bogus_runtime.test.mjs brain/outcome_state.test.mjs brain/owned_outcome_acceptance.test.mjs brain/result_truth_receipts.test.mjs brain/fact_runtime.test.mjs brain/truth_resolver.test.mjs brain/founder_request.test.mjs brain/request_gateway.test.mjs brain/execution_plan.test.mjs brain/conversation_state_store.test.mjs victor-telegram-worker/model_router.test.mjs victor-telegram-worker/cognee_memory_bridge.test.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/core_rules.test.mjs victor-telegram-worker/memory_runtime.test.mjs
       - name: Syntax checks
         run: |
           node --check brain/runtime.mjs
@@ -103,6 +110,7 @@ jobs:
           node --check brain/active_context.mjs
           node --check brain/founder_conversation.mjs
           node --check brain/problem_ownership.mjs
+          node --check brain/anti_bogus_runtime.mjs
           node --check brain/outcome_state.mjs
           node --check brain/owned_outcome_acceptance.mjs
           node --check brain/result_truth_receipts.mjs
@@ -113,6 +121,8 @@ jobs:
           node --check brain/request_gateway.mjs
           node --check brain/execution_plan.mjs
           node --check brain/conversation_state_store.mjs
+          node --check victor-telegram-worker/model_router.mjs
+          node --check victor-telegram-worker/cognee_memory_bridge.mjs
           node --check victor-telegram-worker/autonomy_runtime.mjs
           node --check victor-telegram-worker/department_bridge.mjs
           node --check victor-telegram-worker/worker.js
@@ -122,7 +132,7 @@ jobs:
         run: |
           git config user.name "victor-governed-runtime"
           git config user.email "actions@users.noreply.github.com"
-          git add victor-telegram-worker/autonomy_runtime.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/worker.js victor-telegram-worker/department_bridge.mjs brain/fact_runtime.mjs
+          git add victor-telegram-worker/autonomy_runtime.mjs victor-telegram-worker/autonomy_runtime.test.mjs victor-telegram-worker/worker.js victor-telegram-worker/department_bridge.mjs victor-telegram-worker/model_router.mjs victor-telegram-worker/model_router.test.mjs victor-telegram-worker/cognee_memory_bridge.mjs brain/fact_runtime.mjs brain/anti_bogus_runtime.mjs brain/anti_bogus_runtime.test.mjs
           git diff --cached --quiet && exit 0
           git commit -m "runtime: apply Victor core integration"
           git pull --rebase --autostash
