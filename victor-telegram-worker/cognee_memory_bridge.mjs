@@ -68,14 +68,21 @@ export async function cogneeRemember(env, text, metadata = {}) {
   form.append('datasetName', c.dataset);
   form.append('run_in_background', 'false');
 
-  const res = await fetch(`${c.base}/api/v1/remember`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'X-Api-Key': c.apiKey,
-    },
-    body: form,
-  });
+  let res;
+  try {
+    res = await fetch(`${c.base}/api/v1/remember`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'X-Api-Key': c.apiKey,
+        'X-Tenant-Id': c.tenantId,
+      },
+      body: form,
+      signal: signal(c.rememberTimeoutMs),
+    });
+  } catch (error) {
+    return { status: 'FAILED', stage: 'COGNEE_REMEMBER', reason: error?.name || 'FETCH_ERROR' };
+  }
   if (!res.ok) return { status: 'FAILED', stage: 'COGNEE_REMEMBER', http_status: res.status };
   return { status: 'REMEMBERED', dataset: c.dataset };
 }
