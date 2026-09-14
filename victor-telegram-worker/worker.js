@@ -37,6 +37,7 @@ import {
 
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
 import { callVictorModel, callCogneeInference } from './model_router.mjs';
+import { assessReplyNaturalness, buildNaturalReplyDirective } from './reply_integrity.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
 import { classifyConversationFollowUp, buildInvestigationTaskText, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';
@@ -145,6 +146,7 @@ export default {
         model_router: 'BEDROCK_DISCOVERY_SPECIALIST_V1',
         anti_bogus_runtime: 'DEAD_END_RECOVERY_V1',
         response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1',
+        reply_style_guard: 'NATURAL_DIRECT_V1',
         autonomy_requested_mode: 'AUTONOMOUS_MANAGED_ORCHESTRATOR',
         autonomy_runtime_configured: autonomyConfigured(env),
         autonomy_scheduler_bound: true,
@@ -1235,10 +1237,11 @@ INDEPENDENT RESPONSE INTEGRITY LOCK — MANDATORY:
 - Never invent a selected model, response, 2xx status, timestamp, target, receipt, heartbeat, deployment state, or business outcome.
 - A self-report by Victor, a department, memory, or another model is not independent proof of external runtime state.
 - If something is wrong, state what is wrong; do not cosmetically rewrite the result. Fixing happens as a separate action, never by manipulating the report.
-- Never expose credentials or secrets.`;
-  try {
-    const result = await callVictorModel(env, integritySystem, userMessage);
-    const content = String(result.content || '').trim();
+- Never expose credentials or secrets.
+
+${buildNaturalReplyDirective()}`;
+
+  const verifyEvidenceIntegrity = content => {
     const claimsSuccess = /\b(pass|passed|success|successful|verified|active|healthy|live)\b/i.test(content);
     const assumptionEvidence = /\b(assum(?:e|ed|ing)|assume kiya|no error|error nahi|error not seen|error nahi dikh)\b/i.test(content);
     const nullEvidence = /\b(?:selected model|model|result|inference result)\s*:\s*(?:null|unknown|not specified|none)\b/i.test(content);
@@ -1247,6 +1250,35 @@ INDEPENDENT RESPONSE INTEGRITY LOCK — MANDATORY:
         code: 'INDEPENDENT_EVIDENCE_REQUIRED',
       });
     }
+  };
+
+  try {
+    let result = await callVictorModel(env, integritySystem, userMessage);
+    let content = String(result.content || '').trim();
+    verifyEvidenceIntegrity(content);
+
+    let style = assessReplyNaturalness(content, userMessage);
+    let styleRetry = false;
+    if (!style.ok) {
+      styleRetry = true;
+      const retrySystem = `${integritySystem}
+
+The previous draft was rejected for scripted/template style only. Generate a fresh answer from the same evidence and the Founder message. Do not copy the rejected structure. No Note:, Summary:, Current state:, Next step:, generic CTA, follow-up offer, checklist, or status-dump wrapper unless explicitly requested. Preserve factual evidence exactly.`;
+      result = await callVictorModel(env, retrySystem, userMessage, {
+        task: result.task,
+        temperature: 0.05,
+      });
+      content = String(result.content || '').trim();
+      verifyEvidenceIntegrity(content);
+      style = assessReplyNaturalness(content, userMessage);
+      if (!style.ok) {
+        const error = new Error(`Scripted reply style remained after regeneration: ${style.violations.join(',')}`);
+        error.code = 'SCRIPTED_REPLY_BLOCKED';
+        error.replyStyleViolations = style.violations;
+        throw error;
+      }
+    }
+
     console.log(JSON.stringify({
       event: 'VICTOR_MODEL_ROUTE',
       task: result.task,
@@ -1254,6 +1286,8 @@ INDEPENDENT RESPONSE INTEGRITY LOCK — MANDATORY:
       discovery_status: result.discovery_status,
       fallback_attempts: result.failures?.length || 0,
       response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1',
+      reply_style_guard: 'NATURAL_DIRECT_V1',
+      style_retry: styleRetry,
       secrets_exposed: false,
     }));
     return content;
@@ -1261,6 +1295,11 @@ INDEPENDENT RESPONSE INTEGRITY LOCK — MANDATORY:
     if (error?.code === 'AI_CREDENTIAL_MISSING') throw codedError('AI_CREDENTIAL_MISSING', 'API_VICTOR is not configured');
     if (error?.code === 'INDEPENDENT_EVIDENCE_REQUIRED') {
       throw codedError('INDEPENDENT_EVIDENCE_REQUIRED', 'Victor draft blocked because the claimed outcome was not independently supported by observed evidence');
+    }
+    if (error?.code === 'SCRIPTED_REPLY_BLOCKED') {
+      const blocked = codedError('SCRIPTED_REPLY_BLOCKED', 'Victor draft blocked because it remained scripted/template-style after one clean regeneration');
+      blocked.replyStyleViolations = error.replyStyleViolations || [];
+      throw blocked;
     }
     const routed = codedError(error?.code || 'AI_MODEL_ROUTER_EXHAUSTED', 'Victor specialist model router could not obtain a verified response');
     if (Array.isArray(error?.modelFailures)) routed.modelFailures = error.modelFailures;
@@ -1298,6 +1337,7 @@ export function classifyProcessingError(error, stage = 'UNKNOWN') {
     AI_UPSTREAM_EMPTY_RESPONSE: 'Victor ke AI provider se blank response mila.',
     AI_MODEL_ROUTER_EXHAUSTED: 'Victor ne available specialist models try kiye, lekin koi verified compatible response nahi mila.',
     INDEPENDENT_EVIDENCE_REQUIRED: 'Victor ka draft block hua kyunki claimed result independent fresh evidence se prove nahi tha.',
+    SCRIPTED_REPLY_BLOCKED: 'Victor ka reply scripted/template-style raha, isliye delivery block kar di gayi.',
     TRUTH_GUARD_REJECTED: 'Victor ka generated reply truth verification pass nahi kar saka.',
     TELEGRAM_DELIVERY_FAILED: 'Victor reply bana chuka tha, lekin Telegram delivery fail hui.',
     MEMORY_PROCESSING_FAILED: 'Victor memory processing stage par error aaya.',
