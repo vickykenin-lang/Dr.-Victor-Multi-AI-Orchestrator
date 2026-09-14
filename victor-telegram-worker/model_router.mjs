@@ -1,5 +1,6 @@
 const DEFAULT_BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
 const DEFAULT_FALLBACK_MODEL = 'qwen.qwen3-coder-next';
+const COGNEE_AUTH_BREAKER_KEY = 'victor:cognee:auth-breaker:v1';
 
 function norm(value) {
   return String(value || '').trim();
@@ -8,6 +9,54 @@ function norm(value) {
 function modelId(item) {
   if (typeof item === 'string') return item;
   return item?.id || item?.model_id || item?.modelId || item?.name || '';
+}
+
+async function credentialFingerprint(secret) {
+  const bytes = new TextEncoder().encode(String(secret || ''));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].slice(0, 12).map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+function cogneeBreakerStore(env = {}) {
+  const store = env.VICTOR_CONVERSATION_STATE;
+  return store && typeof store.get === 'function' && typeof store.put === 'function' ? store : null;
+}
+
+async function readCogneeAuthBreaker(env = {}) {
+  const store = cogneeBreakerStore(env);
+  if (!store) return null;
+  try {
+    const raw = await store.get(COGNEE_AUTH_BREAKER_KEY);
+    if (!raw) return null;
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCogneeAuthBreaker(env = {}, state = null) {
+  const store = cogneeBreakerStore(env);
+  if (!store) return false;
+  try {
+    if (state == null) {
+      if (typeof store.delete === 'function') await store.delete(COGNEE_AUTH_BREAKER_KEY);
+      else await store.put(COGNEE_AUTH_BREAKER_KEY, JSON.stringify({ status: 'CLEARED', cleared_at_utc: new Date().toISOString() }));
+      return true;
+    }
+    await store.put(COGNEE_AUTH_BREAKER_KEY, JSON.stringify(state));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function cogneeAuthBlockedError(httpStatus, suppressNotification = false) {
+  return Object.assign(new Error('Cognee inference auth is blocked until VICTOR_COGNEE_API changes'), {
+    code: 'COGNEE_AUTH_BLOCKED',
+    httpStatus: httpStatus || 401,
+    suppressNotification,
+    credentialChangeRequired: true,
+  });
 }
 
 function scoreModel(id, task) {
@@ -171,22 +220,41 @@ export async function resolveCogneeOpenAIModel(env = {}) {
   const openAiModels = discovery.models.filter(id => /(^|[.\-_])(openai|gpt)([.\-_]|$)/i.test(id));
   const configured = norm(env.VICTOR_COGNEE_MODEL);
   if (configured && (!openAiModels.length || openAiModels.includes(configured))) {
-    return { status: 'RESOLVED', model: configured, discovery_status: discovery.status, base: discovery.base };
+    return { status: 'RESOLVED', model: configured, discovery_status: discovery.status, discovery_http_status: discovery.http_status || null, base: discovery.base };
   }
   const ranked = openAiModels
     .map(id => ({ id, score: scoreModel(id, 'chat') + (/gpt/i.test(id) ? 20 : 0) }))
     .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
   return ranked.length
-    ? { status: 'RESOLVED', model: ranked[0].id, discovery_status: discovery.status, base: discovery.base }
-    : { status: 'OPENAI_MODEL_NOT_VERIFIED', model: null, discovery_status: discovery.status, base: discovery.base };
+    ? { status: 'RESOLVED', model: ranked[0].id, discovery_status: discovery.status, discovery_http_status: discovery.http_status || null, base: discovery.base }
+    : { status: 'OPENAI_MODEL_NOT_VERIFIED', model: null, discovery_status: discovery.status, discovery_http_status: discovery.http_status || null, base: discovery.base };
 }
 
 export async function callCogneeInference(env = {}, system = '', userMessage = '', options = {}) {
   const apiKey = env.VICTOR_COGNEE_API || '';
   if (!apiKey) throw Object.assign(new Error('VICTOR_COGNEE_API is not configured'), { code: 'COGNEE_INFERENCE_CREDENTIAL_MISSING' });
 
+  const fingerprint = await credentialFingerprint(apiKey);
+  const breaker = await readCogneeAuthBreaker(env);
+  if (breaker?.status === 'COGNEE_AUTH_BLOCKED' && breaker?.credential_fingerprint === fingerprint) {
+    throw cogneeAuthBlockedError(breaker.http_status || 401, true);
+  }
+  if (breaker?.credential_fingerprint && breaker.credential_fingerprint !== fingerprint) {
+    await writeCogneeAuthBreaker(env, null);
+  }
+
   const resolved = await resolveCogneeOpenAIModel(env);
   if (resolved.status !== 'RESOLVED' || !resolved.model) {
+    if ([401, 403].includes(Number(resolved.discovery_http_status))) {
+      await writeCogneeAuthBreaker(env, {
+        status: 'COGNEE_AUTH_BLOCKED',
+        credential_fingerprint: fingerprint,
+        http_status: Number(resolved.discovery_http_status),
+        blocked_at_utc: new Date().toISOString(),
+        stage: 'MODEL_DISCOVERY',
+      });
+      throw cogneeAuthBlockedError(Number(resolved.discovery_http_status), false);
+    }
     throw Object.assign(new Error('No verified OpenAI model available for Cognee inference'), {
       code: 'COGNEE_OPENAI_MODEL_NOT_VERIFIED',
       discoveryStatus: resolved.discovery_status || null,
@@ -215,6 +283,16 @@ export async function callCogneeInference(env = {}, system = '', userMessage = '
   }
 
   if (!response.ok) {
+    if ([401, 403].includes(response.status)) {
+      await writeCogneeAuthBreaker(env, {
+        status: 'COGNEE_AUTH_BLOCKED',
+        credential_fingerprint: fingerprint,
+        http_status: response.status,
+        blocked_at_utc: new Date().toISOString(),
+        stage: 'INFERENCE',
+      });
+      throw cogneeAuthBlockedError(response.status, false);
+    }
     throw Object.assign(new Error('Cognee inference request returned non-success status'), {
       code: 'COGNEE_INFERENCE_HTTP_ERROR',
       httpStatus: response.status,
@@ -230,6 +308,7 @@ export async function callCogneeInference(env = {}, system = '', userMessage = '
     throw Object.assign(new Error('Cognee inference response was empty'), { code: 'COGNEE_INFERENCE_EMPTY_RESPONSE' });
   }
 
+  await writeCogneeAuthBreaker(env, null);
   return {
     content: content.trim(),
     model: resolved.model,
