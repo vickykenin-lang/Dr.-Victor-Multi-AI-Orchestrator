@@ -22,3 +22,13 @@ test('Cognee recall remains advisory beside authoritative Victor memory', () => 
   assert.match(merged.prompt, /never overrides active Founder decisions or verified evidence/i);
   assert.deepEqual(merged.cogneeMemory, [{ text: 'graph memory' }]);
 });
+
+
+test('enabled bridge requires tenant id after URL and API key', () => {
+  const status = cogneeMemoryStatus({
+    COGNEE_MEMORY_ENABLED: 'true',
+    COGNEE_SERVICE_URL: 'https://tenant-test.aws.cognee.ai',
+    COGNEE_API_KEY: 'test-key',
+  });
+  assert.equal(status.reason, 'COGNEE_TENANT_ID_NOT_CONFIGURED');
+});

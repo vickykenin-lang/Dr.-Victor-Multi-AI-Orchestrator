@@ -8,16 +8,18 @@ function cfg(env) {
     base,
     apiKey: env.COGNEE_API_KEY || env.VICTOR_COGNEE_API || '',
     dataset: env.COGNEE_DATASET || 'victor_long_term_memory',
+    tenantId: String(env.COGNEE_TENANT_ID || '').trim(),
     inferenceApiKey: env.VICTOR_COGNEE_API || '',
     inferenceModel: env.VICTOR_COGNEE_MODEL || 'AUTO_OPENAI',
   };
 }
 
-function headers(apiKey) {
+function headers(apiKey, tenantId) {
   return {
     'Content-Type': 'application/json',
     Accept: 'application/json',
     ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
+    ...(tenantId ? { 'X-Tenant-Id': tenantId } : {}),
   };
 }
 
@@ -26,6 +28,7 @@ export function cogneeMemoryStatus(env = {}) {
   if (!c.enabled) return { status: 'DISABLED' };
   if (!c.base) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_SERVICE_URL_NOT_CONFIGURED' };
   if (!c.apiKey) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_API_KEY_NOT_CONFIGURED' };
+  if (!c.tenantId) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_TENANT_ID_NOT_CONFIGURED' };
   return {
     status: 'CONFIGURED',
     dataset: c.dataset,
@@ -71,6 +74,7 @@ export async function cogneeRemember(env, text, metadata = {}) {
     headers: {
       Accept: 'application/json',
       'X-Api-Key': c.apiKey,
+      'X-Tenant-Id': c.tenantId,
     },
     body: form,
   });
@@ -84,7 +88,7 @@ export async function cogneeRecall(env, query, options = {}) {
   if (status.status !== 'CONFIGURED') return { ...status, results: [] };
   const res = await fetch(`${c.base}/api/v1/recall`, {
     method: 'POST',
-    headers: headers(c.apiKey),
+    headers: headers(c.apiKey, c.tenantId),
     body: JSON.stringify({
       query: String(query || ''),
       datasets: [c.dataset],
@@ -104,7 +108,7 @@ export async function cogneeImprove(env, sessionIds = []) {
   const status = cogneeMemoryStatus(env);
   if (status.status !== 'CONFIGURED') return status;
   const res = await fetch(`${c.base}/api/v1/improve`, {
-    method: 'POST', headers: headers(c.apiKey),
+    method: 'POST', headers: headers(c.apiKey, c.tenantId),
     body: JSON.stringify({ dataset_name: c.dataset, session_ids: sessionIds, run_in_background: true }),
   });
   if (!res.ok) return { status: 'FAILED', stage: 'COGNEE_IMPROVE', http_status: res.status };

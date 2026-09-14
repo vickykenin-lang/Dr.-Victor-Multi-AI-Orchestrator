@@ -222,7 +222,7 @@ export async function resolveCogneeOpenAIModel(env = {}) {
     status: 'COGNEE_CLOUD_MEMORY_API',
     model: null,
     discovery_status: 'NOT_APPLICABLE',
-    base: String(env.COGNEE_SERVICE_URL || 'https://api.cognee.ai').replace(/\/$/, ''),
+    base: String(env.COGNEE_SERVICE_URL || '').replace(/\/$/, ''),
   };
 }
 
@@ -246,13 +246,21 @@ export async function callCogneeInference(env = {}, system = '', userMessage = '
     await writeCogneeAuthBreaker(env, null);
   }
 
-  const base = String(options.base || env.COGNEE_SERVICE_URL || 'https://api.cognee.ai').replace(/\/$/, '');
+  const base = String(options.base || env.COGNEE_SERVICE_URL || '').replace(/\/$/, '');
+  const tenantId = String(env.COGNEE_TENANT_ID || '').trim();
+  if (!base) {
+    throw Object.assign(new Error('Cognee tenant service URL is not configured'), { code: 'COGNEE_SERVICE_URL_MISSING' });
+  }
+  if (!tenantId) {
+    throw Object.assign(new Error('Cognee tenant ID is not configured'), { code: 'COGNEE_TENANT_ID_MISSING' });
+  }
   let response;
   try {
     response = await fetch(`${base}/api/v1/datasets/`, {
       method: 'GET',
       headers: {
         'X-Api-Key': apiKey,
+        'X-Tenant-Id': tenantId,
         Accept: 'application/json',
       },
       signal: AbortSignal.timeout(Number(env.VICTOR_COGNEE_AI_TIMEOUT_MS || env.VICTOR_AI_TIMEOUT_MS || 25000)),

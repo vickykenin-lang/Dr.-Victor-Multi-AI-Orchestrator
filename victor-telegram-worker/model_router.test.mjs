@@ -19,7 +19,7 @@ test('does not route embeddings as chat specialist', () => {
 });
 
 test('Cognee compatibility resolver identifies Cognee Cloud memory API without Bedrock model discovery', async () => {
-  const result = await resolveCogneeOpenAIModel({ VICTOR_COGNEE_API: 'test-key' });
+  const result = await resolveCogneeOpenAIModel({ VICTOR_COGNEE_API: 'test-key', COGNEE_SERVICE_URL: 'https://tenant-test.aws.cognee.ai' });
   assert.equal(result.status, 'COGNEE_CLOUD_MEMORY_API');
   assert.equal(result.model, null);
   assert.equal(result.discovery_status, 'NOT_APPLICABLE');
@@ -34,6 +34,7 @@ test('Cognee probe uses X-Api-Key against Cognee datasets endpoint and never API
       url: String(url),
       xApiKey: init?.headers?.['X-Api-Key'] || '',
       authorization: init?.headers?.Authorization || '',
+      tenantId: init?.headers?.['X-Tenant-Id'] || '',
     });
     return new Response(JSON.stringify([{ id: '1', name: 'victor_long_term_memory' }]), {
       status: 200,
@@ -41,7 +42,7 @@ test('Cognee probe uses X-Api-Key against Cognee datasets endpoint and never API
     });
   };
   try {
-    const result = await callCogneeInference({ VICTOR_COGNEE_API: 'cognee-key', API_VICTOR: 'main-key' });
+    const result = await callCogneeInference({ VICTOR_COGNEE_API: 'cognee-key', API_VICTOR: 'main-key', COGNEE_SERVICE_URL: 'https://tenant-test.aws.cognee.ai', COGNEE_TENANT_ID: 'tenant-test' });
     assert.equal(result.provider, 'COGNEE_CLOUD');
     assert.equal(result.discovery_status, 'COGNEE_DATASETS_VERIFIED');
     assert.equal(result.dataset_count, 1);
@@ -49,6 +50,7 @@ test('Cognee probe uses X-Api-Key against Cognee datasets endpoint and never API
     assert.match(seen[0].url, /\/api\/v1\/datasets\/$/);
     assert.equal(seen[0].xApiKey, 'cognee-key');
     assert.equal(seen[0].authorization, '');
+    assert.equal(seen[0].tenantId, 'tenant-test');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -67,7 +69,7 @@ test('Cognee 401 opens durable auth circuit breaker and suppresses repeated netw
     calls += 1;
     return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
   };
-  const env = { VICTOR_COGNEE_API: 'bad-key', VICTOR_CONVERSATION_STATE: store };
+  const env = { VICTOR_COGNEE_API: 'bad-key', VICTOR_CONVERSATION_STATE: store, COGNEE_SERVICE_URL: 'https://tenant-test.aws.cognee.ai', COGNEE_TENANT_ID: 'tenant-test' };
   try {
     await assert.rejects(
       () => callCogneeInference(env),
@@ -98,9 +100,9 @@ test('Cognee auth breaker resets automatically when credential changes', async (
     return new Response(JSON.stringify([]), { status: 200, headers: { 'content-type': 'application/json' } });
   };
   try {
-    await assert.rejects(() => callCogneeInference({ VICTOR_COGNEE_API: 'old-key', VICTOR_CONVERSATION_STATE: store }));
+    await assert.rejects(() => callCogneeInference({ VICTOR_COGNEE_API: 'old-key', VICTOR_CONVERSATION_STATE: store, COGNEE_SERVICE_URL: 'https://tenant-test.aws.cognee.ai', COGNEE_TENANT_ID: 'tenant-test' }));
     mode = 'good';
-    const result = await callCogneeInference({ VICTOR_COGNEE_API: 'new-key', VICTOR_CONVERSATION_STATE: store });
+    const result = await callCogneeInference({ VICTOR_COGNEE_API: 'new-key', VICTOR_CONVERSATION_STATE: store, COGNEE_SERVICE_URL: 'https://tenant-test.aws.cognee.ai', COGNEE_TENANT_ID: 'tenant-test' });
     assert.equal(result.discovery_status, 'COGNEE_DATASETS_VERIFIED');
   } finally {
     globalThis.fetch = originalFetch;
