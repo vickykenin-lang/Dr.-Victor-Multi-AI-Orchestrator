@@ -143,6 +143,7 @@ export default {
         ai_credential_configured: Boolean(env.API_VICTOR),
         cognee_inference_credential_configured: Boolean(env.VICTOR_COGNEE_API),
         cognee_inference_runtime: 'DEDICATED_OPENAI_PATH_V1',
+        cognee_auth_circuit_breaker: 'AUTH_401_403_HOLD_UNTIL_CREDENTIAL_CHANGE_V1',
         model_router: 'BEDROCK_DISCOVERY_SPECIALIST_V1',
         anti_bogus_runtime: 'DEAD_END_RECOVERY_V1',
         response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1',
@@ -427,18 +428,34 @@ export default {
         } catch (error) {
           const code = error?.code || 'COGNEE_INFERENCE_FAILED';
           const detail = error?.httpStatus ? ` HTTP ${error.httpStatus}.` : '';
-          await sendTelegramMessage(env, chatId, `Cognee live inference FAILED. Runtime code: ${code}.${detail} API_VICTOR fallback nahi kiya gaya.`, message.message_id);
+          const suppressed = Boolean(error?.suppressNotification);
+          if (!suppressed) {
+            const messageText = code === 'COGNEE_AUTH_BLOCKED'
+              ? `Cognee auth blocked.${detail} Same credential par retries hold kar diye gaye hain; VICTOR_COGNEE_API change hone ke baad automatically retry allow hoga. API_VICTOR fallback nahi kiya gaya.`
+              : `Cognee live inference FAILED. Runtime code: ${code}.${detail} API_VICTOR fallback nahi kiya gaya.`;
+            await sendTelegramMessage(env, chatId, messageText, message.message_id);
+          }
+          console.log(JSON.stringify({
+            event: 'VICTOR_COGNEE_INFERENCE_BLOCKED',
+            code,
+            http_status: error?.httpStatus || null,
+            notification_suppressed: suppressed,
+            credential_change_required: Boolean(error?.credentialChangeRequired),
+            secrets_exposed: false,
+          }));
           return json({
             ok: false,
             mode: 'LIVE_COGNEE_INFERENCE_DIAGNOSTIC',
-            status: 'FAILED',
+            status: code === 'COGNEE_AUTH_BLOCKED' ? 'AUTH_BLOCKED' : 'FAILED',
             code,
             http_status: error?.httpStatus || null,
             discovery_status: error?.discoveryStatus || null,
             credential_source: 'VICTOR_COGNEE_API',
             api_victor_fallback: false,
+            notification_suppressed: suppressed,
+            credential_change_required: Boolean(error?.credentialChangeRequired),
             secrets_exposed: false,
-          }, 503);
+          }, 200);
         }
       }
 
