@@ -8,6 +8,8 @@ function cfg(env) {
     base,
     apiKey: env.COGNEE_API_KEY || '',
     dataset: env.COGNEE_DATASET || 'victor_long_term_memory',
+    inferenceApiKey: env.VICTOR_COGNEE_API || '',
+    inferenceModel: env.VICTOR_COGNEE_MODEL || 'AUTO_OPENAI',
   };
 }
 
@@ -24,7 +26,27 @@ export function cogneeMemoryStatus(env = {}) {
   if (!c.enabled) return { status: 'DISABLED' };
   if (!c.base) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_SERVICE_URL_NOT_CONFIGURED' };
   if (!c.apiKey) return { status: 'PENDING_CONFIGURATION', reason: 'COGNEE_API_KEY_NOT_CONFIGURED' };
-  return { status: 'CONFIGURED', dataset: c.dataset };
+  return {
+    status: 'CONFIGURED',
+    dataset: c.dataset,
+    inference_credential_configured: Boolean(c.inferenceApiKey),
+    inference_model_policy: c.inferenceModel,
+  };
+}
+
+export function cogneeInferenceStatus(env = {}) {
+  const c = cfg(env);
+  if (!c.inferenceApiKey) return { status: 'PENDING_CONFIGURATION', reason: 'VICTOR_COGNEE_API_NOT_CONFIGURED' };
+  return {
+    status: 'CREDENTIAL_CONFIGURED',
+    model_policy: c.inferenceModel,
+    model_verified: c.inferenceModel !== 'AUTO_OPENAI',
+  };
+}
+
+export function getCogneeInferenceCredential(env = {}) {
+  const c = cfg(env);
+  return c.inferenceApiKey || '';
 }
 
 export async function cogneeRemember(env, text, metadata = {}) {
