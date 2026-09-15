@@ -560,12 +560,25 @@ export default {
           .replace(/^\s*[:\-]\s*/, '')
           .trim() || 'Falcon validation code';
         const result = await cogneeRecall(env, diagnosticQuery, { topK: 5, timeoutMs: 10000 });
+        const diagnosticResults = Array.isArray(result.results) ? result.results : [];
+        const serializedResults = JSON.stringify(diagnosticResults).toLowerCase();
+        const firstResult = diagnosticResults[0];
+        const firstResultType = Array.isArray(firstResult) ? 'array' : typeof firstResult;
+        const firstResultKeys = firstResult && typeof firstResult === 'object' && !Array.isArray(firstResult)
+          ? Object.keys(firstResult).slice(0, 12).join(',')
+          : 'n/a';
+        const containsFalcon = serializedResults.includes('falcon');
+        const containsExpectedCode = serializedResults.includes('cf-914-vg');
         const reply = [
           'Cognee recall diagnostic',
           `Status: ${result.status || 'unknown'}`,
           `Dataset: ${result.dataset || 'unknown'}`,
-          `Result count: ${Array.isArray(result.results) ? result.results.length : Number(result.result_count || 0)}`,
+          `Result count: ${diagnosticResults.length || Number(result.result_count || 0)}`,
           `Payload shape: ${result.payload_shape || 'n/a'}`,
+          `First result type: ${firstResultType}`,
+          `First result keys: ${firstResultKeys}`,
+          `Contains Falcon: ${containsFalcon ? 'yes' : 'no'}`,
+          `Contains expected code: ${containsExpectedCode ? 'yes' : 'no'}`,
           `HTTP status: ${result.http_status || 'n/a'}`,
           `Reason: ${result.reason || 'n/a'}`,
           'Secrets exposed: no',
@@ -576,8 +589,12 @@ export default {
           mode: 'LIVE_COGNEE_RECALL_DIAGNOSTIC',
           status: result.status || 'unknown',
           dataset: result.dataset || null,
-          result_count: Array.isArray(result.results) ? result.results.length : Number(result.result_count || 0),
+          result_count: diagnosticResults.length || Number(result.result_count || 0),
           payload_shape: result.payload_shape || null,
+          first_result_type: firstResultType,
+          first_result_keys: firstResultKeys,
+          contains_falcon: containsFalcon,
+          contains_expected_code: containsExpectedCode,
           http_status: result.http_status || null,
           reason: result.reason || null,
           secrets_exposed: false,
