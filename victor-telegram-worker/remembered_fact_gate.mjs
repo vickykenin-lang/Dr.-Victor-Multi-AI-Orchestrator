@@ -33,7 +33,7 @@ function cleanMemoryLead(text) {
 }
 
 function asksForFact(query) {
-  return /\?|\b(?:what|which|who|when|where|code|detail|value|kya|ka|ki|ke|batao)\b/i.test(String(query));
+  return /\?|\b(?:what|which|who|when|where|code|detail|value|kya|ka|ki|ke|batao)\b|(?:क्या|कोड|वैलिडेशन|बताओ|विवरण)/i.test(String(query));
 }
 
 function codeValues(text) {
@@ -48,14 +48,25 @@ function directFactText(text, query) {
   const fragments = cleaned.split(/\n+|(?<=[.!?])\s+/)
     .map(fragment => fragment.replace(/^\s*[-*]\s*/, '').trim())
     .filter(Boolean);
+  const isDirectCandidate = fragment => !fragment.startsWith('{')
+    && !fragment.includes('"text":')
+    && !/^relevant\b|^related\s+facts\b|^document\s+chunk\b/i.test(fragment)
+    && codeValues(fragment).length > 0;
   const direct = fragments.find(fragment => {
-    // JSON and provider headings are evidence containers, not Founder-facing facts.
-    if (fragment.startsWith('{') || fragment.includes('"text":') || /^relevant\b/i.test(fragment)) return false;
+    if (!isDirectCandidate(fragment)) return false;
     const fragmentTerms = tokens(fragment);
     const overlap = [...queryTerms].filter(term => fragmentTerms.has(term));
-    return overlap.length >= 2 && codeValues(fragment).length > 0;
+    return overlap.length >= 2;
   });
-  return direct || cleaned;
+  if (direct) return direct;
+
+  // Some Founder messages use a non-Latin script while the stored entity name is
+  // Latin. With no comparable tokens, only use a single unambiguous coded fact.
+  if (!queryTerms.size) {
+    const candidates = [...new Set(fragments.filter(isDirectCandidate))];
+    if (candidates.length === 1) return candidates[0];
+  }
+  return cleaned;
 }
 
 // A contradiction must be explicit: the same named subject and requested fact
@@ -105,16 +116,24 @@ export function renderRememberedFactForFounder(query, answer) {
 export function selectDirectRememberedFact(query, results = [], sourceRecords = []) {
   if (!asksForFact(query)) return { matched: false, reason: 'NOT_A_FACT_QUESTION' };
   const queryTerms = tokens(query);
-  if (!queryTerms.size) return { matched: false, reason: 'NO_QUERY_TERMS' };
+  const nonLatinFactQuestion = !queryTerms.size
+    && /[^\u0000-\u007F]/.test(String(query))
+    && asksForFact(query);
+  if (!queryTerms.size && !nonLatinFactQuestion) return { matched: false, reason: 'NO_QUERY_TERMS' };
 
-  for (const result of Array.isArray(results) ? results : []) {
+  const recallResults = Array.isArray(results) ? results : [];
+  for (const result of recallResults) {
     const answer = directFactText(recalledText(result), query);
     if (!answer) continue;
     const answerTerms = tokens(answer);
     const overlap = [...queryTerms].filter(term => answerTerms.has(term));
     // A direct answer needs at least two meaningful shared terms. This prevents
     // a vaguely related semantic result from being returned as a fact.
-    if (overlap.length < 2) continue;
+    const unambiguousNonLatinFact = nonLatinFactQuestion
+      && recallResults.length === 1
+      && codeValues(answer).length === 1
+      && !/\n/.test(answer);
+    if (overlap.length < 2 && !unambiguousNonLatinFact) continue;
     if (hasExplicitCanonicalContradiction(query, answer, sourceRecords)) {
       return { matched: false, reason: 'CANONICAL_CONTRADICTION', answer: null };
     }
