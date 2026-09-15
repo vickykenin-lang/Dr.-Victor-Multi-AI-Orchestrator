@@ -38,6 +38,7 @@ import {
 import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from './autonomy_runtime.mjs';
 import { callVictorModel, callCogneeInference } from './model_router.mjs';
 import { memoryBrainStatus, writeVictorMemory, recallVictorMemory } from './memory_brain.mjs';
+import { cogneeRecall } from './cognee_memory_bridge.mjs';
 import { assessReplyNaturalness, buildNaturalReplyDirective } from './reply_integrity.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
@@ -549,6 +550,38 @@ export default {
             secrets_exposed: false,
           }, 200);
         }
+      }
+
+      const explicitMemoryRecallDiagnostic = /\b(memory recall diagnostic|cognee recall diagnostic|debug memory recall)\b/i.test(text);
+      if (!memoryDirective && explicitMemoryRecallDiagnostic) {
+        processingStage = 'LIVE_COGNEE_RECALL_DIAGNOSTIC';
+        const diagnosticQuery = text
+          .replace(/\b(memory recall diagnostic|cognee recall diagnostic|debug memory recall)\b/ig, '')
+          .replace(/^\s*[:\-]\s*/, '')
+          .trim() || 'Falcon validation code';
+        const result = await cogneeRecall(env, diagnosticQuery, { topK: 5, timeoutMs: 10000 });
+        const reply = [
+          'Cognee recall diagnostic',
+          `Status: ${result.status || 'unknown'}`,
+          `Dataset: ${result.dataset || 'unknown'}`,
+          `Result count: ${Array.isArray(result.results) ? result.results.length : Number(result.result_count || 0)}`,
+          `Payload shape: ${result.payload_shape || 'n/a'}`,
+          `HTTP status: ${result.http_status || 'n/a'}`,
+          `Reason: ${result.reason || 'n/a'}`,
+          'Secrets exposed: no',
+        ].join('\n');
+        await sendTelegramMessage(env, chatId, reply, message.message_id);
+        return json({
+          ok: result.status === 'RECALLED',
+          mode: 'LIVE_COGNEE_RECALL_DIAGNOSTIC',
+          status: result.status || 'unknown',
+          dataset: result.dataset || null,
+          result_count: Array.isArray(result.results) ? result.results.length : Number(result.result_count || 0),
+          payload_shape: result.payload_shape || null,
+          http_status: result.http_status || null,
+          reason: result.reason || null,
+          secrets_exposed: false,
+        }, 200);
       }
 
       if (!memoryDirective && shouldUseFactGateway(founderRequest, factRequest)) {

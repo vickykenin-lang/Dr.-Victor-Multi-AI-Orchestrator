@@ -124,8 +124,23 @@ export async function cogneeRecall(env, query, options = {}) {
   } catch {
     return { status: 'FAILED', stage: 'COGNEE_RECALL', reason: 'INVALID_JSON', results: [] };
   }
-  const results = Array.isArray(payload) ? payload : (payload?.results || payload?.items || []);
-  return { status: 'RECALLED', dataset: c.dataset, results };
+  let results = [];
+  let payloadShape = Array.isArray(payload) ? 'array' : typeof payload;
+  if (Array.isArray(payload)) {
+    results = payload;
+  } else if (payload && typeof payload === 'object') {
+    if (Array.isArray(payload.results)) results = payload.results;
+    else if (Array.isArray(payload.items)) results = payload.items;
+    else if (Array.isArray(payload.data)) results = payload.data;
+    else if (Array.isArray(payload.search_results)) results = payload.search_results;
+    else if (typeof payload.context === 'string' && payload.context.trim()) results = [{ context: payload.context }];
+    else if (typeof payload.answer === 'string' && payload.answer.trim()) results = [{ answer: payload.answer, context: payload.context || '' }];
+    payloadShape = 'object:' + Object.keys(payload).slice(0, 12).join(',');
+  } else if (typeof payload === 'string' && payload.trim()) {
+    results = [{ context: payload }];
+    payloadShape = 'string';
+  }
+  return { status: 'RECALLED', dataset: c.dataset, results, result_count: results.length, payload_shape: payloadShape };
 }
 
 export async function cogneeImprove(env, sessionIds = []) {
