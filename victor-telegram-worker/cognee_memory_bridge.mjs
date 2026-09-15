@@ -92,24 +92,32 @@ export async function cogneeRecall(env, query, options = {}) {
   const status = cogneeMemoryStatus(env);
   if (status.status !== 'CONFIGURED') return { ...status, results: [] };
 
+  // Cognee Cloud v1 Recall API uses camelCase JSON fields. Sending the old
+  // snake_case SDK-style names can cause options to be ignored or rejected.
+  const requestBody = {
+    query: String(query || ''),
+    datasets: [c.dataset],
+    topK: Math.max(1, Math.min(Number(options.topK || 5), 15)),
+    onlyContext: true,
+    ...(options.sessionId ? { sessionId: String(options.sessionId) } : {}),
+  };
+
   let res;
   try {
     res = await fetch(`${c.base}/api/v1/recall`, {
       method: 'POST',
       headers: headers(c.apiKey, c.tenantId),
-      body: JSON.stringify({
-        query: String(query || ''),
-        datasets: [c.dataset],
-        top_k: Math.max(1, Math.min(Number(options.topK || 5), 15)),
-        only_context: true,
-        ...(options.sessionId ? { session_id: String(options.sessionId) } : {}),
-      }),
+      body: JSON.stringify(requestBody),
       signal: signal(options.timeoutMs || c.recallTimeoutMs),
     });
   } catch (error) {
     return { status: 'FAILED', stage: 'COGNEE_RECALL', reason: error?.name || 'FETCH_ERROR', results: [] };
   }
-  if (!res.ok) return { status: 'FAILED', stage: 'COGNEE_RECALL', http_status: res.status, results: [] };
+  if (!res.ok) {
+    let detail = null;
+    try { detail = String(await res.text()).slice(0, 500); } catch (_) {}
+    return { status: 'FAILED', stage: 'COGNEE_RECALL', http_status: res.status, detail, results: [] };
+  }
   let payload;
   try {
     payload = await res.json();
