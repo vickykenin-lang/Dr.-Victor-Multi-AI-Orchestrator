@@ -40,6 +40,22 @@ function codeValues(text) {
   return String(text).match(/\b[A-Z]{2,}(?:[-_][A-Z0-9]{2,})+\b/g) || [];
 }
 
+// Recall providers may return a graph/report containing the remembered sentence.
+// Return that sentence, rather than exposing provider scaffolding to the Founder.
+function directFactText(text, query) {
+  const cleaned = cleanMemoryLead(text);
+  const queryTerms = tokens(query);
+  const fragments = cleaned.split(/\n+|(?<=[.!?])\s+/)
+    .map(fragment => fragment.replace(/^\s*[-*]\s*/, '').trim())
+    .filter(Boolean);
+  const direct = fragments.find(fragment => {
+    const fragmentTerms = tokens(fragment);
+    const overlap = [...queryTerms].filter(term => fragmentTerms.has(term));
+    return overlap.length >= 2 && codeValues(fragment).length > 0;
+  });
+  return direct || cleaned;
+}
+
 // A contradiction must be explicit: the same named subject and requested fact
 // must appear in a canonical source with a different concrete value. A missing
 // registry row or a merely related source cannot be a contradiction.
@@ -69,7 +85,7 @@ export function selectDirectRememberedFact(query, results = [], sourceRecords = 
   if (!queryTerms.size) return { matched: false, reason: 'NO_QUERY_TERMS' };
 
   for (const result of Array.isArray(results) ? results : []) {
-    const answer = cleanMemoryLead(recalledText(result));
+    const answer = directFactText(recalledText(result), query);
     if (!answer) continue;
     const answerTerms = tokens(answer);
     const overlap = [...queryTerms].filter(term => answerTerms.has(term));
