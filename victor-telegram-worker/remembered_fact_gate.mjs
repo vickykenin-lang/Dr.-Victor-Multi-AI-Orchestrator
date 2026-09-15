@@ -17,6 +17,37 @@ function tokens(value = '') {
     .filter(word => word.length > 2 && !STOP_WORDS.has(word)));
 }
 
+// Accept a one-character typo in a meaningful Roman-script term, but never
+// make fuzzy matching the only evidence: the caller still requires two matches.
+function oneEditApart(left, right) {
+  if (left === right || left.length < 4 || right.length < 4) return left === right;
+  if (Math.abs(left.length - right.length) > 1) return false;
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+  while (i < left.length && j < right.length) {
+    if (left[i] === right[j]) {
+      i += 1;
+      j += 1;
+      continue;
+    }
+    edits += 1;
+    if (edits > 1) return false;
+    if (left.length > right.length) i += 1;
+    else if (right.length > left.length) j += 1;
+    else {
+      i += 1;
+      j += 1;
+    }
+  }
+  return true;
+}
+
+function matchedTerms(queryTerms, answerTerms) {
+  return [...queryTerms].filter(term => answerTerms.has(term)
+    || [...answerTerms].some(candidate => oneEditApart(term, candidate)));
+}
+
 function recalledText(result) {
   if (typeof result === 'string') return result.trim();
   if (!result || typeof result !== 'object') return '';
@@ -55,7 +86,7 @@ function directFactText(text, query) {
   const direct = fragments.find(fragment => {
     if (!isDirectCandidate(fragment)) return false;
     const fragmentTerms = tokens(fragment);
-    const overlap = [...queryTerms].filter(term => fragmentTerms.has(term));
+    const overlap = matchedTerms(queryTerms, fragmentTerms);
     return overlap.length >= 2;
   });
   if (direct) return direct;
@@ -126,7 +157,7 @@ export function selectDirectRememberedFact(query, results = [], sourceRecords = 
     const answer = directFactText(recalledText(result), query);
     if (!answer) continue;
     const answerTerms = tokens(answer);
-    const overlap = [...queryTerms].filter(term => answerTerms.has(term));
+    const overlap = matchedTerms(queryTerms, answerTerms);
     // A direct answer needs at least two meaningful shared terms. This prevents
     // a vaguely related semantic result from being returned as a fact.
     const unambiguousNonLatinFact = nonLatinFactQuestion
