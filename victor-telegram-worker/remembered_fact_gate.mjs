@@ -81,6 +81,27 @@ function hasExplicitCanonicalContradiction(query, remembered, sourceRecords = []
   return false;
 }
 
+function queryLanguage(query) {
+  const text = String(query || '');
+  if (/[\u0900-\u097F]/.test(text)) return 'HINDI';
+  if (/\b(?:kya|ka|ki|ke|batao|mujhe|chahiye|hai|nahi|yaad|memory)\b/i.test(text)) return 'HINGLISH';
+  return 'ENGLISH';
+}
+
+// The fact selection stays deterministic, while its short presentation follows
+// the Founder's language. It only reformats a parsed subject/property/value
+// sentence; unparseable facts are returned verbatim so no details are invented.
+export function renderRememberedFactForFounder(query, answer) {
+  const text = String(answer || '').trim();
+  const match = text.match(/^(.+?)\s+(?:has|have|had)\s+(?:an?\s+)?(.+?)\s+([A-Z]{2,}(?:[-_][A-Z0-9]{2,})+)\.?$/i);
+  if (!match) return text;
+  const [, subject, property, value] = match;
+  const language = queryLanguage(query);
+  if (language === 'HINDI') return `${subject} का ${property} ${value} है।`;
+  if (language === 'HINGLISH') return `${subject} ka ${property} ${value} hai.`;
+  return text;
+}
+
 export function selectDirectRememberedFact(query, results = [], sourceRecords = []) {
   if (!asksForFact(query)) return { matched: false, reason: 'NOT_A_FACT_QUESTION' };
   const queryTerms = tokens(query);
