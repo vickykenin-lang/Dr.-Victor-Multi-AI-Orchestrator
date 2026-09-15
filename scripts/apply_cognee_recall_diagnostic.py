@@ -1,3 +1,4 @@
+# Triggered by workflow to patch and verify live Cognee recall diagnostics.
 from pathlib import Path
 
 bridge_path = Path('victor-telegram-worker/cognee_memory_bridge.mjs')
