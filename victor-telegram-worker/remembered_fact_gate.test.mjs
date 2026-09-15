@@ -41,3 +41,14 @@ test('extracts the direct fact from a structured Cognee graph response', () => {
   assert.equal(result.matched, true);
   assert.equal(result.answer, 'Project Comet has validation code CM-914-QZ.');
 });
+
+
+test('does not return a JSON evidence container when it embeds the remembered code', () => {
+  const result = selectDirectRememberedFact(
+    'Comet ka validation code kya hai?',
+    [{ text: '{"text":"Project Comet validation code is CM-914-QZ."}\n- Project Comet has validation code CM-914-QZ.' }],
+    [],
+  );
+  assert.equal(result.matched, true);
+  assert.equal(result.answer, 'Project Comet has validation code CM-914-QZ.');
+});
