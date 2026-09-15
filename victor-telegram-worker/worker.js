@@ -39,6 +39,7 @@ import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from 
 import { callVictorModel, callCogneeInference } from './model_router.mjs';
 import { memoryBrainStatus, writeVictorMemory, recallVictorMemory } from './memory_brain.mjs';
 import { cogneeRecall } from './cognee_memory_bridge.mjs';
+import { selectDirectRememberedFact } from './remembered_fact_gate.mjs';
 import { assessReplyNaturalness, buildNaturalReplyDirective } from './reply_integrity.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
@@ -608,29 +609,19 @@ export default {
           const authoritativeMemory = buildMemoryContext(text, [], 0);
           const semanticMemory = await recallVictorMemory(env, text, authoritativeMemory, { topK: 5 });
           const semanticResults = Array.isArray(semanticMemory?.cogneeMemory) ? semanticMemory.cogneeMemory : [];
-          const canonicalTargetEvidencePresent = Boolean(
-            (Array.isArray(factRequest?.targets) && factRequest.targets.length) ||
-            evidence?.rio || evidence?.aura3 || evidence?.tony_stark
-          );
-          const firstSemantic = semanticResults[0];
-          const semanticTextRaw = firstSemantic && typeof firstSemantic === 'object'
-            ? (typeof firstSemantic.text === 'string' ? firstSemantic.text
-              : typeof firstSemantic.context === 'string' ? firstSemantic.context
-              : typeof firstSemantic.answer === 'string' ? firstSemantic.answer
-              : '')
-            : (typeof firstSemantic === 'string' ? firstSemantic : '');
-          const semanticText = String(semanticTextRaw || '')
-            .replace(/^\s*Victor\s*,?\s*remember\s+this\s*[:\-]?\s*/i, '')
-            .replace(/^\s*remember\s+this\s*[:\-]?\s*/i, '')
-            .trim();
+          const rememberedFact = selectDirectRememberedFact(text, semanticResults, [{
+            name: 'FACT_GATEWAY_EVIDENCE',
+            ok: true,
+            text: JSON.stringify(evidence),
+          }]);
           let reply;
-          if (semanticText && !canonicalTargetEvidencePresent) {
-            reply = semanticText;
+          if (rememberedFact.matched) {
+            reply = rememberedFact.answer;
             console.log(JSON.stringify({
               event: 'VICTOR_MEMORY_DIRECT_ANSWER',
               provider: 'COGNEE',
               semantic_result_count: semanticResults.length,
-              canonical_target_evidence_present: false,
+              canonical_contradiction: false,
               secrets_exposed: false,
             }));
           } else if (env.ENABLE_AI_INFERENCE === 'true' && env.API_VICTOR) {
@@ -1272,6 +1263,27 @@ async function callVictorCore(env, userMessage, requestFacts, activeSession = {}
   const core = await loadVictorCore();
   if (!core.ready || !core.architectureLockLoaded) throw codedError('CORE_CONTEXT_UNAVAILABLE', 'Victor canonical governance context unavailable');
 
+  // A normal knowledge question previously returned through callVictorNatural
+  // before Cognee was queried. Resolve a direct remembered fact before the
+  // conversation/system split so registry silence is not mistaken for conflict.
+  const semanticMemory = await recallVictorMemory(
+    env,
+    userMessage,
+    buildMemoryContext(userMessage, core.sourceRecords, 6),
+    { topK: 5 },
+  );
+  const rememberedFact = selectDirectRememberedFact(userMessage, semanticMemory.cogneeMemory, core.sourceRecords);
+  if (rememberedFact.matched) {
+    console.log(JSON.stringify({
+      event: 'VICTOR_MEMORY_DIRECT_ANSWER',
+      provider: 'COGNEE',
+      semantic_result_count: semanticMemory.cogneeMemory.length,
+      canonical_contradiction: false,
+      secrets_exposed: false,
+    }));
+    return rememberedFact.answer;
+  }
+
   const intent = classifyFounderMessage(userMessage);
 
   // Conversation-first: casual talk and explanations behave like a normal AI.
@@ -1288,8 +1300,7 @@ async function callVictorCore(env, userMessage, requestFacts, activeSession = {}
     entityResolutionReason: entity.reason,
   };
   const truthSnapshot = buildTruthSnapshot(core.sourceRecords, facts);
-  let memory = buildMemoryContext(userMessage, core.sourceRecords, 6);
-  memory = await recallVictorMemory(env, userMessage, memory, { topK: 5 });
+  const memory = semanticMemory;
   const entityDirective = entity.matched
     ? `FOUNDER ENTITY RESOLUTION: The message target is ${entity.canonical_name} (${entity.entity_id}) because ${entity.reason}. Answer for this target only. If target is AURA3, do not mention AURA2 unless Founder explicitly asked for comparison.`
     : 'FOUNDER ENTITY RESOLUTION: no special alias matched.';
