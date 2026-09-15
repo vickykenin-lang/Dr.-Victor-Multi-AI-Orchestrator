@@ -555,21 +555,36 @@ export default {
         processingStage = 'FACT_RETRIEVAL';
         try {
           const evidence = await collectFactEvidence(env, text, factRequest);
+          const authoritativeMemory = buildMemoryContext(text, [], 0);
+          const semanticMemory = await recallVictorMemory(env, text, authoritativeMemory, { topK: 5 });
+          const semanticResults = Array.isArray(semanticMemory?.cogneeMemory) ? semanticMemory.cogneeMemory : [];
           let reply;
           if (env.ENABLE_AI_INFERENCE === 'true' && env.API_VICTOR) {
             reply = await askModel(
               env,
-              'Answer from fresh GitHub evidence only. Cover every sub-question. Be natural and concise; never replace facts with reassurance or a status template.',
-              buildFactAnswerPrompt(text, evidence),
+              'Answer from verified evidence. GitHub canonical evidence has precedence. Cognee long-term memory may be used when it directly answers the Founder query and does not conflict with canonical evidence. Never claim a Cognee memory is canonical unless GitHub also supports it. If neither source supports the answer, say UNVERIFIED.',
+              buildFactAnswerPrompt(text, evidence) + `
+
+COGNEE LONG-TERM MEMORY (advisory semantic recall):
+${JSON.stringify(semanticResults)}`,
             );
+          } else if (semanticResults.length) {
+            reply = `Semantic memory recall returned ${semanticResults.length} result(s), but AI synthesis is unavailable.`;
           } else {
             reply = `Fresh evidence fetched at ${evidence.fetched_at_utc}. AI synthesis unavailable; raw fact retrieval succeeded.`;
           }
           await sendTelegramMessage(env, chatId, reply, message.message_id);
-          return json({ ok: true, mode: 'FACT_EVIDENCE_QUERY', targets: factRequest.targets, questions: founderRequest.questions.length });
+          return json({
+            ok: true,
+            mode: 'FACT_EVIDENCE_QUERY',
+            targets: factRequest.targets,
+            questions: founderRequest.questions.length,
+            semantic_recall_status: semanticMemory?.semantic_recall_status || null,
+            semantic_result_count: semanticResults.length,
+          });
         } catch (error) {
           console.error('Fresh fact retrieval failed:', safeErrorMessage(error));
-          await sendTelegramMessage(env, chatId, 'Fresh evidence read fail hua. Main generic status line se gap cover nahi karunga; exact GitHub fact abhi verify nahi hua.', message.message_id);
+          await sendTelegramMessage(env, chatId, 'Fresh evidence read fail hua. Main generic status line se gap cover nahi karunga; exact GitHub/Cognee fact abhi verify nahi hua.', message.message_id);
           return json({ ok: true, mode: 'FACT_EVIDENCE_QUERY_FAILED' });
         }
       }
