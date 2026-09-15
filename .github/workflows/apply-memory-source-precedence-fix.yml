@@ -1,0 +1,47 @@
+name: Apply Memory Source Precedence Fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply_memory_source_precedence_fix.py'
+      - '.github/workflows/apply-memory-source-precedence-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply precedence fix
+        run: python scripts/apply_memory_source_precedence_fix.py
+      - name: Syntax check
+        run: node --check victor-telegram-worker/worker.js
+      - name: Run memory tests
+        run: |
+          node --test victor-telegram-worker/cognee_memory_bridge.test.mjs
+          node --test victor-telegram-worker/memory_brain.test.mjs
+      - name: Guard semantic-memory precedence wording
+        run: |
+          grep -q "Mere absence from a department registry" victor-telegram-worker/worker.js
+          grep -q "Absence from a registry" brain/fact_runtime.mjs
+      - name: Persist patch if changed
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add brain/fact_runtime.mjs victor-telegram-worker/worker.js
+            git commit -m "runtime: fix canonical-silence vs semantic-memory precedence"
+            git push
+          fi
