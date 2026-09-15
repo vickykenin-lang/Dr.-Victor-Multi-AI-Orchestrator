@@ -11,11 +11,14 @@ COGNEE_SERVICE_URL = "https://tenant-0a6a1d31-b1ae-4ac6-97c2-ca7516939878.aws.co
 COGNEE_TENANT_ID = "0a6a1d31-b1ae-4ac6-97c2-ca7516939878"
 COGNEE_MEMORY_ENABLED = "true"
 
+[secrets]
+required = [ "COGNEE_API_KEY" ]
+
 [[kv_namespaces]]
 binding = "VICTOR_CONVERSATION_STATE"
 
 [triggers]
-crons = [ "*/15 * * * *", "30 16 * * *" ]
+crons = [ "*/15 * * * *", "30 16 * * * *" ]
 
 [observability]
 enabled = true
