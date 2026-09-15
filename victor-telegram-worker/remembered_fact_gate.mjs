@@ -64,7 +64,13 @@ function cleanMemoryLead(text) {
 }
 
 function asksForFact(query) {
-  return /\?|\b(?:what|which|who|when|where|code|detail|value|kya|ka|ki|ke|batao)\b|(?:क्या|कोड|वैलिडेशन|बताओ|विवरण)/i.test(String(query));
+  const text = String(query || '');
+  // Semantic recall must only run for an actual question. General chat, commands,
+  // reminders, and pasted notes can contain fact-like words such as "code" but
+  // must never activate this path.
+  const questionCue = /\?|\b(?:what|which|who|when|where|kya|batao)\b|(?:क्या|बताओ)/i.test(text);
+  const factCue = /\b(?:code|validation|detail|value|status|owner|date)\b|(?:कोड|वैलिडेशन|विवरण|स्थिति|मालिक|तारीख)/i.test(text);
+  return questionCue && factCue;
 }
 
 function codeValues(text) {
@@ -97,7 +103,9 @@ function directFactText(text, query) {
     const candidates = [...new Set(fragments.filter(isDirectCandidate))];
     if (candidates.length === 1) return candidates[0];
   }
-  return cleaned;
+  // Provider reports/graphs are evidence for matching only. They are never a
+  // user-facing answer: exposing them leaks internal retrieval scaffolding.
+  return '';
 }
 
 // A contradiction must be explicit: the same named subject and requested fact
