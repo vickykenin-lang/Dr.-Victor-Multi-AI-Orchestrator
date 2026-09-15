@@ -74,3 +74,26 @@ test('does not invent a localized structure for an unparseable remembered fact',
   const fact = 'The Comet rollout needs two approvers.';
   assert.equal(renderRememberedFactForFounder('Comet ke baare mein batao.', fact), fact);
 });
+
+
+test('uses one unambiguous recalled coded fact for a Devanagari fact question', () => {
+  const result = selectDirectRememberedFact(
+    'कॉमेट का वैलिडेशन कोड क्या है?',
+    [{ text: 'Project Comet has validation code CM-914-QZ.' }],
+    [],
+  );
+  assert.equal(result.matched, true);
+  assert.equal(result.answer, 'Project Comet has validation code CM-914-QZ.');
+});
+
+test('does not use a non-Latin fallback when recall contains multiple results', () => {
+  const result = selectDirectRememberedFact(
+    'कॉमेट का वैलिडेशन कोड क्या है?',
+    [
+      { text: 'Project Comet has validation code CM-914-QZ.' },
+      { text: 'Project Nova has validation code NV-123-AB.' },
+    ],
+    [],
+  );
+  assert.equal(result.matched, false);
+});
