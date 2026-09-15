@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectDirectRememberedFact } from './remembered_fact_gate.mjs';
+import { selectDirectRememberedFact, renderRememberedFactForFounder } from './remembered_fact_gate.mjs';
 
 test('returns a direct long-term-memory fact when canonical sources are silent', () => {
   const result = selectDirectRememberedFact(
@@ -51,4 +51,26 @@ test('does not return a JSON evidence container when it embeds the remembered co
   );
   assert.equal(result.matched, true);
   assert.equal(result.answer, 'Project Comet has validation code CM-914-QZ.');
+});
+
+
+test('renders a parsed remembered fact in Hinglish when the Founder uses Hinglish', () => {
+  const reply = renderRememberedFactForFounder(
+    'Comet ka validation code batao.',
+    'Project Comet has validation code CM-914-QZ.',
+  );
+  assert.equal(reply, 'Project Comet ka validation code CM-914-QZ hai.');
+});
+
+test('renders a parsed remembered fact in Hindi when the Founder uses Devanagari', () => {
+  const reply = renderRememberedFactForFounder(
+    'कॉमेट का वैलिडेशन कोड क्या है?',
+    'Project Comet has validation code CM-914-QZ.',
+  );
+  assert.equal(reply, 'Project Comet का validation code CM-914-QZ है।');
+});
+
+test('does not invent a localized structure for an unparseable remembered fact', () => {
+  const fact = 'The Comet rollout needs two approvers.';
+  assert.equal(renderRememberedFactForFounder('Comet ke baare mein batao.', fact), fact);
 });
