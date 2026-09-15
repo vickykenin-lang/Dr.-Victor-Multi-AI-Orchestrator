@@ -39,7 +39,7 @@ import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from 
 import { callVictorModel, callCogneeInference } from './model_router.mjs';
 import { memoryBrainStatus, writeVictorMemory, recallVictorMemory } from './memory_brain.mjs';
 import { cogneeRecall } from './cognee_memory_bridge.mjs';
-import { selectDirectRememberedFact } from './remembered_fact_gate.mjs';
+import { selectDirectRememberedFact, renderRememberedFactForFounder } from './remembered_fact_gate.mjs';
 import { assessReplyNaturalness, buildNaturalReplyDirective } from './reply_integrity.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { resolveFounderIntent, founderDirectionReply, clarificationFallback } from '../brain/founder_intent.mjs';
@@ -1281,7 +1281,7 @@ async function callVictorCore(env, userMessage, requestFacts, activeSession = {}
       canonical_contradiction: false,
       secrets_exposed: false,
     }));
-    return rememberedFact.answer;
+    return renderRememberedFactForFounder(userMessage, rememberedFact.answer);
   }
 
   const intent = classifyFounderMessage(userMessage);
