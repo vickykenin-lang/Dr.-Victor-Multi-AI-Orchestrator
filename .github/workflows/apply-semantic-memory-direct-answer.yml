@@ -1,0 +1,49 @@
+name: Apply Semantic Memory Direct Answer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply_semantic_memory_direct_answer.py'
+      - '.github/workflows/apply-semantic-memory-direct-answer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply semantic direct-answer patch
+        run: python scripts/apply_semantic_memory_direct_answer.py
+      - name: Syntax check worker
+        run: node --check victor-telegram-worker/worker.js
+      - name: Run memory tests
+        run: |
+          node --test victor-telegram-worker/cognee_memory_bridge.test.mjs
+          node --test victor-telegram-worker/memory_brain.test.mjs
+      - name: Verify deterministic memory answer guard
+        run: |
+          grep -q "VICTOR_MEMORY_DIRECT_ANSWER" victor-telegram-worker/worker.js
+          grep -q "canonicalTargetEvidencePresent" victor-telegram-worker/worker.js
+      - name: Persist patch if changed
+        run: |
+          if git diff --quiet; then
+            echo "No runtime changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add victor-telegram-worker/worker.js
+          git commit -m "runtime: answer semantic-only remembered facts deterministically"
+          git push
