@@ -49,6 +49,8 @@ function directFactText(text, query) {
     .map(fragment => fragment.replace(/^\s*[-*]\s*/, '').trim())
     .filter(Boolean);
   const direct = fragments.find(fragment => {
+    // JSON and provider headings are evidence containers, not Founder-facing facts.
+    if (fragment.startsWith('{') || fragment.includes('"text":') || /^relevant\b/i.test(fragment)) return false;
     const fragmentTerms = tokens(fragment);
     const overlap = [...queryTerms].filter(term => fragmentTerms.has(term));
     return overlap.length >= 2 && codeValues(fragment).length > 0;
