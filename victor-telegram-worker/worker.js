@@ -608,8 +608,32 @@ export default {
           const authoritativeMemory = buildMemoryContext(text, [], 0);
           const semanticMemory = await recallVictorMemory(env, text, authoritativeMemory, { topK: 5 });
           const semanticResults = Array.isArray(semanticMemory?.cogneeMemory) ? semanticMemory.cogneeMemory : [];
+          const canonicalTargetEvidencePresent = Boolean(
+            (Array.isArray(factRequest?.targets) && factRequest.targets.length) ||
+            evidence?.rio || evidence?.aura3 || evidence?.tony_stark
+          );
+          const firstSemantic = semanticResults[0];
+          const semanticTextRaw = firstSemantic && typeof firstSemantic === 'object'
+            ? (typeof firstSemantic.text === 'string' ? firstSemantic.text
+              : typeof firstSemantic.context === 'string' ? firstSemantic.context
+              : typeof firstSemantic.answer === 'string' ? firstSemantic.answer
+              : '')
+            : (typeof firstSemantic === 'string' ? firstSemantic : '');
+          const semanticText = String(semanticTextRaw || '')
+            .replace(/^\s*Victor\s*,?\s*remember\s+this\s*[:\-]?\s*/i, '')
+            .replace(/^\s*remember\s+this\s*[:\-]?\s*/i, '')
+            .trim();
           let reply;
-          if (env.ENABLE_AI_INFERENCE === 'true' && env.API_VICTOR) {
+          if (semanticText && !canonicalTargetEvidencePresent) {
+            reply = semanticText;
+            console.log(JSON.stringify({
+              event: 'VICTOR_MEMORY_DIRECT_ANSWER',
+              provider: 'COGNEE',
+              semantic_result_count: semanticResults.length,
+              canonical_target_evidence_present: false,
+              secrets_exposed: false,
+            }));
+          } else if (env.ENABLE_AI_INFERENCE === 'true' && env.API_VICTOR) {
             reply = await askModel(
               env,
               'Answer from the verified evidence provided. GitHub canonical evidence has precedence only when it contains an explicit relevant fact or an explicit contradiction. Cognee long-term memory is valid remembered evidence when it directly answers the Founder query and GitHub is silent. Mere absence from a department registry, file, or canonical source is NOT a conflict and must not cause UNVERIFIED if Cognee contains a direct matching memory. Never call Cognee canonical unless GitHub also supports it. If Cognee directly contains the requested remembered fact and there is no explicit canonical contradiction, answer that fact naturally and identify it as remembered long-term memory when provenance matters. If neither source supports the answer, say UNVERIFIED.',
