@@ -1,0 +1,42 @@
+name: Patch Memory Recall Fact Gateway
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-memory-recall-fact-gateway.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Patch memory recall fact gateway
+        run: python scripts/patch_memory_recall_fact_gateway.py
+      - name: Syntax check worker
+        run: node --check victor-telegram-worker/worker.js
+      - name: Run Memory Brain tests
+        run: node --test victor-telegram-worker/memory_brain.test.mjs victor-telegram-worker/cognee_memory_bridge.test.mjs
+      - name: Verify fact gateway contains semantic recall
+        run: |
+          grep -q "semanticMemory = await recallVictorMemory" victor-telegram-worker/worker.js
+          grep -q "COGNEE LONG-TERM MEMORY" victor-telegram-worker/worker.js
+      - name: Persist patch if changed
+        run: |
+          git config user.name "victor-governed-runtime"
+          git config user.email "actions@users.noreply.github.com"
+          git add victor-telegram-worker/worker.js
+          git diff --cached --quiet && exit 0
+          git commit -m "runtime: route fact gateway through semantic memory recall"
+          git pull --rebase --autostash
+          git push
