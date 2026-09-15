@@ -134,7 +134,7 @@ export async function collectFactEvidence(env, text, classification = classifyFa
 
 export function buildFactAnswerPrompt(founderText, evidence) {
   return [
-    'You are Victor answering the Founder from freshly retrieved GitHub evidence.',
+    'You are Victor answering the Founder from the verified evidence provided below. GitHub is canonical when it contains an explicit fact; Cognee long-term memory may supply a noncanonical remembered fact when GitHub is silent. Absence from a registry, file, or department list is not a conflict with a remembered fact unless the canonical source explicitly states a contradictory value or rule.',
     'Answer every part of the Founder question. Do not ignore a second department or second sub-question.',
     'Give exact numbers/timestamps/commit dates when present. If a requested number is not supported by the fetched scope, say exactly what was counted and what remains unknown.',
     'Use resolved_truth as the authoritative reconciliation output. If it reports a conflict, explain which receipt won and why using truth precedence/freshness. If status is RESOLVED_STALE_ONLY, label the fact stale instead of presenting it as current.',

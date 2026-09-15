@@ -612,7 +612,7 @@ export default {
           if (env.ENABLE_AI_INFERENCE === 'true' && env.API_VICTOR) {
             reply = await askModel(
               env,
-              'Answer from verified evidence. GitHub canonical evidence has precedence. Cognee long-term memory may be used when it directly answers the Founder query and does not conflict with canonical evidence. Never claim a Cognee memory is canonical unless GitHub also supports it. If neither source supports the answer, say UNVERIFIED.',
+              'Answer from the verified evidence provided. GitHub canonical evidence has precedence only when it contains an explicit relevant fact or an explicit contradiction. Cognee long-term memory is valid remembered evidence when it directly answers the Founder query and GitHub is silent. Mere absence from a department registry, file, or canonical source is NOT a conflict and must not cause UNVERIFIED if Cognee contains a direct matching memory. Never call Cognee canonical unless GitHub also supports it. If Cognee directly contains the requested remembered fact and there is no explicit canonical contradiction, answer that fact naturally and identify it as remembered long-term memory when provenance matters. If neither source supports the answer, say UNVERIFIED.',
               buildFactAnswerPrompt(text, evidence) + `
 
 COGNEE LONG-TERM MEMORY (advisory semantic recall):
