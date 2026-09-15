@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 router_path = Path('victor-telegram-worker/model_router.mjs')
 bridge_path = Path('victor-telegram-worker/cognee_memory_bridge.mjs')
@@ -87,6 +88,41 @@ bridge_path.write_text(bridge, encoding='utf-8')
 # ---------------------------------------------------------------------------
 worker = worker_path.read_text(encoding='utf-8')
 
+# Deploy-safety cleanup. Older generated patches left duplicate health keys and a
+# second legacy Cognee diagnostic block in the same scope. Make this cleanup
+# deterministic and idempotent so future generator runs cannot reintroduce the
+# Cloudflare/esbuild redeclaration failure.
+health_pattern = re.compile(
+    r"(        cognee_inference_credential_configured: Boolean\(env\.COGNEE_API_KEY\),\n)"
+    r"(?:        cognee_inference_runtime: '[^']+',\n)+"
+)
+worker, health_cleanup_count = health_pattern.subn(
+    r"\1        cognee_inference_runtime: 'COGNEE_CLOUD_MEMORY_API_V2',\n",
+    worker,
+    count=1,
+)
+worker = worker.replace(
+    "        cognee_auth_circuit_breaker: 'COGNEE_CLOUD_AUTH_401_403_HOLD_V2',",
+    "        cognee_auth_circuit_breaker: 'COGNEE_CLOUD_AUTH_401_403_HOLD_V3',",
+)
+worker = worker.replace(
+    "        if (!env.VICTOR_COGNEE_API && !env.COGNEE_API_KEY) {",
+    "        if (!env.COGNEE_API_KEY) {",
+    1,
+)
+
+legacy_marker = "      const explicitCogneeInferenceDiagnostic = /\\b(cognee inference|cognee smoke|victor_cognee_api|cognee api|test cognee)\\b/i.test(text);"
+legacy_positions = [m.start() for m in re.finditer(re.escape(legacy_marker), worker)]
+if len(legacy_positions) > 1:
+    legacy_start = legacy_positions[1]
+    legacy_end_marker = "\n      if (!memoryDirective && shouldUseFactGateway(founderRequest, factRequest)) {"
+    legacy_end = worker.find(legacy_end_marker, legacy_start)
+    if legacy_end == -1:
+        raise RuntimeError('WORKER_LEGACY_COGNEE_BLOCK_END_NOT_FOUND')
+    worker = worker[:legacy_start] + worker[legacy_end + 1:]
+elif len(legacy_positions) == 0:
+    raise RuntimeError('WORKER_COGNEE_DIAGNOSTIC_ANCHOR_NOT_FOUND')
+
 memory_import = "import { memoryBrainStatus, writeVictorMemory, recallVictorMemory } from './memory_brain.mjs';"
 if memory_import not in worker:
     anchor = "import { callVictorModel, callCogneeInference } from './model_router.mjs';"
@@ -128,6 +164,12 @@ if old_memory_recall in worker:
     worker = worker.replace(old_memory_recall, new_memory_recall, 1)
 elif new_memory_recall not in worker:
     raise RuntimeError('WORKER_MEMORY_RECALL_ANCHOR_NOT_FOUND')
+
+# Hard guards: generator success must imply a deployable single diagnostic path.
+if worker.count(legacy_marker) != 1:
+    raise RuntimeError('WORKER_COGNEE_DIAGNOSTIC_NOT_UNIQUE')
+if worker.count("cognee_inference_runtime:") != 1:
+    raise RuntimeError('WORKER_COGNEE_RUNTIME_HEALTH_KEY_NOT_UNIQUE')
 
 worker_path.write_text(worker, encoding='utf-8')
 
