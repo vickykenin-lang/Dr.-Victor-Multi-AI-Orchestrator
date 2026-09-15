@@ -1,0 +1,43 @@
+name: Enrich Cognee Recall Diagnostic
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'scripts/enrich_cognee_recall_diagnostic.py'
+      - '.github/workflows/enrich-cognee-recall-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply enriched recall diagnostic
+        run: python scripts/enrich_cognee_recall_diagnostic.py
+      - name: Syntax check
+        run: node --check victor-telegram-worker/worker.js
+      - name: Run memory tests
+        run: node --test victor-telegram-worker/cognee_memory_bridge.test.mjs
+      - name: Persist patch if changed
+        run: |
+          if git diff --quiet; then
+            echo 'No runtime change required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add victor-telegram-worker/worker.js
+          git commit -m 'runtime: expose safe Cognee recall relevance diagnostics'
+          git push
