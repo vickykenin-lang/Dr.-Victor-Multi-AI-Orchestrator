@@ -117,3 +117,24 @@ test('does not match a single unrelated typo to a remembered fact', () => {
   );
   assert.equal(result.matched, false);
 });
+
+
+test('never returns a provider graph for a pasted reminder or note', () => {
+  const result = selectDirectRememberedFact(
+    'Mujhe ye sab kal yaad dilana 3 baje. Tool roadmap: code search and image tools.',
+    [{ text: 'Relevant passages\n{"source":"memory","text":"Project Comet has validation code CM-914-QZ."}\nRelated facts\n- Project Comet has validation code CM-914-QZ.' }],
+    [],
+  );
+  assert.equal(result.matched, false);
+  assert.notEqual(result.answer, 'Relevant passages');
+});
+
+test('rejects a graph if it has no clean direct fact fragment', () => {
+  const result = selectDirectRememberedFact(
+    'Comet ka validation code kya hai?',
+    [{ text: 'Relevant passages\n{"source":"memory","entity":"Project Comet","code":"CM-914-QZ"}' }],
+    [],
+  );
+  assert.equal(result.matched, false);
+  assert.notEqual(result.answer, 'Relevant passages');
+});
