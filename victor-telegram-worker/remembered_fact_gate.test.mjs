@@ -97,3 +97,23 @@ test('does not use a non-Latin fallback when recall contains multiple results', 
   );
   assert.equal(result.matched, false);
 });
+
+
+test('accepts two meaningful one-character typos in a direct remembered fact query', () => {
+  const result = selectDirectRememberedFact(
+    'Commet ka validation kode kya hai?',
+    [{ text: 'Project Comet has validation code CM-914-QZ.' }],
+    [],
+  );
+  assert.equal(result.matched, true);
+  assert.equal(result.answer, 'Project Comet has validation code CM-914-QZ.');
+});
+
+test('does not match a single unrelated typo to a remembered fact', () => {
+  const result = selectDirectRememberedFact(
+    'Komet ka detail kya hai?',
+    [{ text: 'Project Comet has validation code CM-914-QZ.' }],
+    [],
+  );
+  assert.equal(result.matched, false);
+});
