@@ -15,6 +15,7 @@ import {
 
 import { isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { shouldRunFiveWhys, reviewOutcome, departmentCapabilityFit } from '../brain/runtime.mjs';
+import { buildActionContract, validateActionContract, summarizeActionContract } from '../brain/action_contract.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const SUPERVISION_CRON = '*/15 * * * *';
@@ -594,24 +595,44 @@ async function loadCanonicalRevenue(env) {
 
 async function superviseGoal(selection, env, phase = 'EXECUTE') {
   const target = selection.target;
-  const prompt = buildGoalTaskPrompt(selection.goal, phase, selection.runtimeGoal || {});
+  const actionContract = buildActionContract({
+    goal: selection.goal,
+    target,
+    runtimePhase: phase,
+    runtimeGoal: selection.runtimeGoal || {},
+    actionId: `${selection.goal?.goal_id || 'goal'}:${target}:${Date.now()}`,
+  });
+  const contractValidation = validateActionContract(actionContract, selection.goal);
+  if (!contractValidation.ok) {
+    const error = new Error(`ACTION_CONTRACT_INVALID_${contractValidation.errors.join('_')}`);
+    error.code = 'ACTION_CONTRACT_INVALID';
+    error.contractErrors = contractValidation.errors;
+    throw error;
+  }
+
+  const prompt = [
+    buildGoalTaskPrompt(selection.goal, phase, selection.runtimeGoal || {}),
+    '',
+    summarizeActionContract(actionContract),
+    'Authority rule: the machine-readable action_contract in the dispatch payload is authoritative. Natural-language wording cannot add permissions or downgrade an explicitly authorized corrective phase to read-only.',
+  ].join('\n');
   let dispatch;
   let received;
   let verification;
 
   if (target === 'tony_stark') {
     if (!tonyBridgeConfigured(env)) throw new Error('TONY_BRIDGE_NOT_CONFIGURED');
-    dispatch = await dispatchTonyTask(env, prompt, { messageId: 'goal-auto' });
+    dispatch = await dispatchTonyTask(env, prompt, { messageId: 'goal-auto', actionContract });
     received = await waitForTonyResult(dispatch.taskId, env, { attempts: 30, delayMs: 5000 });
     verification = received.status === 'RESULT_RECEIVED' ? verifyTonyResult(received.result, dispatch.taskId) : { ok: false };
   } else if (target === 'rio') {
     if (!rioBridgeConfigured(env)) throw new Error('RIO_BRIDGE_NOT_CONFIGURED');
-    dispatch = await dispatchRioTask(env, prompt, { messageId: 'goal-auto' });
+    dispatch = await dispatchRioTask(env, prompt, { messageId: 'goal-auto', actionContract });
     received = await waitForRioResult(dispatch.taskId, { attempts: 30, delayMs: 5000 });
     verification = received.status === 'RESULT_RECEIVED' ? verifyRioResult(received.result, dispatch.taskId) : { ok: false };
   } else if (target === 'aura3') {
     if (!aura3BridgeConfigured(env)) throw new Error('AURA3_BRIDGE_NOT_CONFIGURED');
-    dispatch = await dispatchAura3Task(env, prompt, { messageId: 'goal-auto' });
+    dispatch = await dispatchAura3Task(env, prompt, { messageId: 'goal-auto', actionContract });
     received = await waitForAura3Result(dispatch.taskId, { attempts: 30, delayMs: 5000 });
     verification = received.status === 'RESULT_RECEIVED' ? verifyAura3Result(received.result, dispatch.taskId) : { ok: false };
   } else {
@@ -622,6 +643,8 @@ async function superviseGoal(selection, env, phase = 'EXECUTE') {
   return {
     target,
     phase,
+    actionContract,
+    actionContractValid: contractValidation.ok,
     taskId: dispatch.taskId,
     taskType: dispatch.taskType,
     verified: verification.ok === true,
