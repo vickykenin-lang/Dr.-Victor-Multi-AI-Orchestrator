@@ -1,6 +1,6 @@
 {
   "stage": "picture",
-  "checked_at": "2026-09-22T05:05:10.214326+05:30",
+  "checked_at": "2026-09-22T07:20:43.607709+05:30",
   "pass": false,
   "reason": "KEI_I2V_KEY missing",
   "must_fix": [
