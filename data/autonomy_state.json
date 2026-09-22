@@ -2,12 +2,12 @@
   "schema_version": 2,
   "requested_mode": "AUTONOMOUS_MANAGED_ORCHESTRATOR",
   "decision_mode": "GOAL_DRIVEN_EXECUTIVE",
-  "runtime_status": "AUTONOMOUS_GOAL_CYCLE_VERIFIED",
+  "runtime_status": "AUTONOMOUS_GOAL_CYCLE_NO_PROGRESS",
   "scheduler": "CLOUDFLARE_CRON_BOUND_LIVE_HEALTH_VERIFIED_PENDING_POST_PATCH_GOAL_CYCLE",
   "heartbeat_role": "WATCHDOG_AND_WAKE_NOT_FIXED_DEPARTMENT_ROTATION",
   "governed_dispatch": "DYNAMIC_GOAL_SELECTION_AND_ROUTE_DISPATCH_IMPLEMENTED",
   "automatic_evidence_review": "IMPLEMENTED_AND_DETERMINISTIC_TESTED_PENDING_POST_PATCH_PRODUCTION_CYCLE",
-  "automatic_next_action_loop": "GOAL_SELECT_ROUTE_EXECUTE_VERIFY_REPLAN_IMPLEMENTED",
+  "automatic_next_action_loop": "GOAL_SELECT_ROUTE_EXECUTE_VERIFY_MATERIAL_PROGRESS_REPLAN",
   "founder_reporting_filter": "BOUNDARY_ESCALATION_VERIFIED_OUTCOME_DAILY_SUMMARY",
   "goal_registry": "data/goal_registry.json",
   "goal_runtime_state": "data/goal_runtime_state.json",
@@ -63,13 +63,28 @@
     "manifest": "backups/VICTOR_PRE_GOAL_DRIVEN_ARCHITECTURE_2026-08-28.md"
   },
   "last_cycle_attempt": {
-    "checked_at_utc": "2026-09-22T19:01:25.153Z",
+    "checked_at_utc": "2026-09-22T19:16:19.857Z",
     "cron": "*/15 * * * *",
-    "status": "GOAL_PROGRESS_VERIFIED",
+    "status": "GOAL_NO_PROGRESS_VERIFIED",
     "goal_id": "ORG-REVENUE-001",
     "target": "tony_stark",
     "error_code": null,
     "diagnostics": null
   },
-  "report_card": null
+  "report_card": null,
+  "last_observed_cycle": {
+    "checked_at_utc": "2026-09-22T19:16:19.857Z",
+    "cron": "*/15 * * * *",
+    "status": "GOAL_NO_PROGRESS_VERIFIED",
+    "goal_id": "ORG-REVENUE-001",
+    "target": "tony_stark",
+    "task_id": "victor-tony-1790104544709-goal-auto",
+    "progress_delta": {
+      "material": false,
+      "types": [],
+      "evidence": [],
+      "source": "DETERMINISTIC_INFERENCE",
+      "reason": "CORRECTIVE_EXECUTE_DEGRADED_TO_READ_ONLY_ACTIVITY"
+    }
+  }
 }
