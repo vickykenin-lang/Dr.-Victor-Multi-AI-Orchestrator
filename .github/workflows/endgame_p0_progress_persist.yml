@@ -1,0 +1,53 @@
+name: END GAME P0 Material Progress Persist
+
+on:
+  push:
+    branches:
+      - 'endgame/p0-material-progress-v1'
+    paths:
+      - 'scripts/apply_endgame_p0_progress_runtime.py'
+      - '.github/workflows/endgame_p0_progress_persist.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-persist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@v4
+        with:
+          ref: endgame/p0-material-progress-v1
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply material-progress runtime integration
+        run: python scripts/apply_endgame_p0_progress_runtime.py
+      - name: Run P0-1 and P0-2 regression tests
+        run: >-
+          node --test
+          brain/action_contract.test.mjs
+          brain/progress_contract.test.mjs
+          victor-telegram-worker/department_bridge.test.mjs
+          victor-telegram-worker/autonomy_runtime.test.mjs
+      - name: Syntax check END GAME runtime modules
+        run: |
+          node --check brain/action_contract.mjs
+          node --check brain/progress_contract.mjs
+          node --check victor-telegram-worker/department_bridge.mjs
+          node --check victor-telegram-worker/autonomy_runtime.mjs
+      - name: Persist verified non-workflow runtime changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add victor-telegram-worker/autonomy_runtime.mjs victor-telegram-worker/autonomy_runtime.test.mjs
+          if git diff --cached --quiet; then
+            echo 'Runtime integration already persisted.'
+          else
+            git commit -m 'endgame: integrate material ProgressDelta and convergence V1'
+            git push origin HEAD:endgame/p0-material-progress-v1
+          fi
