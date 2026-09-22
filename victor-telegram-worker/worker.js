@@ -54,6 +54,7 @@ import { classifyFactRequest, collectFactEvidence, buildFactAnswerPrompt } from 
 import { buildRuntimeFounderRequest, buildSessionPatchForRequest, buildFactRequestFromFounderRequest, shouldUseFactGateway } from '../brain/request_gateway.mjs';
 import { shouldExecuteCrossDepartment } from '../brain/execution_plan.mjs';
 import { classifyHulkRequest, hulkActionBlockedReply, hulkStatusReply, isCasualWellbeing, casualWellbeingReply } from '../brain/hulk_guard.mjs';
+import { readActiveFounderGuidance, shouldTreatAsFounderGuidanceAnswer, recordFounderGuidanceAnswer } from '../brain/founder_guidance.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const BEDROCK_BASE = 'https://bedrock-mantle.us-east-1.api.aws/v1';
@@ -355,6 +356,30 @@ export default {
     let processingStage = 'REQUEST_ACCEPTED';
 
     try {
+      processingStage = 'FOUNDER_GUIDANCE_CHECK';
+      const pendingGuidance = await readActiveFounderGuidance(env);
+      if (shouldTreatAsFounderGuidanceAnswer(text, message, pendingGuidance)) {
+        const answered = await recordFounderGuidanceAnswer(env, pendingGuidance, text, {
+          chatId,
+          messageId: message.message_id,
+        });
+        if (answered.status === 'ANSWERED') {
+          await writeConversationSession(chatId, {
+            task_state: 'FOUNDER_GUIDANCE_ANSWERED',
+            founder_guidance_id: answered.record.guidance_id,
+            founder_guidance_goal_id: answered.record.goal_id,
+          }, env);
+          await sendTelegramMessage(
+            env,
+            chatId,
+            `Guidance received for ${answered.record.goal_id}. Victor is replanning now; completion will be claimed only after fresh verified evidence.`,
+            message.message_id,
+          );
+          ctx?.waitUntil(runFounderGuidanceWake(env));
+          return json({ ok: true, mode: 'FOUNDER_GUIDANCE_ANSWER', status: 'ANSWERED', goal_id: answered.record.goal_id });
+        }
+      }
+
       processingStage = 'MEMORY_WRITE';
       let memoryWrite = { status: 'NOT_REQUESTED' };
       const memoryDirective = isExplicitMemoryDirective(text);
@@ -905,6 +930,30 @@ ${JSON.stringify(semanticResults)}`,
 function sanitizeRuntimeError(error) {
   const value = String(error?.message || 'AUTONOMOUS_CYCLE_FAILED').toUpperCase();
   return value.replace(/[^A-Z0-9_:-]/g, '_').slice(0, 120);
+}
+
+
+async function runFounderGuidanceWake(env) {
+  const controller = { cron: 'founder-command', scheduledTime: Date.now() };
+  let result;
+  try {
+    result = await runAutonomousCycle(controller, env);
+  } catch (error) {
+    result = {
+      status: 'SAFE_STOP',
+      target: null,
+      error_code: sanitizeRuntimeError(error),
+    };
+  }
+  await persistAutonomyEvidence(env, controller, result);
+  console.log(JSON.stringify({
+    event: 'VICTOR_FOUNDER_GUIDANCE_WAKE',
+    status: result.status,
+    goal_id: result.goalId || null,
+    target: result.target || null,
+    secrets_exposed: false,
+  }));
+  return result;
 }
 
 async function handleAura3RoundTrip(env, chatId, dispatch, replyToMessageId) {

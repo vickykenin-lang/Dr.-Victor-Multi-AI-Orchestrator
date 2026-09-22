@@ -128,6 +128,7 @@ export function buildExecutiveReasoningPrompt({ goal = {}, runtimeGoal = {}, ava
       recovery_generation: Number(runtimeGoal.recovery_generation || 0),
       last_progress_delta: runtimeGoal.last_progress_delta || null,
       evidence_refs: Array.isArray(runtimeGoal.evidence) ? runtimeGoal.evidence.slice(-12) : [],
+      founder_guidance: runtimeGoal.founder_guidance || null,
     },
     available_departments: unique(availableDepartments),
     instruction: 'Return a strategy proposal only. Deterministic code will validate it and separately build the Action Contract.',

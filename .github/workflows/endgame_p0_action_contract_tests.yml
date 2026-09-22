@@ -11,10 +11,13 @@ on:
       - 'brain/progress_contract.test.mjs'
       - 'brain/executive_reasoning.mjs'
       - 'brain/executive_reasoning.test.mjs'
+      - 'brain/founder_guidance.mjs'
+      - 'brain/founder_guidance.test.mjs'
       - 'victor-telegram-worker/autonomy_runtime.mjs'
       - 'victor-telegram-worker/autonomy_runtime.test.mjs'
       - 'victor-telegram-worker/department_bridge.mjs'
       - 'victor-telegram-worker/department_bridge.test.mjs'
+      - 'victor-telegram-worker/worker.js'
       - '.github/workflows/endgame_p0_action_contract_tests.yml'
 
 permissions:
@@ -37,6 +40,7 @@ jobs:
           brain/action_contract.test.mjs
           brain/progress_contract.test.mjs
           brain/executive_reasoning.test.mjs
+          brain/founder_guidance.test.mjs
           victor-telegram-worker/department_bridge.test.mjs
           victor-telegram-worker/autonomy_runtime.test.mjs
       - name: Syntax check END GAME runtime modules
@@ -44,5 +48,7 @@ jobs:
           node --check brain/action_contract.mjs
           node --check brain/progress_contract.mjs
           node --check brain/executive_reasoning.mjs
+          node --check brain/founder_guidance.mjs
           node --check victor-telegram-worker/department_bridge.mjs
           node --check victor-telegram-worker/autonomy_runtime.mjs
+          node --check victor-telegram-worker/worker.js
