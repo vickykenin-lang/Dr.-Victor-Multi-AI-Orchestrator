@@ -1,4 +1,4 @@
-name: END GAME P0 Action Contract Tests
+name: END GAME P0 Runtime Regression
 
 on:
   push:
@@ -7,6 +7,8 @@ on:
     paths:
       - 'brain/action_contract.mjs'
       - 'brain/action_contract.test.mjs'
+      - 'brain/progress_contract.mjs'
+      - 'brain/progress_contract.test.mjs'
       - 'victor-telegram-worker/autonomy_runtime.mjs'
       - 'victor-telegram-worker/autonomy_runtime.test.mjs'
       - 'victor-telegram-worker/department_bridge.mjs'
@@ -17,7 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  action-contract:
+  endgame-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,14 +29,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run END GAME contract and regression tests
+      - name: Run END GAME contract, progress and runtime regression tests
         run: >-
           node --test
           brain/action_contract.test.mjs
+          brain/progress_contract.test.mjs
           victor-telegram-worker/department_bridge.test.mjs
           victor-telegram-worker/autonomy_runtime.test.mjs
-      - name: Syntax check changed runtime modules
+      - name: Syntax check END GAME runtime modules
         run: |
           node --check brain/action_contract.mjs
+          node --check brain/progress_contract.mjs
           node --check victor-telegram-worker/department_bridge.mjs
           node --check victor-telegram-worker/autonomy_runtime.mjs
