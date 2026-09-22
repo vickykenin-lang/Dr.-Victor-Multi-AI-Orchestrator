@@ -24,7 +24,8 @@ export function buildStrategyFingerprint(actionContract = {}) {
 function explicitProgressDelta(result = {}, strict = {}) {
   const candidate = strict.progress_delta || result.progress_delta || null;
   if (!candidate || typeof candidate !== 'object') return null;
-  const types = stableList(candidate.types || candidate.type ? (Array.isArray(candidate.types) ? candidate.types : [candidate.type]) : []);
+  const rawTypes = Array.isArray(candidate.types) ? candidate.types : (candidate.type ? [candidate.type] : []);
+  const types = stableList(rawTypes);
   const evidence = Array.isArray(candidate.evidence) ? candidate.evidence.filter(Boolean) : [];
   return {
     material: candidate.material === true && types.length > 0,
@@ -86,13 +87,20 @@ export function evaluateProgressDelta({ previousGoal = {}, actionContract = {}, 
   }
 
   const types = [];
-  let source = 'DETERMINISTIC_INFERENCE';
+  const source = 'DETERMINISTIC_INFERENCE';
   let reason = null;
 
   if (assessment.founderGate === true) {
     const changedGate = previousGoal.state !== 'FOUNDER_ONLY_BLOCKER'
       || materiallyDifferentText(nextAction, previousGoal.last_next_action);
     if (changedGate) types.push('FOUNDER_BOUNDARY_VERIFIED');
+  }
+
+  if (assessment.hasBlocker === true) {
+    const blockerChanged = previousGoal.state !== 'BLOCKED_RETRYABLE'
+      || (rootCause && materiallyDifferentText(rootCause, previousGoal.last_root_cause))
+      || materiallyDifferentText(nextAction, previousGoal.last_next_action);
+    if (blockerChanged) types.push('BLOCKER_IDENTIFIED');
   }
 
   if (phase === 'DIAGNOSE') {
@@ -174,7 +182,7 @@ export function nextConvergenceState({ previousGoal = {}, progressDelta = {}, st
   const phase = upper(actionContract.phase);
 
   if (progressDelta.material === true) {
-    const diagnosticRecovery = phase === 'DIAGNOSE' && previousStalled;
+    const diagnosticRecovery = phase === 'DIAGNOSE' && Boolean(previousStalled);
     return {
       no_progress_count: 0,
       stalled_strategy_fingerprint: diagnosticRecovery ? previousStalled : null,
