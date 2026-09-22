@@ -175,3 +175,23 @@ test('reasoner fails closed when AI is disabled or credential is absent', async 
     error => error.code === 'EXECUTIVE_REASONER_CREDENTIAL_MISSING',
   );
 });
+
+
+test('prompt carries FOUNDER_CONFIRMED scoped guidance after Founder answer', () => {
+  const prompt = buildExecutiveReasoningPrompt({
+    goal,
+    runtimeGoal: {
+      state: 'NO_PROGRESS',
+      founder_guidance: {
+        guidance_id: 'ORG-REVENUE-001:4',
+        scope: 'GOAL',
+        answer: 'Prioritize verified conversion evidence when landed-cost ceiling is satisfied.',
+        provenance: 'FOUNDER_CONFIRMED',
+      },
+    },
+    availableDepartments: ['rio', 'tony_stark'],
+    trigger: 'FOUNDER_GUIDANCE_APPLIED',
+  });
+  assert.match(prompt.user, /FOUNDER_CONFIRMED/);
+  assert.match(prompt.user, /Prioritize verified conversion evidence/);
+});

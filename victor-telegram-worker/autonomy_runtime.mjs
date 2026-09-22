@@ -18,6 +18,7 @@ import { shouldRunFiveWhys, reviewOutcome, departmentCapabilityFit } from '../br
 import { buildActionContract, validateActionContract, summarizeActionContract } from '../brain/action_contract.mjs';
 import { buildStrategyFingerprint, evaluateProgressDelta, nextConvergenceState, validateStrategyChange } from '../brain/progress_contract.mjs';
 import { shouldInvokeExecutiveReasoner, requestExecutivePlan } from '../brain/executive_reasoning.mjs';
+import { buildFounderGuidanceRequest, persistFounderGuidanceRequest, readFounderGuidance, attachFounderGuidanceMessage, founderGuidanceContext, consumeFounderGuidance, formatFounderGuidanceQuestion } from '../brain/founder_guidance.mjs';
 import { callVictorModel } from './model_router.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -573,6 +574,33 @@ export async function runAutonomousCycle(controller, env) {
     };
   }
 
+  const storedGuidance = await readFounderGuidance(env, selection.goal.goal_id);
+  if (storedGuidance?.status === 'PENDING') {
+    return {
+      status: 'SAFE_STOP',
+      goalId: selection.goal.goal_id,
+      target: selection.target,
+      error_code: 'FOUNDER_GUIDANCE_PENDING',
+      diagnostics: {
+        stage: 'FOUNDER_GUIDANCE_LOOP',
+        guidance_id: storedGuidance.guidance_id || null,
+        exact_question: storedGuidance.exact_question || null,
+        secrets_exposed: false,
+      },
+    };
+  }
+
+  const answeredGuidance = founderGuidanceContext(storedGuidance);
+  if (answeredGuidance) {
+    selection = {
+      ...selection,
+      runtimeGoal: {
+        ...(selection.runtimeGoal || {}),
+        founder_guidance: answeredGuidance,
+      },
+    };
+  }
+
   let initialPhase = (
     selection.runtimeGoal?.brain_required_mode === 'FIVE_WHYS_BEFORE_NEXT_DISPATCH'
     || Number(selection.runtimeGoal?.same_recommendation_count) >= 2
@@ -583,7 +611,7 @@ export async function runAutonomousCycle(controller, env) {
     : 'EXECUTE';
 
   let executiveReasoning = null;
-  if (shouldInvokeExecutiveReasoner(selection.runtimeGoal || {})) {
+  if (shouldInvokeExecutiveReasoner(selection.runtimeGoal || {}, { force: Boolean(answeredGuidance) })) {
     let reasoned;
     try {
       reasoned = await requestExecutivePlan({
@@ -616,17 +644,39 @@ export async function runAutonomousCycle(controller, env) {
     };
 
     if (reasoned.status === 'FOUNDER_GUIDANCE_NEEDED') {
+      const guidanceRequest = buildFounderGuidanceRequest({
+        goal: selection.goal,
+        reasonedPlan: reasoned.plan,
+        runtimeGoal: selection.runtimeGoal || {},
+      });
+      const persisted = await persistFounderGuidanceRequest(env, guidanceRequest);
+      if (persisted.status === 'PENDING_CONFIGURATION') {
+        return {
+          status: 'SAFE_STOP',
+          goalId: selection.goal.goal_id,
+          target: selection.target,
+          error_code: 'FOUNDER_GUIDANCE_STORE_UNAVAILABLE',
+          diagnostics: { stage: 'FOUNDER_GUIDANCE_LOOP', secrets_exposed: false },
+        };
+      }
+      let telegramMessageId = persisted.record?.telegram_message_id || null;
+      if (persisted.status === 'PERSISTED' || !telegramMessageId) {
+        const sent = await sendFounder(env, formatFounderGuidanceQuestion(persisted.record || guidanceRequest));
+        telegramMessageId = sent?.message_id || null;
+        if (telegramMessageId) {
+          await attachFounderGuidanceMessage(env, selection.goal.goal_id, telegramMessageId);
+        }
+      }
       return {
         status: 'SAFE_STOP',
         goalId: selection.goal.goal_id,
         target: selection.target,
-        error_code: 'FOUNDER_GUIDANCE_REQUIRED',
+        error_code: 'FOUNDER_GUIDANCE_PENDING',
         diagnostics: {
-          stage: 'EXECUTIVE_REASONING_BOUNDARY',
-          strategy_summary: reasoned.plan.strategy_summary,
-          exact_question: reasoned.plan.founder_question,
-          unknowns: reasoned.plan.unknowns,
-          evidence_needed: reasoned.plan.evidence_needed,
+          stage: 'FOUNDER_GUIDANCE_LOOP',
+          guidance_id: persisted.record?.guidance_id || guidanceRequest.guidance_id,
+          exact_question: persisted.record?.exact_question || guidanceRequest.exact_question,
+          telegram_message_id: telegramMessageId,
           secrets_exposed: false,
         },
       };
@@ -642,6 +692,12 @@ export async function runAutonomousCycle(controller, env) {
 
   let outcome = await superviseGoal(selection, env, initialPhase);
   if (executiveReasoning) outcome = { ...outcome, executiveReasoning };
+  if (answeredGuidance && executiveReasoning && outcome?.actionContract?.action_id) {
+    await consumeFounderGuidance(env, selection.goal.goal_id, {
+      actionId: outcome.actionContract.action_id,
+      strategySummary: executiveReasoning.plan?.strategy_summary || null,
+    });
+  }
   state = buildGoalRuntimeState(state, selection, outcome);
 
   if (
@@ -798,6 +854,8 @@ async function sendFounder(env, text) {
     }),
   });
   if (!response.ok) throw new Error(`AUTONOMY_TELEGRAM_HTTP_${response.status}`);
+  const body = await response.json().catch(() => null);
+  return body?.result || null;
 }
 
 export const AUTONOMY_CRONS = { SUPERVISION_CRON, DAILY_REPORT_CRON };
