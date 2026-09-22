@@ -1,26 +1,19 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "runtime_status": "GOAL_DRIVEN_ACTIVE",
   "active_goal_id": "ORG-REVENUE-001",
   "goals": {
     "ORG-REVENUE-001": {
-      "state": "WORKING",
-      "attempts": 4471,
+      "state": "NO_PROGRESS",
+      "attempts": 4473,
       "last_target": "tony_stark",
       "recommended_department": "tony_stark",
-      "last_status": "FIVE_WHYS_DIAGNOSIS_COMPLETED",
-      "last_next_action": "VICTOR_REVIEW_FIVE_WHYS_AND_DISPATCH_CORRECTIVE_ACTION",
-      "last_attempt_at_utc": "2026-09-22T19:01:23.434Z",
+      "last_status": "READ_ONLY_AUDIT_COMPLETED",
+      "last_next_action": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
+      "last_attempt_at_utc": "2026-09-22T19:16:18.141Z",
       "last_verified_progress_at_utc": "2026-09-22T19:01:23.434Z",
       "goal_achieved_at_utc": null,
       "evidence": [
-        "integration/results/audits/victor-tony-1790097351582-goal-auto.json",
-        ".github/workflows/apply-telemetry-guard.yml",
-        ".github/workflows/deploy-pages.yml",
-        "integration/results/tasks/victor-tony-1790098214109-goal-auto.json",
-        "integration/results/audits/victor-tony-1790098214109-goal-auto.json",
-        ".github/workflows/generate-campaign-creative.yml",
-        ".github/workflows/rio.yml",
         "integration/results/tasks/victor-tony-1790098254166-goal-auto.json",
         "integration/results/audits/victor-tony-1790098254166-goal-auto.json",
         ".github/workflows/telemetry-control-room.yml",
@@ -63,22 +56,44 @@
         "integration/results/tasks/victor-tony-1790103649793-goal-auto.json",
         "integration/results/audits/victor-tony-1790103649793-goal-auto.json",
         ".github/workflows/affiliate-attribution.yml",
-        "integration/results/plans/victor-tony-1790103649793-goal-auto.json"
+        "integration/results/plans/victor-tony-1790103649793-goal-auto.json",
+        "integration/results/tasks/victor-tony-1790104511066-goal-auto.json",
+        "integration/results/audits/victor-tony-1790104511066-goal-auto.json",
+        ".github/workflows/apply-emergency-pause-guard.yml",
+        "integration/results/tasks/victor-tony-1790104544709-goal-auto.json",
+        "integration/results/audits/victor-tony-1790104544709-goal-auto.json",
+        ".github/workflows/apply-telemetry-guard.yml",
+        ".github/workflows/deploy-pages.yml"
       ],
       "failure_fingerprint": null,
-      "brain_required_mode": "NORMAL_EXECUTION",
+      "brain_required_mode": "FIVE_WHYS_BEFORE_NEXT_DISPATCH",
       "brain_review": {
         "expected": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
-        "actual": "VICTOR_REVIEW_FIVE_WHYS_AND_DISPATCH_CORRECTIVE_ACTION",
-        "matched": false,
+        "actual": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
+        "matched": true,
         "previous_action": "READ_ONLY_AUDIT_COMPLETED",
-        "repeat_loop_detected": false,
-        "learning_candidate": "MISMATCH_OR_FAILURE_PATTERN_CANDIDATE",
-        "required_next_mode": "NORMAL_REPLAN"
+        "repeat_loop_detected": true,
+        "learning_candidate": "REPEATED_MEANING_FAILURE_PATTERN",
+        "required_next_mode": "FIVE_WHYS_BEFORE_NEXT_DISPATCH"
       },
       "same_failure_count": 0,
-      "same_recommendation_count": 1
+      "same_recommendation_count": 2,
+      "no_progress_count": 2,
+      "stalled_strategy_fingerprint": "tony_stark|CORRECTIVE_EXECUTE|L2|M1|P0|ANALYZE,PROPOSE_OR_APPLY_CODE_CHANGE_SUBJECT_TO_AUTHORITY,READ_REPOSITORY,RETURN_EVIDENCE,RUN_TESTS",
+      "recovery_generation": 0,
+      "must_change_strategy": true,
+      "last_strategy_fingerprint": "tony_stark|CORRECTIVE_EXECUTE|L2|M1|P0|ANALYZE,PROPOSE_OR_APPLY_CODE_CHANGE_SUBJECT_TO_AUTHORITY,READ_REPOSITORY,RETURN_EVIDENCE,RUN_TESTS",
+      "last_progress_delta": {
+        "material": false,
+        "types": [],
+        "evidence": [],
+        "source": "DETERMINISTIC_INFERENCE",
+        "reason": "CORRECTIVE_EXECUTE_DEGRADED_TO_READ_ONLY_ACTIVITY"
+      },
+      "last_root_cause": "WRITE_ENABLED_WORKFLOWS",
+      "last_outcome_progress_fingerprint": null,
+      "last_progress_delta_at_utc": null
     }
   },
-  "note": "Runtime state records progress and routing. It does not redefine the Goal Contract."
+  "note": "Runtime state records material progress separately from verified activity. New artifact filenames alone are not progress."
 }
