@@ -5,24 +5,15 @@
   "goals": {
     "ORG-REVENUE-001": {
       "state": "WORKING",
-      "attempts": 4377,
+      "attempts": 4379,
       "last_target": "tony_stark",
       "recommended_department": "tony_stark",
       "last_status": "READ_ONLY_AUDIT_COMPLETED",
       "last_next_action": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
-      "last_attempt_at_utc": "2026-09-22T07:16:15.730Z",
-      "last_verified_progress_at_utc": "2026-09-22T07:16:15.730Z",
+      "last_attempt_at_utc": "2026-09-22T07:31:27.149Z",
+      "last_verified_progress_at_utc": "2026-09-22T07:31:27.149Z",
       "goal_achieved_at_utc": null,
       "evidence": [
-        "integration/results/tasks/victor-tony-1790054157717-goal-auto.json",
-        "integration/results/audits/victor-tony-1790054157717-goal-auto.json",
-        ".github/workflows/telemetry-control-room.yml",
-        ".github/workflows/victor-rio-transport.yml",
-        "integration/results/plans/victor-tony-1790054157717-goal-auto.json",
-        "integration/results/tasks/victor-tony-1790055917819-goal-auto.json",
-        "integration/results/audits/victor-tony-1790055917819-goal-auto.json",
-        ".github/workflows/campaign-founder-action.yml",
-        "integration/results/tasks/victor-tony-1790055951358-goal-auto.json",
         "OBJECTIVE.md",
         "integration/results/audits/victor-tony-1790055951358-goal-auto.json",
         "integration/results/tasks/victor-tony-1790056820103-goal-auto.json",
@@ -63,21 +54,30 @@
         "integration/results/tasks/victor-tony-1790061347438-goal-auto.json",
         "integration/results/audits/victor-tony-1790061347438-goal-auto.json",
         ".github/workflows/apply-telemetry-guard.yml",
-        ".github/workflows/deploy-pages.yml"
+        ".github/workflows/deploy-pages.yml",
+        "integration/results/tasks/victor-tony-1790062213145-goal-auto.json",
+        "integration/results/audits/victor-tony-1790062213145-goal-auto.json",
+        ".github/workflows/generate-campaign-creative.yml",
+        ".github/workflows/rio.yml",
+        "integration/results/plans/victor-tony-1790062213145-goal-auto.json",
+        "integration/results/tasks/victor-tony-1790062253073-goal-auto.json",
+        "integration/results/audits/victor-tony-1790062253073-goal-auto.json",
+        ".github/workflows/telemetry-control-room.yml",
+        ".github/workflows/victor-rio-transport.yml"
       ],
       "failure_fingerprint": null,
-      "brain_required_mode": "FIVE_WHYS_BEFORE_NEXT_DISPATCH",
+      "brain_required_mode": "NORMAL_EXECUTION",
       "brain_review": {
-        "expected": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
+        "expected": "VICTOR_REVIEW_FIVE_WHYS_AND_DISPATCH_CORRECTIVE_ACTION",
         "actual": "VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN",
-        "matched": true,
-        "previous_action": "READ_ONLY_AUDIT_COMPLETED",
-        "repeat_loop_detected": true,
-        "learning_candidate": "REPEATED_MEANING_FAILURE_PATTERN",
-        "required_next_mode": "FIVE_WHYS_BEFORE_NEXT_DISPATCH"
+        "matched": false,
+        "previous_action": "FIVE_WHYS_DIAGNOSIS_COMPLETED",
+        "repeat_loop_detected": false,
+        "learning_candidate": "MISMATCH_OR_FAILURE_PATTERN_CANDIDATE",
+        "required_next_mode": "NORMAL_REPLAN"
       },
       "same_failure_count": 0,
-      "same_recommendation_count": 2
+      "same_recommendation_count": 1
     }
   },
   "note": "Runtime state records progress and routing. It does not redefine the Goal Contract."
