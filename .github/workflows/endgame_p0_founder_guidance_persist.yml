@@ -1,0 +1,55 @@
+name: END GAME P0 Founder Guidance Persist
+
+on:
+  push:
+    branches:
+      - 'endgame/p0-founder-guidance-v1'
+    paths:
+      - 'scripts/apply_endgame_p0_founder_guidance.py'
+      - '.github/workflows/endgame_p0_founder_guidance_persist.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-persist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@v4
+        with:
+          ref: endgame/p0-founder-guidance-v1
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply Founder Guidance runtime integration
+        run: python scripts/apply_endgame_p0_founder_guidance.py
+      - name: Run END GAME P0-1 through P0-4 tests
+        run: >-
+          node --test
+          brain/action_contract.test.mjs
+          brain/progress_contract.test.mjs
+          brain/executive_reasoning.test.mjs
+          brain/founder_guidance.test.mjs
+          victor-telegram-worker/department_bridge.test.mjs
+          victor-telegram-worker/autonomy_runtime.test.mjs
+      - name: Syntax check Founder Guidance/runtime modules
+        run: |
+          node --check brain/founder_guidance.mjs
+          node --check brain/executive_reasoning.mjs
+          node --check victor-telegram-worker/autonomy_runtime.mjs
+          node --check victor-telegram-worker/worker.js
+      - name: Persist verified runtime integration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add brain/executive_reasoning.mjs brain/executive_reasoning.test.mjs victor-telegram-worker/autonomy_runtime.mjs victor-telegram-worker/worker.js
+          if git diff --cached --quiet; then
+            echo 'Founder Guidance runtime integration already persisted.'
+          else
+            git commit -m 'endgame: integrate scoped Founder Guidance Loop V1'
+            git push origin HEAD:endgame/p0-founder-guidance-v1
+          fi
