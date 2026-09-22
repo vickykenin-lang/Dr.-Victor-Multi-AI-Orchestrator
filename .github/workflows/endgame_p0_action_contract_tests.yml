@@ -1,4 +1,4 @@
-name: END GAME P0 Runtime Tests
+name: END GAME P0 Runtime Regression
 
 on:
   push:
