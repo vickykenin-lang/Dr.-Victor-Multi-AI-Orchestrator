@@ -40,6 +40,35 @@ test('routes governed engineering tasks with fail-closed metadata', () => {
   assert.ok(payload.evidence_requirements.includes('TEST_RESULTS'));
 });
 
+test('explicit Action Contract overrides prompt-derived Tony permissions', () => {
+  const contract = {
+    contract_version: 1,
+    objective_id: 'ORG-REVENUE-001',
+    phase: 'CORRECTIVE_EXECUTE',
+    target: 'tony_stark',
+    requested_actions: [
+      'READ_REPOSITORY',
+      'ANALYZE',
+      'PROPOSE_OR_APPLY_CODE_CHANGE_SUBJECT_TO_AUTHORITY',
+      'RUN_TESTS',
+      'RETURN_EVIDENCE',
+    ],
+    authority_level: 'L2',
+    mutation_allowed: true,
+    production_allowed: false,
+    public_action_allowed: false,
+    spend_allowed: false,
+    expected_progress_delta: ['CORRECTIVE_CHANGE_APPLIED'],
+    exit_criteria: ['TEST_OR_VERIFICATION_EVIDENCE_RETURNED'],
+    founder_gate_if: ['CREDENTIAL_OR_ACCOUNT_IDENTITY_ADMINISTRATION'],
+  };
+  const payload = buildTonyTaskPayload('Tony review next action', contract);
+  assert.deepEqual(payload.requested_actions, contract.requested_actions);
+  assert.equal(payload.authority.maximum_level, 'L2');
+  assert.equal(payload.authority.production_activation_authorized, false);
+  assert.deepEqual(payload.action_contract, contract);
+});
+
 test('dispatches structured Tony payload and preserves Aura payload', async () => {
   const originalFetch = global.fetch;
   const calls = [];
@@ -48,15 +77,33 @@ test('dispatches structured Tony payload and preserves Aura payload', async () =
     return { status: 204, text: async () => '' };
   };
   try {
+    const contract = {
+      contract_version: 1,
+      objective_id: 'ORG-REVENUE-001',
+      phase: 'CORRECTIVE_EXECUTE',
+      target: 'tony_stark',
+      requested_actions: ['READ_REPOSITORY', 'ANALYZE', 'PROPOSE_OR_APPLY_CODE_CHANGE_SUBJECT_TO_AUTHORITY', 'RUN_TESTS', 'RETURN_EVIDENCE'],
+      authority_level: 'L2',
+      mutation_allowed: true,
+      production_allowed: false,
+      public_action_allowed: false,
+      spend_allowed: false,
+      expected_progress_delta: ['CORRECTIVE_CHANGE_APPLIED'],
+      exit_criteria: ['TEST_OR_VERIFICATION_EVIDENCE_RETURNED'],
+      founder_gate_if: ['CREDENTIAL_OR_ACCOUNT_IDENTITY_ADMINISTRATION'],
+    };
     await dispatchTonyTask(
       { GITHUB_ORCHESTRATION_TOKEN: 'test-token' },
-      'Tony RIO audit task implement karo',
-      { messageId: 9 },
+      'Tony review next action',
+      { messageId: 9, actionContract: contract },
     );
     const tonyPayload = JSON.parse(calls[0].inputs.payload);
+    assert.equal(calls[0].inputs.task_type, 'TASK_REQUEST');
     assert.equal(tonyPayload.schema_version, 1);
-    assert.equal(tonyPayload.target_repository, 'vickykenin-lang/rio-affiliate-engine');
+    assert.equal(tonyPayload.target_repository, null);
     assert.equal(tonyPayload.authority.production_activation_authorized, false);
+    assert.deepEqual(tonyPayload.requested_actions, contract.requested_actions);
+    assert.equal(tonyPayload.action_contract.phase, 'CORRECTIVE_EXECUTE');
 
     await dispatchAura3Task(
       { GITHUB_ORCHESTRATION_TOKEN: 'test-token' },

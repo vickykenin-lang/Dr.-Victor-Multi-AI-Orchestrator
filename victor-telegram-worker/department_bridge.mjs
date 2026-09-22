@@ -27,7 +27,10 @@ export async function dispatchAura3Task(env, text, metadata = {}) {
     return { status: 'PENDING_CONFIGURATION', reason: 'GITHUB_ORCHESTRATION_TOKEN_NOT_CONFIGURED' };
   }
 
-  const taskType = selectAura3TaskType(text);
+  const actionContract = metadata.actionContract || null;
+  const taskType = actionContract?.phase === 'CORRECTIVE_EXECUTE'
+    ? 'RECOVERY_EXECUTE'
+    : selectAura3TaskType(text);
   const taskId = `victor-aura3-${Date.now()}-${metadata.messageId || 'msg'}`;
   const response = await fetch(`${GITHUB_API}/repos/${AURA3_REPO}/actions/workflows/${AURA3_WORKFLOW}/dispatches`, {
     method: 'POST',
@@ -41,6 +44,7 @@ export async function dispatchAura3Task(env, text, metadata = {}) {
           founder_message: String(text || '').slice(0, 1000),
           requested_by: 'victor',
           supervision_mode: 'STRICT',
+          action_contract: actionContract,
         }),
       },
     }),
@@ -51,7 +55,7 @@ export async function dispatchAura3Task(env, text, metadata = {}) {
     throw new Error(`AURA3 dispatch HTTP ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
   }
 
-  return { status: 'DISPATCHED', taskId, taskType };
+  return { status: 'DISPATCHED', taskId, taskType, actionContract };
 }
 
 export async function waitForAura3Result(taskId, options = {}) {
@@ -155,17 +159,34 @@ export function shouldContactRio(text, entity) {
 
 export async function dispatchRioTask(env, text, metadata = {}) {
   if (!rioBridgeConfigured(env)) return { status: 'PENDING_CONFIGURATION', reason: 'GITHUB_ORCHESTRATION_TOKEN_NOT_CONFIGURED' };
-  const taskType = selectRioTaskType(text);
+  const actionContract = metadata.actionContract || null;
+  const taskType = actionContract?.phase === 'COMMERCIAL_EXECUTE' ? 'GOAL_EXECUTE' : selectRioTaskType(text);
   const taskId = `victor-rio-${Date.now()}-${metadata.messageId || 'msg'}`;
+  const externalActionAuthorized = actionContract
+    ? actionContract.public_action_allowed === true
+    : taskType === 'GOAL_EXECUTE';
   const response = await fetch(`${GITHUB_API}/repos/${RIO_REPO}/actions/workflows/${RIO_WORKFLOW}/dispatches`, {
     method: 'POST', headers: githubHeaders(env),
-    body: JSON.stringify({ ref: 'main', inputs: { task_id: taskId, task_type: taskType, payload: JSON.stringify({ founder_message: String(text || '').slice(0, 1000), requested_by: 'victor', supervision_mode: 'STRICT', external_action_authorized: taskType === 'GOAL_EXECUTE' }) } }),
+    body: JSON.stringify({
+      ref: 'main',
+      inputs: {
+        task_id: taskId,
+        task_type: taskType,
+        payload: JSON.stringify({
+          founder_message: String(text || '').slice(0, 1000),
+          requested_by: 'victor',
+          supervision_mode: 'STRICT',
+          external_action_authorized: externalActionAuthorized,
+          action_contract: actionContract,
+        }),
+      },
+    }),
   });
   if (response.status !== 204) {
     const detail = await safeText(response);
     throw new Error(`RIO dispatch HTTP ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
   }
-  return { status: 'DISPATCHED', taskId, taskType };
+  return { status: 'DISPATCHED', taskId, taskType, actionContract };
 }
 
 export async function waitForRioResult(taskId, options = {}) {
@@ -237,19 +258,31 @@ export function selectTonyTaskType(text) {
   return 'STATUS_CHECK';
 }
 
-export function buildTonyTaskPayload(text) {
+export function buildTonyTaskPayload(text, actionContract = null) {
   const founderMessage = String(text || '').trim().slice(0, 3000);
   const explicitRepo = (founderMessage.match(/vickykenin-lang\/[A-Za-z0-9._-]+/i)?.[0] || '').replace(/[.,;:!?]+$/, '') || null;
   const lower = founderMessage.toLowerCase();
   const targetRepository = explicitRepo
     || (/\brio\b/.test(lower) ? 'vickykenin-lang/rio-affiliate-engine' : null)
     || (/\b(memory|victor)\b/.test(lower) ? 'vickykenin-lang/Dr.-Victor-Multi-AI-Orchestrator' : null);
-  const requestedActions = ['READ_REPOSITORY', 'ANALYZE', 'RETURN_EVIDENCE'];
-  const requestedLevel = founderMessage.match(/\bL([012])\b/i)?.[1];
-  const maximumLevel = requestedLevel ? `L${requestedLevel}` : 'L2';
+
+  const fallbackActions = ['READ_REPOSITORY', 'ANALYZE', 'RETURN_EVIDENCE'];
   if (/\b(implement|build|create|modify|upgrade|fix|repair|solve)\b/.test(lower)) {
-    requestedActions.push('PROPOSE_OR_APPLY_CODE_CHANGE_SUBJECT_TO_AUTHORITY');
+    fallbackActions.push('PROPOSE_OR_APPLY_CODE_CHANGE_SUBJECT_TO_AUTHORITY');
   }
+  const requestedActions = actionContract?.requested_actions?.length
+    ? [...actionContract.requested_actions]
+    : fallbackActions;
+
+  const requestedLevel = founderMessage.match(/\bL([012])\b/i)?.[1];
+  const contractLevel = /^L[012]$/.test(String(actionContract?.authority_level || ''))
+    ? actionContract.authority_level
+    : null;
+  const maximumLevel = contractLevel || (requestedLevel ? `L${requestedLevel}` : 'L2');
+  const productionAuthorized = actionContract
+    ? actionContract.production_allowed === true
+    : false;
+
   return {
     schema_version: 1,
     objective: founderMessage,
@@ -259,17 +292,18 @@ export function buildTonyTaskPayload(text) {
       requested_by: 'founder_via_victor',
       supervision_mode: 'STRICT',
       maximum_level: maximumLevel,
-      production_activation_authorized: false,
+      production_activation_authorized: productionAuthorized,
     },
     prohibited_actions: [
       'EXPOSE_OR_ROTATE_SECRETS',
       'PAID_ACTION',
       'DESTRUCTIVE_ACTION',
-      'PRODUCTION_DEPLOYMENT',
+      ...(productionAuthorized ? [] : ['PRODUCTION_DEPLOYMENT']),
       'LOCKED_OBJECTIVE_OR_AUTHORITY_CHANGE',
     ],
     evidence_requirements: ['TASK_RESULT_ENVELOPE', 'CHANGED_FILES_OR_PLAN', 'TEST_RESULTS', 'BLOCKERS'],
     founder_message: founderMessage,
+    action_contract: actionContract,
   };
 }
 
@@ -285,13 +319,15 @@ export async function dispatchTonyTask(env, text, metadata = {}) {
     return { status: 'PENDING_CONFIGURATION', reason: 'GITHUB_ORCHESTRATION_TOKEN_NOT_CONFIGURED' };
   }
 
-  const taskType = selectTonyTaskType(text);
+  const actionContract = metadata.actionContract || null;
+  const taskType = actionContract ? 'TASK_REQUEST' : selectTonyTaskType(text);
   const payload = taskType === 'TASK_REQUEST'
-    ? buildTonyTaskPayload(text)
+    ? buildTonyTaskPayload(text, actionContract)
     : {
         founder_message: String(text || '').slice(0, 1000),
         requested_by: 'victor',
         supervision_mode: 'STRICT',
+        action_contract: actionContract,
       };
   const taskId = `victor-tony-${Date.now()}-${metadata.messageId || 'msg'}`;
   const response = await fetch(`${GITHUB_API}/repos/${TONY_REPO}/actions/workflows/${TONY_WORKFLOW}/dispatches`, {
@@ -312,7 +348,7 @@ export async function dispatchTonyTask(env, text, metadata = {}) {
     throw new Error(`TONY dispatch HTTP ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
   }
 
-  return { status: 'DISPATCHED', taskId, taskType };
+  return { status: 'DISPATCHED', taskId, taskType, actionContract };
 }
 
 export async function waitForTonyResult(taskId, env, options = {}) {
