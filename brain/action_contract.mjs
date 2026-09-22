@@ -79,8 +79,11 @@ export function resolveActionPhase({ target, runtimePhase = 'EXECUTE', runtimeGo
   if (requested === 'FIVE_WHYS_DIAGNOSIS' || priorMode === 'FIVE_WHYS_BEFORE_NEXT_DISPATCH') {
     return 'DIAGNOSE';
   }
-  if (requested === 'VERIFY') return 'VERIFY';
-  if (requested === 'MONITOR') return 'MONITOR';
+
+  // A bounded Executive Reasoner may propose one of the canonical phases.
+  // The phase is accepted here only as a planning signal; validateActionContract
+  // still determines whether that phase/target combination is permitted.
+  if (PHASES.has(requested)) return requested;
 
   if (resolvedTarget === 'tony_stark') {
     const correctiveContinuation = requested === 'REPLAN_EXECUTE'
@@ -149,6 +152,7 @@ export function validateActionContract(contract = {}, goal = {}) {
   }
 
   if (phase === 'CORRECTIVE_EXECUTE') {
+    if (!['tony_stark', 'aura3'].includes(target)) errors.push('CORRECTIVE_EXECUTE_TARGET_INVALID');
     if (contract.mutation_allowed !== true) errors.push('CORRECTIVE_EXECUTE_REQUIRES_MUTATION_ALLOWED');
     if (!actions.includes('PROPOSE_OR_APPLY_CODE_CHANGE_SUBJECT_TO_AUTHORITY')) errors.push('CORRECTIVE_EXECUTE_REQUIRES_CHANGE_ACTION');
     if (!actions.includes('RUN_TESTS')) errors.push('CORRECTIVE_EXECUTE_REQUIRES_TESTS');
@@ -165,6 +169,10 @@ export function validateActionContract(contract = {}, goal = {}) {
   } else {
     if (contract.production_allowed === true) errors.push('PRODUCTION_NOT_ALLOWED_FOR_PHASE');
     if (contract.public_action_allowed === true) errors.push('PUBLIC_ACTION_NOT_ALLOWED_FOR_PHASE');
+  }
+
+  if (phase === 'DIAGNOSE' && !['tony_stark', 'hulk'].includes(target)) {
+    errors.push('DIAGNOSE_TARGET_INVALID');
   }
 
   if (actions.some(action => /CREDENTIAL|SECRET|ROTATE|REVOKE|DELETE_ACCOUNT/i.test(String(action)))) {
