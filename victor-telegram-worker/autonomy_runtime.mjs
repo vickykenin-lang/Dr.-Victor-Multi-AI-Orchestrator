@@ -16,6 +16,7 @@ import {
 import { isExecutionPaused } from './emergency_pause_runtime.mjs';
 import { shouldRunFiveWhys, reviewOutcome, departmentCapabilityFit } from '../brain/runtime.mjs';
 import { buildActionContract, validateActionContract, summarizeActionContract } from '../brain/action_contract.mjs';
+import { buildStrategyFingerprint, evaluateProgressDelta, nextConvergenceState, validateStrategyChange } from '../brain/progress_contract.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const SUPERVISION_CRON = '*/15 * * * *';
@@ -137,6 +138,7 @@ export function scoreGoal(goal, runtimeGoal = {}, nowMs = Date.now()) {
   if (runtimeStatus === 'READY') score += 5;
   if (runtimeStatus === 'WORKING') score += 10;
   if (runtimeStatus === 'BLOCKED_RETRYABLE') score += 15;
+  if (runtimeStatus === 'NO_PROGRESS') score += 20;
   if (runtimeGoal?.failure_fingerprint) score += 3;
 
   const lastAttempt = Date.parse(runtimeGoal?.last_attempt_at_utc || '');
@@ -190,7 +192,7 @@ export function buildGoalTaskPrompt(goal, phase = 'EXECUTE', runtimeGoal = {}) {
     'Commercial priority rule: when verified revenue is zero and executable offers/actions exist, prioritize the closest policy-valid revenue/conversion action. Planning, readiness documents, or pillar rotation must not displace an executable higher-impact commercial action unless they remove a verified blocker.',
     'Do not wait for routine Founder approval. Founder is required only for credential/account identity administration, a hard-boundary/goal change, or objective impossibility after governed recovery.',
     'Return fresh evidence. Do not report task completion as goal achievement unless the Goal Contract success conditions are actually verified.',
-    'Return strict_supervision with status, goal_id, outcome_progress, error_or_blocker, root_cause, solution, next_action, evidence, requires_follow_up. Include final_outcome only when final outcome evidence exists.',
+    'Return strict_supervision with status, goal_id, outcome_progress, error_or_blocker, root_cause, solution, next_action, evidence, requires_follow_up, and progress_delta. progress_delta must include material:boolean, types:[], evidence:[] and must describe a real state/evidence/outcome delta, never a newly-created filename by itself. Include final_outcome only when final outcome evidence exists.',
   ].join('\n');
 }
 
@@ -211,16 +213,33 @@ export function buildGoalRuntimeState(previous, selection, outcome, checkedAt = 
   const previousGoals = previous?.goals || {};
   const oldGoal = previousGoals[goalId] || {};
   const assessment = outcome?.assessment || {};
+  const actionContract = outcome?.actionContract || {};
+  const rawResult = outcome?.rawResult || {};
   const achieved = outcome?.verified === true && assessment.goalAchieved === true;
   const founderBlocked = assessment.founderGate === true;
-  const verifiedProgress = outcome?.verified === true && Array.isArray(assessment.evidence) && assessment.evidence.length > 0;
+  const strategyFingerprint = buildStrategyFingerprint(actionContract);
+  const progressDelta = evaluateProgressDelta({
+    previousGoal: oldGoal,
+    actionContract,
+    outcome,
+    rawResult,
+  });
+  const convergence = nextConvergenceState({
+    previousGoal: oldGoal,
+    progressDelta,
+    strategyFingerprint,
+    actionContract,
+  });
+  const materialProgress = progressDelta.material === true;
   const state = achieved
     ? 'GOAL_ACHIEVED_VERIFIED'
     : founderBlocked
       ? 'FOUNDER_ONLY_BLOCKER'
-      : outcome?.verified === true
-        ? (assessment.hasBlocker ? 'BLOCKED_RETRYABLE' : 'WORKING')
-        : 'EXECUTION_UNVERIFIED';
+      : outcome?.verified !== true
+        ? 'EXECUTION_UNVERIFIED'
+        : materialProgress
+          ? (assessment.hasBlocker ? 'BLOCKED_RETRYABLE' : 'WORKING')
+          : 'NO_PROGRESS';
   const failureFingerprint = assessment.hasBlocker
     ? [selection?.target, assessment.status, assessment.nextAction].filter(Boolean).join('|').slice(0, 240)
     : null;
@@ -238,22 +257,28 @@ export function buildGoalRuntimeState(previous, selection, outcome, checkedAt = 
     expected: oldGoal.last_next_action || null,
     actual: assessment.nextAction || null,
     previousAction: oldGoal.last_status || null,
-    sameActionCount: Math.max(sameFailureCount, sameRecommendationCount),
-    hasNewEvidence,
+    sameActionCount: Math.max(sameFailureCount, sameRecommendationCount, convergence.no_progress_count),
+    hasNewEvidence: materialProgress ? hasNewEvidence : false,
   });
-  const fiveWhysRequired = !achieved && !founderBlocked && shouldRunFiveWhys({
-    rootCauseKnown: Boolean(assessment.rootCause),
-    repeatedFailureCount: sameFailureCount,
-    sameRecommendationCount,
-    hasNewEvidence,
-    departmentExplainsFailure: assessment.hasBlocker ? Boolean(assessment.rootCause || assessment.outcomeProgress) : true,
-    confidence: assessment.hasBlocker && !assessment.rootCause ? 'LOW' : 'MEDIUM',
-  });
+  const fiveWhysRequired = !achieved && !founderBlocked && !materialProgress && (
+    convergence.no_progress_count >= 2
+    || shouldRunFiveWhys({
+      rootCauseKnown: Boolean(assessment.rootCause),
+      repeatedFailureCount: Math.max(sameFailureCount, convergence.no_progress_count),
+      sameRecommendationCount,
+      hasNewEvidence: false,
+      departmentExplainsFailure: assessment.hasBlocker ? Boolean(assessment.rootCause || assessment.outcomeProgress) : true,
+      confidence: assessment.hasBlocker && !assessment.rootCause ? 'LOW' : 'MEDIUM',
+    })
+  );
   const evidence = unique([...oldEvidence, ...assessmentEvidence]).slice(-50);
+  const outcomeProgressFingerprint = assessment.outcomeProgress
+    ? JSON.stringify(assessment.outcomeProgress).slice(0, 1000)
+    : null;
 
   return {
     ...previous,
-    schema_version: 1,
+    schema_version: 2,
     runtime_status: achieved ? 'GOAL_ACHIEVED_VERIFIED' : 'GOAL_DRIVEN_ACTIVE',
     active_goal_id: achieved ? null : goalId,
     goals: {
@@ -268,19 +293,27 @@ export function buildGoalRuntimeState(previous, selection, outcome, checkedAt = 
         brain_review: brainReview,
         same_failure_count: sameFailureCount,
         same_recommendation_count: sameRecommendationCount,
+        no_progress_count: convergence.no_progress_count,
+        stalled_strategy_fingerprint: convergence.stalled_strategy_fingerprint,
+        recovery_generation: convergence.recovery_generation,
+        must_change_strategy: convergence.must_change_strategy,
+        last_strategy_fingerprint: strategyFingerprint || null,
+        last_progress_delta: progressDelta,
         last_status: assessment.status || 'UNKNOWN',
         last_next_action: assessment.nextAction || null,
+        last_root_cause: assessment.rootCause || oldGoal.last_root_cause || null,
+        last_outcome_progress_fingerprint: outcomeProgressFingerprint || oldGoal.last_outcome_progress_fingerprint || null,
         last_attempt_at_utc: checkedAt,
-        last_verified_progress_at_utc: verifiedProgress ? checkedAt : (oldGoal.last_verified_progress_at_utc || null),
+        last_verified_progress_at_utc: materialProgress ? checkedAt : (oldGoal.last_verified_progress_at_utc || null),
+        last_progress_delta_at_utc: materialProgress ? checkedAt : (oldGoal.last_progress_delta_at_utc || null),
         goal_achieved_at_utc: achieved ? checkedAt : (oldGoal.goal_achieved_at_utc || null),
         evidence,
         failure_fingerprint: failureFingerprint,
       },
     },
-    note: 'Runtime state records progress and routing. It does not redefine the Goal Contract.',
+    note: 'Runtime state records material progress separately from verified activity. New artifact filenames alone are not progress.',
   };
 }
-
 export function autonomyConfigured(env) {
   return Boolean(
     env.GITHUB_ORCHESTRATION_TOKEN &&
@@ -290,15 +323,20 @@ export function autonomyConfigured(env) {
 }
 
 export function buildAutonomyEvidence(previous, result, controller, checkedAt = new Date().toISOString()) {
-  const verifiedStatuses = new Set(['GOAL_PROGRESS_VERIFIED', 'GOAL_ACHIEVED_VERIFIED', 'DAILY_REPORT_SENT']);
-  const verified = verifiedStatuses.has(result?.status);
+  const materialStatuses = new Set(['GOAL_PROGRESS_VERIFIED', 'GOAL_ACHIEVED_VERIFIED', 'DAILY_REPORT_SENT']);
+  const materialVerified = materialStatuses.has(result?.status);
+  const noProgressVerified = result?.status === 'GOAL_NO_PROGRESS_VERIFIED';
   return {
     ...previous,
     requested_mode: 'AUTONOMOUS_MANAGED_ORCHESTRATOR',
     decision_mode: 'GOAL_DRIVEN_EXECUTIVE',
-    runtime_status: verified ? 'AUTONOMOUS_GOAL_CYCLE_VERIFIED' : 'AUTONOMOUS_GOAL_CYCLE_SAFE_STOP',
-    automatic_next_action_loop: 'GOAL_SELECT_ROUTE_EXECUTE_VERIFY_REPLAN_IMPLEMENTED',
-    last_verified_cycle: verified ? {
+    runtime_status: materialVerified
+      ? 'AUTONOMOUS_GOAL_CYCLE_VERIFIED'
+      : noProgressVerified
+        ? 'AUTONOMOUS_GOAL_CYCLE_NO_PROGRESS'
+        : 'AUTONOMOUS_GOAL_CYCLE_SAFE_STOP',
+    automatic_next_action_loop: 'GOAL_SELECT_ROUTE_EXECUTE_VERIFY_MATERIAL_PROGRESS_REPLAN',
+    last_verified_cycle: materialVerified ? {
       checked_at_utc: checkedAt,
       cron: controller.cron,
       status: result.status,
@@ -306,7 +344,17 @@ export function buildAutonomyEvidence(previous, result, controller, checkedAt = 
       target: result.target || 'all',
       task_id: result.result?.taskId || null,
       evidence_received: result.result?.evidenceReceived ?? true,
+      progress_delta: result.result?.progressDelta || null,
     } : (previous?.last_verified_cycle || null),
+    last_observed_cycle: {
+      checked_at_utc: checkedAt,
+      cron: controller.cron,
+      status: result?.status || 'UNKNOWN',
+      goal_id: result?.goalId || null,
+      target: result?.target || null,
+      task_id: result?.result?.taskId || null,
+      progress_delta: result?.result?.progressDelta || null,
+    },
     last_cycle_attempt: {
       checked_at_utc: checkedAt,
       cron: controller.cron,
@@ -319,7 +367,6 @@ export function buildAutonomyEvidence(previous, result, controller, checkedAt = 
     report_card: result?.reportCard || previous?.report_card || null,
   };
 }
-
 async function readRepoJsonRaw(url, fallback = {}) {
   try {
     const response = await fetch(`${url}?v=${Date.now()}`, { cache: 'no-store' });
@@ -573,13 +620,20 @@ export async function runAutonomousCycle(controller, env) {
     ].join('\n'));
   }
 
+  const finalRuntimeGoal = state.goals?.[selection.goal.goal_id] || {};
+  const cycleStatus = outcome.verified !== true
+    ? 'SAFE_STOP'
+    : outcome.assessment.goalAchieved
+      ? 'GOAL_ACHIEVED_VERIFIED'
+      : finalRuntimeGoal.last_progress_delta?.material === true
+        ? 'GOAL_PROGRESS_VERIFIED'
+        : 'GOAL_NO_PROGRESS_VERIFIED';
+
   return {
-    status: outcome.verified
-      ? (outcome.assessment.goalAchieved ? 'GOAL_ACHIEVED_VERIFIED' : 'GOAL_PROGRESS_VERIFIED')
-      : 'SAFE_STOP',
+    status: cycleStatus,
     goalId: selection.goal.goal_id,
     target: selection.target,
-    result: outcome,
+    result: { ...outcome, progressDelta: finalRuntimeGoal.last_progress_delta || null },
   };
 }
 
@@ -607,6 +661,17 @@ async function superviseGoal(selection, env, phase = 'EXECUTE') {
     const error = new Error(`ACTION_CONTRACT_INVALID_${contractValidation.errors.join('_')}`);
     error.code = 'ACTION_CONTRACT_INVALID';
     error.contractErrors = contractValidation.errors;
+    throw error;
+  }
+
+  const strategyValidation = validateStrategyChange({
+    previousGoal: selection.runtimeGoal || {},
+    actionContract,
+  });
+  if (!strategyValidation.ok) {
+    const error = new Error(strategyValidation.code);
+    error.code = strategyValidation.code;
+    error.strategyValidation = strategyValidation;
     throw error;
   }
 
@@ -645,6 +710,9 @@ async function superviseGoal(selection, env, phase = 'EXECUTE') {
     phase,
     actionContract,
     actionContractValid: contractValidation.ok,
+    strategyFingerprint: strategyValidation.current_fingerprint,
+    strategyChangeValidated: strategyValidation.ok,
+    rawResult: result,
     taskId: dispatch.taskId,
     taskType: dispatch.taskType,
     verified: verification.ok === true,

@@ -221,3 +221,54 @@ test('cron remains watchdog plus 10 PM IST report', () => {
     DAILY_REPORT_CRON: '30 16 * * *',
   });
 });
+
+
+test('read-only corrective result is verified activity but not material progress', () => {
+  const priorProgress = '2026-08-28T17:00:00Z';
+  const next = buildGoalRuntimeState(
+    { goals: { 'ORG-REVENUE-001': { state: 'WORKING', attempts: 10, evidence: ['old.json'], last_verified_progress_at_utc: priorProgress } } },
+    { goal: revenueGoal, target: 'tony_stark' },
+    {
+      verified: true,
+      actionContract: {
+        contract_version: 1,
+        objective_id: 'ORG-REVENUE-001',
+        phase: 'CORRECTIVE_EXECUTE',
+        target: 'tony_stark',
+        requested_actions: ['READ_REPOSITORY', 'ANALYZE', 'PROPOSE_OR_APPLY_CODE_CHANGE_SUBJECT_TO_AUTHORITY', 'RUN_TESTS', 'RETURN_EVIDENCE'],
+        authority_level: 'L2',
+        mutation_allowed: true,
+        production_allowed: false,
+      },
+      rawResult: { repair_executed: false },
+      assessment: {
+        status: 'READ_ONLY_AUDIT_COMPLETED',
+        hasBlocker: false,
+        founderGate: false,
+        goalAchieved: false,
+        nextAction: 'VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN',
+        evidence: ['fresh-audit-filename.json'],
+      },
+    },
+    '2026-08-28T18:00:00Z',
+  );
+  const goal = next.goals['ORG-REVENUE-001'];
+  assert.equal(goal.state, 'NO_PROGRESS');
+  assert.equal(goal.last_progress_delta.material, false);
+  assert.equal(goal.last_verified_progress_at_utc, priorProgress);
+});
+
+test('NO_PROGRESS cycle does not overwrite last materially verified cycle', () => {
+  const prior = {
+    last_verified_cycle: { status: 'GOAL_PROGRESS_VERIFIED', task_id: 'material-task' },
+  };
+  const next = buildAutonomyEvidence(
+    prior,
+    { status: 'GOAL_NO_PROGRESS_VERIFIED', goalId: 'ORG-REVENUE-001', target: 'tony_stark', result: { taskId: 'audit-task', progressDelta: { material: false } } },
+    { cron: '*/15 * * * *' },
+    '2026-08-28T18:00:00Z',
+  );
+  assert.equal(next.runtime_status, 'AUTONOMOUS_GOAL_CYCLE_NO_PROGRESS');
+  assert.equal(next.last_verified_cycle.task_id, 'material-task');
+  assert.equal(next.last_observed_cycle.task_id, 'audit-task');
+});
