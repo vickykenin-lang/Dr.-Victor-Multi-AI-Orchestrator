@@ -17,9 +17,6 @@ required = [ "COGNEE_API_KEY" ]
 [[kv_namespaces]]
 binding = "VICTOR_CONVERSATION_STATE"
 
-[triggers]
-crons = [ "*/15 * * * *", "30 16 * * *" ]
-
 [observability]
 enabled = true
 head_sampling_rate = 1.0
