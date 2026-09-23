@@ -63,7 +63,7 @@
     "manifest": "backups/VICTOR_PRE_GOAL_DRIVEN_ARCHITECTURE_2026-08-28.md"
   },
   "last_cycle_attempt": {
-    "checked_at_utc": "2026-09-23T13:30:15.524Z",
+    "checked_at_utc": "2026-09-23T13:45:17.188Z",
     "cron": "*/15 * * * *",
     "status": "SAFE_STOP",
     "goal_id": "ORG-REVENUE-001",
@@ -72,14 +72,14 @@
     "diagnostics": {
       "stage": "EXECUTIVE_REASONING_BOUNDARY",
       "validation_errors": [
-        "CORRECTIVE_EXECUTE_TARGET_INVALID"
+        "DIAGNOSE_TARGET_INVALID"
       ],
       "secrets_exposed": false
     }
   },
   "report_card": null,
   "last_observed_cycle": {
-    "checked_at_utc": "2026-09-23T13:30:15.524Z",
+    "checked_at_utc": "2026-09-23T13:45:17.188Z",
     "cron": "*/15 * * * *",
     "status": "SAFE_STOP",
     "goal_id": "ORG-REVENUE-001",
