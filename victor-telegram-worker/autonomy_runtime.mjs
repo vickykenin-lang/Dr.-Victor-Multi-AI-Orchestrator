@@ -22,8 +22,7 @@ import { buildFounderGuidanceRequest, persistFounderGuidanceRequest, readFounder
 import { callVictorModel } from './model_router.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
-const SUPERVISION_CRON = '*/15 * * * *';
-const DAILY_REPORT_CRON = '30 16 * * *';
+const MANUAL_FOUNDER_TRIGGER = 'founder-command';
 const VICTOR_REPO = 'vickykenin-lang/Dr.-Victor-Multi-AI-Orchestrator';
 const AUTONOMY_STATE_PATH = 'data/autonomy_state.json';
 const GOAL_RUNTIME_STATE_PATH = 'data/goal_runtime_state.json';
@@ -326,18 +325,18 @@ export function autonomyConfigured(env) {
 }
 
 export function buildAutonomyEvidence(previous, result, controller, checkedAt = new Date().toISOString()) {
-  const materialStatuses = new Set(['GOAL_PROGRESS_VERIFIED', 'GOAL_ACHIEVED_VERIFIED', 'DAILY_REPORT_SENT']);
+  const materialStatuses = new Set(['GOAL_PROGRESS_VERIFIED', 'GOAL_ACHIEVED_VERIFIED']);
   const materialVerified = materialStatuses.has(result?.status);
   const noProgressVerified = result?.status === 'GOAL_NO_PROGRESS_VERIFIED';
   return {
     ...previous,
-    requested_mode: 'AUTONOMOUS_MANAGED_ORCHESTRATOR',
+    requested_mode: 'MANUAL_GOVERNED_ORCHESTRATOR',
     decision_mode: 'GOAL_DRIVEN_EXECUTIVE',
     runtime_status: materialVerified
-      ? 'AUTONOMOUS_GOAL_CYCLE_VERIFIED'
+      ? 'MANUAL_GOAL_CYCLE_VERIFIED'
       : noProgressVerified
-        ? 'AUTONOMOUS_GOAL_CYCLE_NO_PROGRESS'
-        : 'AUTONOMOUS_GOAL_CYCLE_SAFE_STOP',
+        ? 'MANUAL_GOAL_CYCLE_NO_PROGRESS'
+        : 'MANUAL_GOAL_CYCLE_SAFE_STOP',
     automatic_next_action_loop: 'GOAL_SELECT_ROUTE_EXECUTE_VERIFY_MATERIAL_PROGRESS_REPLAN',
     last_verified_cycle: materialVerified ? {
       checked_at_utc: checkedAt,
@@ -499,35 +498,20 @@ async function persistGoalRuntimeState(env, nextState, goalId) {
 }
 
 export async function runAutonomousCycle(controller, env) {
-  if (!autonomyConfigured(env)) throw new Error('AUTONOMY_REQUIRED_BINDINGS_NOT_CONFIGURED');
-
-  if (controller.cron === DAILY_REPORT_CRON) {
-    const registry = await loadGoalRegistry(env);
-    const state = await loadGoalRuntimeState(env);
-    const revenue = await loadCanonicalRevenue(env);
-    const activeGoal = registry.goals.find(goal => goal.goal_id === state.active_goal_id)
-      || registry.goals.find(goal => normalizedState(goal.status) === 'ACTIVE')
-      || null;
-    const activeState = activeGoal ? (state.goals?.[activeGoal.goal_id] || {}) : {};
-    const lines = [
-      'Victor daily goal report',
-      `Goal: ${activeGoal?.title || 'No active goal'}`,
-      `Goal state: ${activeState.state || (activeGoal ? 'READY' : 'NONE')}`,
-      `Last route: ${activeState.last_target || 'Not run yet'}`,
-      `Next route: ${activeState.recommended_department || activeGoal?.primary_department || 'None'}`,
-      `Verified collected revenue: INR ${revenue.collected_revenue_inr} (${revenue.payments_received} payment events)`,
-    ];
-    if (activeState.state === 'FOUNDER_ONLY_BLOCKER') {
-      lines.push(`Action required: ${activeState.last_next_action || 'Founder boundary decision required'}`);
-    } else {
-      lines.push('Aapko abhi routine execution ke liye kuch approve nahi karna.');
-    }
-    await sendFounder(env, lines.join('\n'));
-    return { status: 'DAILY_REPORT_SENT', goalId: activeGoal?.goal_id || null, target: activeState.last_target || null, revenue };
+  if (controller?.cron !== MANUAL_FOUNDER_TRIGGER) {
+    return {
+      status: 'SAFE_STOP',
+      goalId: null,
+      target: null,
+      error_code: 'MANUAL_TRIGGER_REQUIRED',
+      diagnostics: {
+        received_trigger: controller?.cron || null,
+        allowed_trigger: MANUAL_FOUNDER_TRIGGER,
+        secrets_exposed: false,
+      },
+    };
   }
-
-  const manualFounderTrigger = controller?.cron === 'founder-command';
-  if (controller.cron !== SUPERVISION_CRON && !manualFounderTrigger) return { status: 'IGNORED_UNKNOWN_CRON', cron: controller.cron };
+  if (!autonomyConfigured(env)) throw new Error('AUTONOMY_REQUIRED_BINDINGS_NOT_CONFIGURED');
 
   const pause = await isExecutionPaused(env);
   if (pause.paused) return { status: 'SAFE_STOP', goalId: null, target: null, error_code: 'EMERGENCY_PAUSE_ACTIVE', diagnostics: pause };
@@ -759,16 +743,6 @@ export async function runAutonomousCycle(controller, env) {
   };
 }
 
-async function loadCanonicalRevenue(env) {
-  const record = await readRepoJson(env, 'data/revenue_outcomes.json', {});
-  const totals = record?.verified_totals || {};
-  return {
-    status: record?.status || 'NOT_VERIFIED',
-    collected_revenue_inr: Number(totals.collected_revenue_inr) || 0,
-    payments_received: Number(totals.payments_received) || 0,
-  };
-}
-
 async function superviseGoal(selection, env, phase = 'EXECUTE') {
   const target = selection.target;
   const actionContract = buildActionContract({
@@ -858,4 +832,4 @@ async function sendFounder(env, text) {
   return body?.result || null;
 }
 
-export const AUTONOMY_CRONS = { SUPERVISION_CRON, DAILY_REPORT_CRON };
+export const EXECUTION_TRIGGERS = { MANUAL_FOUNDER_TRIGGER };

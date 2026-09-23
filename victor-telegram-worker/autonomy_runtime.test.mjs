@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  AUTONOMY_CRONS,
+  EXECUTION_TRIGGERS,
   autonomyConfigured,
   buildAutonomyEvidence,
   buildGoalRuntimeState,
@@ -9,6 +9,7 @@ import {
   buildVictorReportCard,
   chooseGoalDepartment,
   classifyAutonomyResult,
+  runAutonomousCycle,
   scoreGoal,
   selectAutonomyGoal,
 } from './autonomy_runtime.mjs';
@@ -69,10 +70,10 @@ test('verified goal cycle creates persistent certification evidence', () => {
   const state = buildAutonomyEvidence(
     { last_verified_cycle: null },
     { status: 'GOAL_PROGRESS_VERIFIED', goalId: 'ORG-REVENUE-001', target: 'rio', result: { taskId: 'task-1', evidenceReceived: true } },
-    { cron: '*/15 * * * *' },
+    { cron: 'founder-command' },
     '2026-08-28T18:00:00.000Z',
   );
-  assert.equal(state.runtime_status, 'AUTONOMOUS_GOAL_CYCLE_VERIFIED');
+  assert.equal(state.runtime_status, 'MANUAL_GOAL_CYCLE_VERIFIED');
   assert.equal(state.decision_mode, 'GOAL_DRIVEN_EXECUTIVE');
   assert.equal(state.last_verified_cycle.goal_id, 'ORG-REVENUE-001');
   assert.equal(state.last_verified_cycle.task_id, 'task-1');
@@ -209,17 +210,21 @@ test('10 out of 10 requires objective met evidence', () => {
   assert.equal(card.score, 9);
 });
 
-test('Founder manual executive trigger is a supported execution trigger', async () => {
-  const source = await import('node:fs/promises').then(fs => fs.readFile(new URL('./autonomy_runtime.mjs', import.meta.url), 'utf8'));
-  assert.match(source, /manualFounderTrigger = controller\?\.cron === 'founder-command'/);
-  assert.match(source, /controller\.cron !== SUPERVISION_CRON && !manualFounderTrigger/);
+test('Founder manual executive trigger is the only supported execution trigger', async () => {
+  assert.deepEqual(EXECUTION_TRIGGERS, { MANUAL_FOUNDER_TRIGGER: 'founder-command' });
+  await assert.rejects(
+    () => runAutonomousCycle({ cron: 'founder-command', scheduledTime: Date.now() }, {}),
+    /AUTONOMY_REQUIRED_BINDINGS_NOT_CONFIGURED/,
+  );
 });
 
-test('cron remains watchdog plus 10 PM IST report', () => {
-  assert.deepEqual(AUTONOMY_CRONS, {
-    SUPERVISION_CRON: '*/15 * * * *',
-    DAILY_REPORT_CRON: '30 16 * * *',
-  });
+test('scheduled and unknown triggers fail closed without executing a goal', async () => {
+  for (const cron of ['*/15 * * * *', '30 16 * * *', 'unknown']) {
+    const result = await runAutonomousCycle({ cron, scheduledTime: Date.now() }, {});
+    assert.equal(result.status, 'SAFE_STOP');
+    assert.equal(result.error_code, 'MANUAL_TRIGGER_REQUIRED');
+    assert.equal(result.target, null);
+  }
 });
 
 
@@ -265,10 +270,10 @@ test('NO_PROGRESS cycle does not overwrite last materially verified cycle', () =
   const next = buildAutonomyEvidence(
     prior,
     { status: 'GOAL_NO_PROGRESS_VERIFIED', goalId: 'ORG-REVENUE-001', target: 'tony_stark', result: { taskId: 'audit-task', progressDelta: { material: false } } },
-    { cron: '*/15 * * * *' },
+    { cron: 'founder-command' },
     '2026-08-28T18:00:00Z',
   );
-  assert.equal(next.runtime_status, 'AUTONOMOUS_GOAL_CYCLE_NO_PROGRESS');
+  assert.equal(next.runtime_status, 'MANUAL_GOAL_CYCLE_NO_PROGRESS');
   assert.equal(next.last_verified_cycle.task_id, 'material-task');
   assert.equal(next.last_observed_cycle.task_id, 'audit-task');
 });

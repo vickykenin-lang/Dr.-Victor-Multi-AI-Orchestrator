@@ -89,22 +89,11 @@ const CORE_SOURCES = [
 
 export default {
   async scheduled(controller, env, ctx) {
-    let result;
-    try {
-      result = await runAutonomousCycle(controller, env);
-    } catch (error) {
-      result = {
-        status: 'SAFE_STOP',
-        target: null,
-        error_code: sanitizeRuntimeError(error),
-      };
-    }
-    await persistAutonomyEvidence(env, controller, result);
     console.log(JSON.stringify({
-      event: 'VICTOR_AUTONOMOUS_CYCLE',
+      event: 'VICTOR_SCHEDULED_TRIGGER_DISABLED',
       cron: controller.cron,
-      status: result.status,
-      target: result.target || null,
+      status: 'SAFE_STOP',
+      error_code: 'MANUAL_TRIGGER_REQUIRED',
       secrets_exposed: false,
     }));
   },
@@ -154,12 +143,13 @@ export default {
         anti_bogus_runtime: 'DEAD_END_RECOVERY_V1',
         response_integrity: 'INDEPENDENT_EVIDENCE_LOCK_V1',
         reply_style_guard: 'NATURAL_DIRECT_V1',
-        autonomy_requested_mode: 'AUTONOMOUS_MANAGED_ORCHESTRATOR',
+        autonomy_requested_mode: 'MANUAL_GOVERNED_ORCHESTRATOR',
         autonomy_runtime_configured: autonomyConfigured(env),
-        autonomy_scheduler_bound: true,
-        autonomy_supervision_interval_minutes: 15,
+        autonomy_scheduler_bound: false,
+        autonomy_supervision_interval_minutes: null,
+        autonomy_allowed_trigger: 'founder-command',
         autonomy_evidence_persistence: 'GITHUB_CANONICAL_STATE_V1',
-        autonomy_reporting: 'ESCALATIONS_VERIFIED_SUCCESS_AND_DAILY_SUMMARY',
+        autonomy_reporting: 'MANUAL_TRIGGER_RESULTS_AND_BOUNDARY_ESCALATIONS',
         telegram_brain_gateway: 'BRAIN_FIRST_FOR_EXECUTIVE_AND_CROSS_DEPARTMENT_COMMANDS_V1',
         victor_report_card_target: '10/10',
         victor_report_card_basis: 'VERIFIED_DEPARTMENT_FINAL_OUTCOMES_ONLY',
