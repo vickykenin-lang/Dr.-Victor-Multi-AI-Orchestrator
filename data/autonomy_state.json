@@ -63,21 +63,23 @@
     "manifest": "backups/VICTOR_PRE_GOAL_DRIVEN_ARCHITECTURE_2026-08-28.md"
   },
   "last_cycle_attempt": {
-    "checked_at_utc": "2026-09-23T10:15:38.619Z",
+    "checked_at_utc": "2026-09-23T10:30:16.067Z",
     "cron": "*/15 * * * *",
     "status": "SAFE_STOP",
     "goal_id": "ORG-REVENUE-001",
     "target": "tony_stark",
-    "error_code": "AI_MODEL_ROUTER_EXHAUSTED",
+    "error_code": "EXECUTIVE_PLAN_VALIDATION_FAILED",
     "diagnostics": {
       "stage": "EXECUTIVE_REASONING_BOUNDARY",
-      "validation_errors": [],
+      "validation_errors": [
+        "CORRECTIVE_EXECUTE_TARGET_INVALID"
+      ],
       "secrets_exposed": false
     }
   },
   "report_card": null,
   "last_observed_cycle": {
-    "checked_at_utc": "2026-09-23T10:15:38.619Z",
+    "checked_at_utc": "2026-09-23T10:30:16.067Z",
     "cron": "*/15 * * * *",
     "status": "SAFE_STOP",
     "goal_id": "ORG-REVENUE-001",
