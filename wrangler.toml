@@ -18,7 +18,7 @@ required = [ "COGNEE_API_KEY" ]
 binding = "VICTOR_CONVERSATION_STATE"
 
 [triggers]
-crons = [ "*/15 * * * *", "30 16 * * *" ]
+crons = []
 
 [observability]
 enabled = true

@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "mode": "AUTONOMOUS_MANAGED_ORCHESTRATOR",
+  "mode": "MANUAL_GOVERNED_ORCHESTRATOR",
   "decision_mode": "GOAL_DRIVEN_EXECUTIVE",
   "activation_status": "ACTIVE_GOVERNED_TRIAL",
   "architecture_ref": "docs/VICTOR_GOAL_DRIVEN_EXECUTIVE_ARCHITECTURE.md",
@@ -8,10 +8,18 @@
   "goal_registry_ref": "data/goal_registry.json",
   "goal_runtime_state_ref": "data/goal_runtime_state.json",
   "founder_attention_policy": "BOUNDARY_ESCALATIONS_AND_VERIFIED_OUTCOMES_ONLY",
+  "execution_trigger": {
+    "mode": "FOUNDER_MANUAL_ONLY",
+    "allowed_trigger": "founder-command",
+    "scheduled_execution": false,
+    "cron_execution": false,
+    "github_heartbeat_execution": false
+  },
   "cycle": {
-    "watchdog_minutes": 15,
-    "heartbeat_role": "WATCHDOG_AND_WAKE_NOT_FIXED_DEPARTMENT_ROTATION",
+    "watchdog_minutes": null,
+    "heartbeat_role": "DISABLED_FOR_END_GAME_EXECUTION",
     "event_wake_preferred_when_available": true,
+    "event_wake_authority": "FOUNDER_MANUAL_ONLY",
     "steps": [
       "LOAD_ACTIVE_GOALS",
       "RECONCILE_GOAL_STATE_AND_EVIDENCE",
@@ -114,8 +122,9 @@
     "unchanged_status_notice": false,
     "verified_material_success": true,
     "founder_only_escalation": true,
-    "daily_executive_summary": true,
-    "founder_local_time": "22:00",
+    "daily_executive_summary": false,
+    "on_demand_executive_summary": true,
+    "founder_local_time": null,
     "timezone": "Asia/Kolkata"
   },
   "truth_requirement": "TASK_COMPLETION_IS_NOT_SUCCESS_GOAL_ACHIEVEMENT_REQUIRES_FRESH_REQUIRED_EVIDENCE",

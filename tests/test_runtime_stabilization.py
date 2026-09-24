@@ -1,4 +1,5 @@
 import json
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -11,13 +12,15 @@ def load(path):
 
 
 class RuntimeStabilizationTests(unittest.TestCase):
-    def test_cadence_is_consistent(self):
+    def test_end_game_execution_is_manual_only(self):
         autonomy = load("data/autonomy_policy.json")
-        management = load("data/management_protocol.json")
-        self.assertEqual(autonomy["cycle"]["target_minutes"], 15)
-        self.assertEqual(management["heartbeat"]["default_minutes"], 15)
-        self.assertIn('"*/15 * * * *"', (ROOT / "wrangler.toml").read_text(encoding="utf-8"))
-        self.assertIn("cron: '*/15 * * * *'", (ROOT / ".github/workflows/victor_heartbeat.yml").read_text(encoding="utf-8"))
+        with (ROOT / "wrangler.toml").open("rb") as handle:
+            wrangler = tomllib.load(handle)
+        heartbeat = (ROOT / ".github/workflows/victor_heartbeat.yml").read_text(encoding="utf-8")
+        self.assertEqual(autonomy["execution_trigger"]["mode"], "FOUNDER_MANUAL_ONLY")
+        self.assertEqual(wrangler["triggers"]["crons"], [])
+        self.assertNotIn("schedule:", heartbeat)
+        self.assertIn("workflow_dispatch:", heartbeat)
 
     def test_production_control_plane_has_single_owner(self):
         ownership = load("data/runtime_ownership.json")
