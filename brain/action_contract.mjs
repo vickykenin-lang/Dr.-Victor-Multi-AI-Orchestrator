@@ -76,14 +76,14 @@ export function resolveActionPhase({ target, runtimePhase = 'EXECUTE', runtimeGo
   const priorMode = upper(runtimeGoal?.brain_required_mode);
   const priorRequiredNextMode = upper(runtimeGoal?.brain_review?.required_next_mode);
 
+  // A bounded Executive Reasoner may propose one of the canonical phases.
+  // Preserve that validated phase instead of letting stale recovery state override it.
+  // validateActionContract still determines whether the phase/target pair is permitted.
+  if (PHASES.has(requested)) return requested;
+
   if (requested === 'FIVE_WHYS_DIAGNOSIS' || priorMode === 'FIVE_WHYS_BEFORE_NEXT_DISPATCH') {
     return 'DIAGNOSE';
   }
-
-  // A bounded Executive Reasoner may propose one of the canonical phases.
-  // The phase is accepted here only as a planning signal; validateActionContract
-  // still determines whether that phase/target combination is permitted.
-  if (PHASES.has(requested)) return requested;
 
   if (resolvedTarget === 'tony_stark') {
     const correctiveContinuation = requested === 'REPLAN_EXECUTE'
