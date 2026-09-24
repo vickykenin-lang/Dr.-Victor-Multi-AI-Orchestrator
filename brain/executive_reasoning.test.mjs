@@ -57,6 +57,126 @@ test('parser accepts strict JSON and fenced JSON', () => {
   assert.equal(fenced.strategy_summary, 'x');
 });
 
+test('validator accepts only canonical plan version representations', () => {
+  const basePlan = {
+    strategy_summary: 'Use the governed commercial route.',
+    target: 'rio',
+    phase: 'COMMERCIAL_EXECUTE',
+    expected_progress_delta: ['COMMERCIAL_ACTION_COMPLETED'],
+    confidence: 0.8,
+    needs_founder_guidance: false,
+    founder_question: null,
+  };
+  assert.equal(validateExecutivePlan({ ...basePlan, plan_version: 1 }, { goal, availableDepartments: ['rio'] }).ok, true);
+  assert.equal(validateExecutivePlan({ ...basePlan, plan_version: ' 1 ' }, { goal, availableDepartments: ['rio'] }).ok, true);
+  for (const value of [true, [1], '01', '1e0', 'v1', 2, undefined]) {
+    const result = validateExecutivePlan({ ...basePlan, plan_version: value }, { goal, availableDepartments: ['rio'] });
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.includes('PLAN_VERSION_UNSUPPORTED'));
+  }
+});
+
+test('authority-bearing plan fails closed without a repair call', async () => {
+  let calls = 0;
+  const fakeModel = async () => {
+    calls += 1;
+    return {
+      content: JSON.stringify({
+        plan_version: 1,
+        strategy_summary: 'Attempt an unauthorized plan.',
+        target: 'rio',
+        phase: 'COMMERCIAL_EXECUTE',
+        expected_progress_delta: ['COMMERCIAL_ACTION_COMPLETED'],
+        confidence: 0.8,
+        needs_founder_guidance: false,
+        founder_question: null,
+        spend_allowed: true,
+      }),
+    };
+  };
+  await assert.rejects(
+    requestExecutivePlan({
+      env: { ENABLE_AI_INFERENCE: 'true', API_VICTOR: 'configured-test-handle' },
+      goal,
+      runtimeGoal: {},
+      availableDepartments: ['rio'],
+      callModel: fakeModel,
+    }),
+    error => error.code === 'EXECUTIVE_PLAN_VALIDATION_FAILED'
+      && error.validationErrors.some(item => item.startsWith('AUTHORITY_FIELDS_PROHIBITED:')),
+  );
+  assert.equal(calls, 1);
+});
+
+test('unsupported plan version receives one bounded repair and is revalidated', async () => {
+  let calls = 0;
+  const fakeModel = async () => {
+    calls += 1;
+    return {
+      model: 'test-executive-model',
+      content: JSON.stringify({
+        plan_version: calls === 1 ? 2 : 1,
+        strategy_summary: 'Use the governed commercial route.',
+        target: 'rio',
+        phase: 'COMMERCIAL_EXECUTE',
+        expected_progress_delta: ['COMMERCIAL_ACTION_COMPLETED'],
+        confidence: 0.8,
+        needs_founder_guidance: false,
+        founder_question: null,
+      }),
+    };
+  };
+  const result = await requestExecutivePlan({
+    env: { ENABLE_AI_INFERENCE: 'true', API_VICTOR: 'configured-test-handle' },
+    goal,
+    runtimeGoal: {},
+    availableDepartments: ['rio'],
+    callModel: fakeModel,
+  });
+  assert.equal(calls, 2);
+  assert.equal(result.status, 'PLAN_VALIDATED');
+  assert.equal(result.plan.plan_version, 1);
+});
+
+test('router exhaustion during bounded repair propagates and never uses rejected plan', async () => {
+  let calls = 0;
+  const fakeModel = async () => {
+    calls += 1;
+    if (calls === 2) {
+      const error = new Error('all models failed');
+      error.code = 'AI_MODEL_ROUTER_EXHAUSTED';
+      error.discoveryStatus = 'DISCOVERED';
+      error.modelFailures = [{ model: 'model-a', http_status: 503 }];
+      throw error;
+    }
+    return {
+      content: JSON.stringify({
+        plan_version: 2,
+        strategy_summary: 'Rejected version.',
+        target: 'rio',
+        phase: 'COMMERCIAL_EXECUTE',
+        expected_progress_delta: ['COMMERCIAL_ACTION_COMPLETED'],
+        confidence: 0.8,
+        needs_founder_guidance: false,
+        founder_question: null,
+      }),
+    };
+  };
+  await assert.rejects(
+    requestExecutivePlan({
+      env: { ENABLE_AI_INFERENCE: 'true', API_VICTOR: 'configured-test-handle' },
+      goal,
+      runtimeGoal: {},
+      availableDepartments: ['rio'],
+      callModel: fakeModel,
+    }),
+    error => error.code === 'AI_MODEL_ROUTER_EXHAUSTED'
+      && error.discoveryStatus === 'DISCOVERED'
+      && error.modelFailures.length === 1,
+  );
+  assert.equal(calls, 2);
+});
+
 test('deterministic validator rejects LLM authority fields', () => {
   const result = validateExecutivePlan({
     plan_version: 1,

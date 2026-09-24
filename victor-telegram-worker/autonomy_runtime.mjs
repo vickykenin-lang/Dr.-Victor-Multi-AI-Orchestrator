@@ -23,6 +23,20 @@ import { callVictorModel } from './model_router.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const MANUAL_FOUNDER_TRIGGER = 'founder-command';
+
+export function safeRouterDiagnostics(error) {
+  const safeToken = value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,100}$/.test(value) ? value : 'REDACTED';
+  const failures = Array.isArray(error?.modelFailures) ? error.modelFailures.slice(0, 4) : [];
+  return {
+    discovery_status: error?.discoveryStatus ? safeToken(error.discoveryStatus) : null,
+    model_failures: failures.map(item => ({
+      model: safeToken(item?.model),
+      ...(Number.isInteger(item?.http_status) && item.http_status >= 100 && item.http_status <= 599
+        ? { http_status: item.http_status } : {}),
+      ...(item?.code ? { code: safeToken(item.code) } : {}),
+    })),
+  };
+}
 const VICTOR_REPO = 'vickykenin-lang/Dr.-Victor-Multi-AI-Orchestrator';
 const AUTONOMY_STATE_PATH = 'data/autonomy_state.json';
 const GOAL_RUNTIME_STATE_PATH = 'data/goal_runtime_state.json';
@@ -615,6 +629,7 @@ export async function runAutonomousCycle(controller, env) {
         diagnostics: {
           stage: 'EXECUTIVE_REASONING_BOUNDARY',
           validation_errors: Array.isArray(error?.validationErrors) ? error.validationErrors : [],
+          ...(error?.code === 'AI_MODEL_ROUTER_EXHAUSTED' ? safeRouterDiagnostics(error) : {}),
           secrets_exposed: false,
         },
       };

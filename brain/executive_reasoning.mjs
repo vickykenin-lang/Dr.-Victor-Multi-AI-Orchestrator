@@ -49,6 +49,14 @@ function finiteConfidence(value) {
   return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
 }
 
+function supportedPlanVersion(value) {
+  return value === 1 || (typeof value === 'string' && value.trim() === '1');
+}
+
+function repairableValidationErrors(errors = []) {
+  return errors.length > 0 && !errors.some(error => String(error).startsWith('AUTHORITY_FIELDS_PROHIBITED:'));
+}
+
 function extractJsonText(content) {
   const raw = norm(content);
   if (!raw) throw Object.assign(new Error('Executive reasoner returned empty output'), { code: 'EXECUTIVE_PLAN_EMPTY' });
@@ -170,7 +178,7 @@ export function validateExecutivePlan(plan = {}, { goal = {}, availableDepartmen
   const authorityKeys = findAuthorityKeys(plan);
   if (authorityKeys.length) errors.push(`AUTHORITY_FIELDS_PROHIBITED:${authorityKeys.join(',')}`);
 
-  if (Number(plan.plan_version) !== 1) errors.push('PLAN_VERSION_UNSUPPORTED');
+  if (!supportedPlanVersion(plan.plan_version)) errors.push('PLAN_VERSION_UNSUPPORTED');
   if (!norm(plan.strategy_summary)) errors.push('STRATEGY_SUMMARY_REQUIRED');
 
   const target = norm(plan.target).toLowerCase();
@@ -245,10 +253,11 @@ export async function requestExecutivePlan({
   let parsed = parseExecutivePlan(result?.content || '');
   let validation = validateExecutivePlan(parsed, { goal, availableDepartments });
   let finalResult = result;
-  if (!validation.ok) {
+  if (!validation.ok && repairableValidationErrors(validation.errors)) {
     const repairSystem = [
       'You are Victor Executive Reasoner repairing one rejected strategy proposal.',
       'Return ONLY one corrected JSON object matching the original planning schema.',
+      'The plan_version field must be the JSON number 1.',
       'Do not add authority, credential, spend, production, public-action, pause, or security fields.',
       'Correct every deterministic validation error without weakening or bypassing any rule.',
     ].join('\n');

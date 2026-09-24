@@ -210,6 +210,7 @@ export async function callVictorModel(env, system, userMessage, options = {}) {
   const error = new Error('No compatible Victor model produced a valid response');
   error.code = 'AI_MODEL_ROUTER_EXHAUSTED';
   error.modelFailures = failures;
+  error.discoveryStatus = route.discovery_status;
   throw error;
 }
 
