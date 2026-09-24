@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRuntimeFounderRequest, buildSessionPatchForRequest, buildFactRequestFromFounderRequest, shouldUseFactGateway } from './request_gateway.mjs';
+import { buildRuntimeFounderRequest, buildSessionPatchForRequest, buildFactRequestFromFounderRequest, shouldUseFactGateway, isExplicitExecutiveGoalCommand } from './request_gateway.mjs';
 
 test('explicit topic switch clears stale task lineage', () => {
   const session = { last_target: 'rio', last_task_id: 'victor-rio-old', parent_task_id: 'parent-old', unresolved_question: 'old rio issue' };
@@ -30,4 +30,10 @@ test('plain conversation does not force fact retrieval', () => {
   const fact = buildFactRequestFromFounderRequest(request, text);
   assert.equal(request.evidence_required, false);
   assert.equal(shouldUseFactGateway(request, fact), false);
+});
+
+test('explicit organization goal execution command is deterministic', () => {
+  assert.equal(isExplicitExecutiveGoalCommand('Victor, ORG-REVENUE-001 ko abhi manually execute karo. Existing governance, validation, SAFE_STOP aur evidence persistence follow karke verified result do.'), true);
+  assert.equal(isExplicitExecutiveGoalCommand('ORG-REVENUE-001 ka current status aur evidence batao'), false);
+  assert.equal(isExplicitExecutiveGoalCommand('RIO ko manually execute karo'), false);
 });

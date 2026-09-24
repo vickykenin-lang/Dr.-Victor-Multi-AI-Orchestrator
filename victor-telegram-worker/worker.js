@@ -51,7 +51,7 @@ import { classifyOwnedProblem, buildOwnedProblemPrompt, naturalOwnedProblemAck }
 import { createOwnedOutcomeState, assessVerifiedDepartmentResult, shouldContinueOwnedRecovery, buildOwnedRecoveryDirective } from '../brain/outcome_state.mjs';
 import { conversationStateCapability, readConversationState, writeConversationState } from '../brain/conversation_state_store.mjs';
 import { classifyFactRequest, collectFactEvidence, buildFactAnswerPrompt } from '../brain/fact_runtime.mjs';
-import { buildRuntimeFounderRequest, buildSessionPatchForRequest, buildFactRequestFromFounderRequest, shouldUseFactGateway } from '../brain/request_gateway.mjs';
+import { buildRuntimeFounderRequest, buildSessionPatchForRequest, buildFactRequestFromFounderRequest, shouldUseFactGateway, isExplicitExecutiveGoalCommand } from '../brain/request_gateway.mjs';
 import { shouldExecuteCrossDepartment } from '../brain/execution_plan.mjs';
 import { classifyHulkRequest, hulkActionBlockedReply, hulkStatusReply, isCasualWellbeing, casualWellbeingReply } from '../brain/hulk_guard.mjs';
 import { readActiveFounderGuidance, shouldTreatAsFounderGuidanceAnswer, recordFounderGuidanceAnswer } from '../brain/founder_guidance.mjs';
@@ -403,6 +403,7 @@ export default {
       const ownedProblem = classifyOwnedProblem(text, sessionWithFounderTurn);
       const deadEnd = detectDeadEndLoop(text, sessionWithFounderTurn);
       const factRequest = buildFactRequestFromFounderRequest(founderRequest, text);
+      const explicitExecutiveGoalCommand = isExplicitExecutiveGoalCommand(text);
       const hulkRequest = classifyHulkRequest(text);
 
       if (!memoryDirective && isCasualWellbeing(text)) {
@@ -617,7 +618,7 @@ export default {
         }, 200);
       }
 
-      if (!memoryDirective && shouldUseFactGateway(founderRequest, factRequest)) {
+      if (!memoryDirective && !explicitExecutiveGoalCommand && shouldUseFactGateway(founderRequest, factRequest)) {
         processingStage = 'FACT_RETRIEVAL';
         try {
           const evidence = await collectFactEvidence(env, text, factRequest);
@@ -771,7 +772,9 @@ ${JSON.stringify(semanticResults)}`,
         return json({ ok: true, mode: deterministicIntent.mode, reason: deterministicIntent.reason });
       }
 
-      const plan = await planFounderRequest(env, text, replyContext, sessionWithFounderTurn);
+      const plan = explicitExecutiveGoalCommand
+        ? { mode: 'EXECUTIVE_GOAL', target: null, reason: 'explicit_organization_goal_execution_command' }
+        : await planFounderRequest(env, text, replyContext, sessionWithFounderTurn);
 
       if (!memoryDirective && plan.mode === 'EXECUTIVE_GOAL') {
         processingStage = 'EXECUTIVE_EXECUTION';

@@ -89,3 +89,10 @@ export function buildFactRequestFromFounderRequest(request = {}, rawText = '') {
 export function shouldUseFactGateway(request = {}, factRequest = {}) {
   return request?.evidence_required === true || (request?.requested_facts || []).length > 0 || factRequest?.matched === true;
 }
+
+export function isExplicitExecutiveGoalCommand(text = '') {
+  const normalized = String(text || '').trim();
+  const namesOrganizationGoal = /\bORG-[A-Z0-9-]+\b/i.test(normalized);
+  const requestsExecution = /\b(execute|run|start|resume|continue|chalao|chala do|shuru karo|aage badhao)\b/i.test(normalized);
+  return namesOrganizationGoal && requestsExecution;
+}
