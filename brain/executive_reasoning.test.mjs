@@ -45,6 +45,9 @@ test('reasoning prompt contains evidence and explicitly denies authority', () =>
   assert.match(prompt.system, /Do not grant permissions/i);
   assert.match(prompt.user, /READ_ONLY_AUDIT_COMPLETED/);
   assert.match(prompt.user, /audit\.json/);
+  assert.match(prompt.user, /phase_target_contract/);
+  assert.match(prompt.user, /DIAGNOSE/);
+  assert.match(prompt.user, /tony_stark/);
 });
 
 test('parser accepts strict JSON and fenced JSON', () => {
@@ -174,6 +177,62 @@ test('reasoner fails closed when AI is disabled or credential is absent', async 
     requestExecutivePlan({ env: { ENABLE_AI_INFERENCE: 'true' }, goal, runtimeGoal: {}, availableDepartments: ['rio'], callModel: fakeModel }),
     error => error.code === 'EXECUTIVE_REASONER_CREDENTIAL_MISSING',
   );
+});
+
+test('reasoner performs one bounded repair for an incompatible diagnose target', async () => {
+  let calls = 0;
+  const fakeModel = async (_env, _system, user, options) => {
+    calls += 1;
+    assert.equal(options.task, 'executive');
+    if (calls === 1) {
+      return {
+        model: 'test-executive-model',
+        content: JSON.stringify({
+          plan_version: 1,
+          strategy_summary: 'Diagnose the stalled commercial route.',
+          target: 'rio',
+          phase: 'DIAGNOSE',
+          hypotheses: ['The route is stalled.'],
+          unknowns: [],
+          evidence_needed: ['root cause evidence'],
+          expected_progress_delta: ['ROOT_CAUSE_ADVANCED'],
+          confidence: 0.7,
+          needs_founder_guidance: false,
+          founder_question: null,
+        }),
+      };
+    }
+    assert.match(user, /DIAGNOSE_TARGET_INVALID/);
+    assert.match(user, /phase_target_contract/);
+    return {
+      model: 'test-executive-model',
+      content: JSON.stringify({
+        plan_version: 1,
+        strategy_summary: 'Diagnose the stalled route through the compatible technical target.',
+        target: 'tony_stark',
+        phase: 'DIAGNOSE',
+        hypotheses: ['The route is stalled.'],
+        unknowns: [],
+        evidence_needed: ['root cause evidence'],
+        expected_progress_delta: ['ROOT_CAUSE_ADVANCED'],
+        confidence: 0.7,
+        needs_founder_guidance: false,
+        founder_question: null,
+      }),
+    };
+  };
+
+  const reasoned = await requestExecutivePlan({
+    env: { ENABLE_AI_INFERENCE: 'true', API_VICTOR: 'configured-test-handle' },
+    goal,
+    runtimeGoal: { state: 'NO_PROGRESS' },
+    availableDepartments: ['rio', 'tony_stark', 'aura3'],
+    callModel: fakeModel,
+  });
+  assert.equal(calls, 2);
+  assert.equal(reasoned.status, 'PLAN_VALIDATED');
+  assert.equal(reasoned.plan.target, 'tony_stark');
+  assert.equal(reasoned.plan.phase, 'DIAGNOSE');
 });
 
 
