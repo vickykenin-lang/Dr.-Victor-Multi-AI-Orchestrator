@@ -1,6 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyVictorTask, rankVictorModels, resolveCogneeOpenAIModel, callCogneeInference } from './model_router.mjs';
+import { classifyVictorTask, rankVictorModels, resolveCogneeOpenAIModel, callCogneeInference, callVictorModel } from './model_router.mjs';
+
+test('exhausted model route carries discovery status and failure evidence', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => String(url).endsWith('/models')
+    ? new Response(JSON.stringify({ data: [{ id: 'model-test' }] }), { status: 200 })
+    : new Response('{}', { status: 429 });
+  try {
+    await assert.rejects(
+      () => callVictorModel({ API_VICTOR: 'test-key', VICTOR_MODEL_MAX_ATTEMPTS: 1 }, 'system', 'user'),
+      error => error.code === 'AI_MODEL_ROUTER_EXHAUSTED'
+        && error.discoveryStatus === 'DISCOVERED'
+        && error.modelFailures[0].http_status === 429,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 const tenantEnv = key => ({
   COGNEE_API_KEY: key,

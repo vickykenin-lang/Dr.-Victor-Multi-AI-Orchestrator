@@ -10,6 +10,7 @@ import {
   chooseGoalDepartment,
   classifyAutonomyResult,
   runAutonomousCycle,
+  safeRouterDiagnostics,
   scoreGoal,
   selectAutonomyGoal,
 } from './autonomy_runtime.mjs';
@@ -26,6 +27,23 @@ const revenueGoal = {
   allowed_departments: ['rio', 'tony_stark', 'aura3'],
   hard_boundaries: ['NO_RAW_SECRET_DISCLOSURE'],
 };
+
+test('router evidence is bounded and excludes arbitrary error text and secrets', () => {
+  const evidence = safeRouterDiagnostics({
+    discoveryStatus: 'DISCOVERED',
+    modelFailures: Array.from({ length: 9 }, (_, index) => ({
+      model: index === 0 ? 'key=secret value' : `model-${index}`,
+      code: index === 0 ? 'Bearer secret' : 'TimeoutError',
+      http_status: 403,
+      detail: 'sensitive body',
+    })),
+  });
+  assert.equal(evidence.discovery_status, 'DISCOVERED');
+  assert.equal(evidence.model_failures.length, 4);
+  assert.equal(evidence.model_failures[0].model, 'REDACTED');
+  assert.equal(evidence.model_failures[0].code, 'REDACTED');
+  assert.doesNotMatch(JSON.stringify(evidence), /secret|sensitive/);
+});
 
 test('goal routing follows runtime recommendation instead of fixed department rotation', () => {
   assert.equal(chooseGoalDepartment(revenueGoal, { recommended_department: 'tony_stark' }, ['rio', 'tony_stark']), 'tony_stark');
