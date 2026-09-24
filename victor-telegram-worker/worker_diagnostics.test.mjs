@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildTruthGuardFallback, classifyProcessingError, isAuthorizedFounderMessage } from './worker.js';
+import { buildTruthGuardFallback, classifyProcessingError, isAuthorizedFounderMessage, shouldRunDeadEndRecovery } from './worker.js';
 import { validateVictorReply } from './core_rules.mjs';
 
 test('classifies AI upstream HTTP errors without exposing credentials', () => {
@@ -86,4 +86,11 @@ test('authorizes Founder in private chat and management group only', () => {
   assert.equal(isAuthorizedFounderMessage(env, '-999', '123'), true);
   assert.equal(isAuthorizedFounderMessage(env, '-999', '456'), false);
   assert.equal(isAuthorizedFounderMessage(env, '-888', '123'), false);
+});
+
+test('explicit organization goal command bypasses repeated-answer recovery', () => {
+  const repeatedDeadEnd = { matched: true, target: 'tony_stark' };
+
+  assert.equal(shouldRunDeadEndRecovery(false, true, repeatedDeadEnd), false);
+  assert.equal(shouldRunDeadEndRecovery(false, false, repeatedDeadEnd), true);
 });
