@@ -7,6 +7,15 @@ const ALLOWED_PHASES = new Set([
   'MONITOR',
 ]);
 
+const PHASE_TARGET_CONTRACT = Object.freeze({
+  DIAGNOSE: ['tony_stark', 'hulk'],
+  CORRECTIVE_EXECUTE: ['tony_stark', 'aura3'],
+  COMMERCIAL_EXECUTE: ['rio'],
+  PLAN: ['rio', 'tony_stark', 'aura3', 'hulk'],
+  VERIFY: ['rio', 'tony_stark', 'aura3', 'hulk'],
+  MONITOR: ['rio', 'tony_stark', 'aura3', 'hulk'],
+});
+
 const AUTHORITY_KEYS = new Set([
   'requested_actions',
   'authority_level',
@@ -84,6 +93,7 @@ export function buildExecutiveReasoningPrompt({ goal = {}, runtimeGoal = {}, ava
     'Do not grant permissions, credentials, spend, production, public-action, pause, or security authority.',
     'Do not claim success. Current evidence and deterministic policy gates remain authoritative.',
     'Choose only from the supplied available departments and allowed phases.',
+    'Respect the supplied phase_target_contract exactly; a phase and target must be compatible.',
     'Prefer a materially different strategy when the current strategy is stalled.',
     'If evidence is insufficient, identify exact unknowns and evidence needed. Do not fabricate facts.',
   ].join('\n');
@@ -131,6 +141,7 @@ export function buildExecutiveReasoningPrompt({ goal = {}, runtimeGoal = {}, ava
       founder_guidance: runtimeGoal.founder_guidance || null,
     },
     available_departments: unique(availableDepartments),
+    phase_target_contract: PHASE_TARGET_CONTRACT,
     instruction: 'Return a strategy proposal only. Deterministic code will validate it and separately build the Action Contract.',
   });
 
@@ -231,8 +242,33 @@ export async function requestExecutivePlan({
     temperature: 0.05,
     maxTokens: 900,
   });
-  const parsed = parseExecutivePlan(result?.content || '');
-  const validation = validateExecutivePlan(parsed, { goal, availableDepartments });
+  let parsed = parseExecutivePlan(result?.content || '');
+  let validation = validateExecutivePlan(parsed, { goal, availableDepartments });
+  let finalResult = result;
+  if (!validation.ok) {
+    const repairSystem = [
+      'You are Victor Executive Reasoner repairing one rejected strategy proposal.',
+      'Return ONLY one corrected JSON object matching the original planning schema.',
+      'Do not add authority, credential, spend, production, public-action, pause, or security fields.',
+      'Correct every deterministic validation error without weakening or bypassing any rule.',
+    ].join('\n');
+    const repairUser = JSON.stringify({
+      request: 'REPAIR_REJECTED_EXECUTIVE_STRATEGY',
+      rejected_plan: parsed,
+      validation_errors: validation.errors,
+      goal_allowed_departments: unique(goal.allowed_departments),
+      available_departments: unique(availableDepartments),
+      phase_target_contract: PHASE_TARGET_CONTRACT,
+      instruction: 'Return one corrected strategy proposal only. Deterministic validation will run again and fail closed if any error remains.',
+    });
+    finalResult = await callModel(env, repairSystem, repairUser, {
+      task: 'executive',
+      temperature: 0,
+      maxTokens: 900,
+    });
+    parsed = parseExecutivePlan(finalResult?.content || '');
+    validation = validateExecutivePlan(parsed, { goal, availableDepartments });
+  }
   if (!validation.ok) {
     const error = new Error(`Executive plan failed deterministic validation: ${validation.errors.join('; ')}`);
     error.code = 'EXECUTIVE_PLAN_VALIDATION_FAILED';
@@ -243,8 +279,11 @@ export async function requestExecutivePlan({
   return {
     status: validation.plan.needs_founder_guidance ? 'FOUNDER_GUIDANCE_NEEDED' : 'PLAN_VALIDATED',
     plan: validation.plan,
-    model: result?.model || null,
-    discovery_status: result?.discovery_status || null,
-    model_failures: Array.isArray(result?.failures) ? result.failures : [],
+    model: finalResult?.model || result?.model || null,
+    discovery_status: finalResult?.discovery_status || result?.discovery_status || null,
+    model_failures: [
+      ...(Array.isArray(result?.failures) ? result.failures : []),
+      ...(finalResult !== result && Array.isArray(finalResult?.failures) ? finalResult.failures : []),
+    ],
   };
 }
