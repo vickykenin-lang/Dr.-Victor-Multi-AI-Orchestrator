@@ -51,6 +51,23 @@ test('Five-Whys diagnosis remains read-only but the next persisted Tony cycle re
   assert.equal(contract.mutation_allowed, true);
 });
 
+test('Founder-guided canonical commercial phase overrides stale Five-Whys runtime mode', () => {
+  const runtimeGoal = { brain_required_mode: 'FIVE_WHYS_BEFORE_NEXT_DISPATCH' };
+  const contract = buildActionContract({
+    goal: revenueGoal,
+    target: 'rio',
+    runtimePhase: 'COMMERCIAL_EXECUTE',
+    runtimeGoal,
+  });
+
+  assert.equal(contract.phase, 'COMMERCIAL_EXECUTE');
+  assert.equal(contract.target, 'rio');
+  assert.equal(contract.production_allowed, true);
+  assert.equal(contract.public_action_allowed, true);
+  assert.equal(contract.spend_allowed, false);
+  assert.equal(validateActionContract(contract, revenueGoal).ok, true);
+});
+
 test('RIO goal execution is explicitly governed commercial execution with no unlocked spend', () => {
   const contract = buildActionContract({ goal: revenueGoal, target: 'rio', runtimePhase: 'EXECUTE' });
   assert.equal(contract.phase, 'COMMERCIAL_EXECUTE');
