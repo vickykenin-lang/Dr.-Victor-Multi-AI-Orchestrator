@@ -418,7 +418,7 @@ export default {
         return json({ ok: true, mode: hulkRequest.mode, target: 'hulk', dispatch: 'NOT_ATTEMPTED_BRIDGE_UNVERIFIED' });
       }
 
-      if (!memoryDirective && deadEnd.matched && ['rio', 'tony_stark', 'aura3'].includes(deadEnd.target)) {
+      if (shouldRunDeadEndRecovery(memoryDirective, explicitExecutiveGoalCommand, deadEnd)) {
         processingStage = 'DEAD_END_RECOVERY';
         const recoveryText = buildDeadEndRecoveryPrompt(deadEnd, text);
         const dispatch = await dispatchContextualInvestigation(env, deadEnd.target, recoveryText, { messageId: message.message_id });
@@ -1656,6 +1656,13 @@ export function isAuthorizedFounderMessage(env, chatId, senderId) {
   return Boolean(managementChatId)
     && String(chatId) === managementChatId
     && String(senderId) === founderChatId;
+}
+
+export function shouldRunDeadEndRecovery(memoryDirective, explicitExecutiveGoalCommand, deadEnd) {
+  return !memoryDirective
+    && !explicitExecutiveGoalCommand
+    && deadEnd?.matched === true
+    && ['rio', 'tony_stark', 'aura3'].includes(deadEnd.target);
 }
 
 function json(value, status = 200) {
