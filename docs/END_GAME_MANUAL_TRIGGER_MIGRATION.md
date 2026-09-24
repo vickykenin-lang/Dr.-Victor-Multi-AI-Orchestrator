@@ -8,7 +8,7 @@ END GAME goal execution is Founder-manual-only. Governance, validation, SAFE_STO
 
 | Entry point or binding | Previous behavior | Manual-only change |
 | --- | --- | --- |
-| `wrangler.toml` `[triggers]` | Bound the production Worker to `*/15 * * * *` goal cycles and `30 16 * * *` daily reports | Entire cron binding removed |
+| `wrangler.toml` `[triggers]` | Bound the production Worker to `*/15 * * * *` goal cycles and `30 16 * * *` daily reports | Sets `crons = []` explicitly; Cloudflare documents that omitting or commenting out the key does not disable existing Cron Triggers |
 | `victor-telegram-worker/worker.js` `scheduled()` | Executed and persisted an END GAME cycle for Cloudflare scheduled events | Fails closed and performs no goal execution or state write |
 | `victor-telegram-worker/autonomy_runtime.mjs` | Accepted the supervision cron, daily-report cron, and `founder-command` | Accepts only `founder-command`; every other trigger returns `SAFE_STOP / MANUAL_TRIGGER_REQUIRED` |
 | `.github/workflows/victor_heartbeat.yml` | Ran readiness reconciliation every 15 minutes and by manual dispatch | Schedule removed; `workflow_dispatch` retained |
@@ -21,7 +21,7 @@ END GAME goal execution is Founder-manual-only. Governance, validation, SAFE_STO
 
 ## Verification ladder
 
-- Configuration changed: verify cron bindings are absent and only manual workflow dispatch remains.
+- Configuration changed: parse `wrangler.toml` and verify `triggers.crons == []`; verify the Victor heartbeat workflow has no schedule and retains only manual `workflow_dispatch`.
 - Source implemented: verify non-manual triggers fail closed before credential, network, dispatch, or persistence work.
 - Tests passed: run the deterministic END GAME and runtime regression suites.
 - Deployment state: unverified until a deployment containing this change is observed.
