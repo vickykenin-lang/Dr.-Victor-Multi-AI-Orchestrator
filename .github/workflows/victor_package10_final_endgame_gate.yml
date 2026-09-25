@@ -29,7 +29,7 @@ jobs:
       - name: Display final truth state
         run: cat data/final_endgame_status.json
       - name: Upload final status evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: victor-final-endgame-${{ github.run_id }}
           path: data/final_endgame_status.json
