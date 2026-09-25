@@ -1,0 +1,36 @@
+name: Victor Package 10 Final END GAME Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/package6_reliability_state.json'
+      - 'data/package8_commercial_status.json'
+      - 'data/revenue_outcomes.json'
+      - 'data/canonical_status_index.json'
+      - 'data/autonomy_state.json'
+      - 'scripts/final_endgame_gate.py'
+      - '.github/workflows/victor_package10_final_endgame_gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  final-truth-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build final END GAME status
+        run: python3 scripts/final_endgame_gate.py
+      - name: Display final truth state
+        run: cat data/final_endgame_status.json
+      - name: Upload final status evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: victor-final-endgame-${{ github.run_id }}
+          path: data/final_endgame_status.json
+          retention-days: 30
