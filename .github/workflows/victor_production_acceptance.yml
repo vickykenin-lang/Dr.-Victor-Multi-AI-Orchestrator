@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: victor-production-evidence-main
+  cancel-in-progress: false
+
 jobs:
   production-acceptance:
     runs-on: ubuntu-latest
@@ -182,11 +186,15 @@ jobs:
         run: |
           git config user.name "victor-production-acceptance"
           git config user.email "actions@users.noreply.github.com"
-          git add data/production_acceptance_status.json
+          EVIDENCE_FILE="data/production_acceptance_status.json"
+          cp "$EVIDENCE_FILE" /tmp/victor-production-acceptance.json
+          git fetch origin main
+          git reset --hard origin/main
+          cp /tmp/victor-production-acceptance.json "$EVIDENCE_FILE"
+          git add "$EVIDENCE_FILE"
           git diff --cached --quiet && exit 0
           git commit -m "evidence: record Victor production acceptance"
-          git pull --rebase --autostash
-          git push
+          git push origin HEAD:main
 
       - name: Enforce readiness gate
         if: always()
