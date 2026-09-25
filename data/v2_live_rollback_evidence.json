@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "verified_at_utc": "2026-09-25T14:47:42Z",
+  "status": "LIVE_ROLLBACK_AND_RESTORE_VERIFIED",
+  "worker": "victor-telegram-webhook",
+  "rollback": {
+    "deployment_id": "f2bcee9d-3b7d-496b-9c6f-c2a73530d840",
+    "version_id": "7855ca9f-4ce2-4dd8-b527-964924a99dd7",
+    "percentage": 100,
+    "created_on": "2026-09-25T14:47:40.058405Z",
+    "api_status": 200
+  },
+  "restore": {
+    "deployment_id": "7035c454-3750-4dc0-869f-c02490b65cd7",
+    "version_id": "1831689a-19fa-426d-8077-7678cb4ef184",
+    "percentage": 100,
+    "created_on": "2026-09-25T14:47:42.757581Z",
+    "api_status": 200
+  },
+  "production_autonomy_enabled": false,
+  "secrets_exposed": false,
+  "post_restore_live_verification_required": true
+}
