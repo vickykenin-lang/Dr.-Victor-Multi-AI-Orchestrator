@@ -39,6 +39,7 @@ import { autonomyConfigured, persistAutonomyEvidence, runAutonomousCycle } from 
 import { callVictorModel, callCogneeInference } from './model_router.mjs';
 import { memoryBrainStatus, writeVictorMemory, recallVictorMemory } from './memory_brain.mjs';
 import { cogneeRecall } from './cognee_memory_bridge.mjs';
+import { endgameRuntimeHealth, runEndgameRuntimeAcceptance } from './endgame_runtime_acceptance.mjs';
 import { selectDirectRememberedFact, renderRememberedFactForFounder } from './remembered_fact_gate.mjs';
 import { assessReplyNaturalness, buildNaturalReplyDirective } from './reply_integrity.mjs';
 import { parseEmergencyCommand, applyEmergencyCommand, isExecutionPaused } from './emergency_pause_runtime.mjs';
@@ -147,6 +148,8 @@ export default {
         ai_credential_configured: Boolean(env.API_VICTOR),
         cognee_inference_credential_configured: Boolean(env.COGNEE_API_KEY),
         cognee_inference_runtime: 'COGNEE_CLOUD_MEMORY_API_V2',
+        endgame_runtime_package: 'PACKAGE2_LIVE_ACCEPTANCE_V1',
+        endgame_runtime_health: endgameRuntimeHealth(env),
         cognee_auth_circuit_breaker: 'COGNEE_CLOUD_AUTH_401_403_HOLD_V3',
         telegram_webhook_ack_policy: 'HANDLED_ERRORS_HTTP_200_V1',
         model_router: 'BEDROCK_DISCOVERY_SPECIALIST_V1',
@@ -330,6 +333,7 @@ export default {
       const lease = issueCapabilityLease({ capability_id: 'sandbox.execute', objective_id: 'V2-LIVE-SELFTEST', action_id: 'LEASE', ttl_seconds: 60 });
       const leaseValidation = validateCapabilityLease(lease, { objective_id: 'V2-LIVE-SELFTEST', action_id: 'LEASE', capability_id: 'sandbox.execute' });
       const watchdog = evaluateWatchdog({ heartbeat_age_seconds: 0 });
+      const endgame = endgameRuntimeHealth(env);
       const ready = stopTest.intent === V2_FOUNDER_INTENT.STOP_PAUSE
         && greenTest.decision === 'ALLOW'
         && redTest.decision === 'DENY'
@@ -351,10 +355,21 @@ export default {
         watchdog: watchdog.decision,
         security_policy: SECURITY_POLICY_VERSION,
         production_autonomy_enabled: false,
+        endgame_runtime_status: endgame.status,
+        endgame_verified_procedure: endgame.verified_procedure,
+        endgame_degraded_mode: endgame.degraded_mode,
+        endgame_truthful_telemetry_surface: endgame.truthful_telemetry_surface,
+        endgame_experience_ledger_durable: endgame.experience_ledger_durable,
+        endgame_cognee_memory_status: endgame.cognee_memory_status,
         live_sandbox_execution_verified: false,
         live_rollback_drill_verified: false,
         secrets_exposed: false,
       }, ready ? 200 : 503);
+    }
+
+    if (request.method === 'GET' && url.pathname === '/endgame-runtime-health') {
+      const health = endgameRuntimeHealth(env);
+      return json(health, health.status === 'READY' ? 200 : 503);
     }
 
     if (request.method !== 'POST' || url.pathname !== '/telegram') return json({ error: 'not_found' }, 404);
@@ -395,6 +410,26 @@ export default {
       chat_authorized: true,
       secrets_exposed: false,
     }));
+    if (/^\s*ENDGAME RUNTIME ACCEPTANCE\s*$/i.test(text)) {
+      const acceptance = await runEndgameRuntimeAcceptance(env, {
+        traceId,
+        query: 'Falcon validation code',
+      });
+      const reply = [
+        `END GAME Package 2: ${acceptance.status}`,
+        `Verified procedure/degraded mode: ${acceptance.procedure_registry_live ? 'VERIFIED' : 'BLOCKED'}`,
+        `Truthful telemetry: ${acceptance.truthful_telemetry_live ? 'VERIFIED' : 'BLOCKED'}`,
+        `Experience ledger round-trip: ${acceptance.experience_ledger_readback_verified ? 'VERIFIED' : 'BLOCKED'}`,
+        `Experience advisory reuse: ${acceptance.experience_advisory_reuse_verified ? 'VERIFIED' : 'BLOCKED'}`,
+        `Cognee semantic round-trip: ${acceptance.cognee_semantic_roundtrip_verified ? 'VERIFIED' : 'BLOCKED'}`,
+        `Blockers: ${acceptance.blockers.length ? acceptance.blockers.join(', ') : 'none'}`,
+        'Production autonomy: OFF',
+        'Secrets exposed: no',
+      ].join('\n');
+      await sendTelegramMessage(env, chatId, reply, message.message_id);
+      return json({ ok: acceptance.status === 'PASS', mode: 'ENDGAME_RUNTIME_ACCEPTANCE', ...acceptance }, 200);
+    }
+
     const emergencyCommand = parseEmergencyCommand(text);
     if (v2Intent.intent === V2_FOUNDER_INTENT.STOP_PAUSE && !emergencyCommand) {
       await sendTelegramMessage(env, chatId, 'Founder STOP/PAUSE precedence detected. New execution fail-closed SAFE_HOLD me hai; no dispatch attempted.', message.message_id);
