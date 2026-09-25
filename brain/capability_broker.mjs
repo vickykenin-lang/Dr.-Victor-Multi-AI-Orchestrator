@@ -1,10 +1,11 @@
-import crypto from 'node:crypto';
 import { evaluateSecurityRequest, SECURITY_POLICY_VERSION } from './security_kernel.mjs';
 
 export const BROKER_VERSION = 'victor-capability-broker-v1';
 
-function makeHandle(seed) {
-  return `cap_${crypto.createHash('sha256').update(seed).digest('hex').slice(0, 24)}`;
+function makeHandle() {
+  const randomUUID = globalThis.crypto?.randomUUID;
+  if (typeof randomUUID !== 'function') throw new Error('SECURE_RANDOM_UUID_UNAVAILABLE');
+  return `cap_${randomUUID.call(globalThis.crypto).replace(/-/g, '').slice(0, 24)}`;
 }
 
 export function issueCapabilityLease({
@@ -39,7 +40,7 @@ export function issueCapabilityLease({
   return {
     issued: true,
     broker_version: BROKER_VERSION,
-    handle: makeHandle(`${objective_id}:${action_id}:${capability_id}:${expires}`),
+    handle: makeHandle(),
     capability_id,
     objective_id,
     action_id,
