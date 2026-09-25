@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "checked_at_utc": "2026-09-25T13:53:25.501918+00:00",
-  "repository_sha_under_test": "3f38dbb3e331bbbaa671b69751d40ad226f853d9",
+  "checked_at_utc": "2026-09-25T13:58:44.110489+00:00",
+  "repository_sha_under_test": "a6fcf0c65a568430f9dc08b32e42e4bbc76823cd",
   "production_verification": {
     "telegram_webhook": {
       "api_http_status": 200,
@@ -381,53 +381,51 @@
       {
         "name": "transport_hi",
         "http_status": 200,
-        "ok": false,
+        "ok": true,
         "mode": null,
         "target": null,
         "ignored": false,
-        "error": "TELEGRAM_DELIVERY_FAILED"
+        "error": null
       },
       {
         "name": "fresh_multi_fact",
         "http_status": 200,
-        "ok": false,
-        "mode": null,
+        "ok": true,
+        "mode": "FACT_EVIDENCE_QUERY",
         "target": null,
         "ignored": false,
-        "error": "PROCESSING_FAILED"
+        "error": null
       },
       {
         "name": "thread_anchor",
         "http_status": 200,
-        "ok": false,
-        "mode": null,
+        "ok": true,
+        "mode": "FACT_EVIDENCE_QUERY",
         "target": null,
         "ignored": false,
-        "error": "PROCESSING_FAILED"
+        "error": null
       },
       {
         "name": "short_followup",
         "http_status": 200,
-        "ok": false,
-        "mode": null,
-        "target": null,
+        "ok": true,
+        "mode": "CONTEXTUAL_EXPLANATION",
+        "target": "rio",
         "ignored": false,
-        "error": "PROCESSING_FAILED"
+        "error": null
       },
       {
         "name": "status_followup",
         "http_status": 200,
-        "ok": false,
-        "mode": null,
+        "ok": true,
+        "mode": "FACT_EVIDENCE_QUERY",
         "target": null,
         "ignored": false,
-        "error": "PROCESSING_FAILED"
+        "error": null
       }
     ]
   },
-  "critical_blockers": [
-    "LIVE_SYNTHETIC_TELEGRAM_ACCEPTANCE_FAILED"
-  ],
-  "ready_for_founder_test": false,
+  "critical_blockers": [],
+  "ready_for_founder_test": true,
   "secrets_exposed": false
 }
