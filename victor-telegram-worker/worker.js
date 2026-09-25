@@ -315,13 +315,22 @@ export default {
 
     const chatId = String(message?.chat?.id ?? '');
     if (!chatId) return json({ ok: true, ignored: true });
+
+    const text = message.text.trim();
+    if (!text) return json({ ok: true, ignored: true });
+
+    // Temporary self-diagnostic: returns only the sender's own Telegram chat ID.
+    // It grants no Founder authority and runs before authorization solely so an
+    // unregistered Founder chat can bootstrap the protected VICTOR_FOUNDER_CHAT_ID.
+    if (/^MY CHAT ID$/i.test(text)) {
+      await sendTelegramMessage(env, chatId, `Your Telegram Chat ID: ${chatId}`, message.message_id);
+      return json({ ok: true, mode: 'CHAT_ID_DIAGNOSTIC', delivered: true, secrets_exposed: false });
+    }
+
     const senderId = String(message?.from?.id ?? '');
     if (!isAuthorizedFounderMessage(env, chatId, senderId)) {
       return json({ ok: true, ignored: true, reason: 'chat_not_authorized' });
     }
-
-    const text = message.text.trim();
-    if (!text) return json({ ok: true, ignored: true });
 
     const traceId = buildTraceId(update?.update_id, message.message_id);
     console.log(JSON.stringify({
