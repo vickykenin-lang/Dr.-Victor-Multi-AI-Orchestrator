@@ -1,5 +1,5 @@
 {
-  "checked_at_utc": "2026-09-25T14:23:10.768594+00:00",
+  "checked_at_utc": "2026-09-25T16:26:40.636111+00:00",
   "token_present": true,
   "webhook": {
     "api_http_status": 200,
@@ -16,7 +16,7 @@
         "service": "victor-telegram-webhook",
         "deployment_git_sha": "d22f433b84f7bbe9e3811e88549e149095943e43",
         "deployment_build_uuid": "5e1c7da4-1bd9-4767-9229-73ff8d824b6d",
-        "cloudflare_version_id": "7855ca9f-4ce2-4dd8-b527-964924a99dd7",
+        "cloudflare_version_id": "1831689a-19fa-426d-8077-7678cb4ef184",
         "deployment_identity_gate": "IDENTITY_PRESENT_NOT_LIVE_VERIFIED",
         "deployment_identity_evidence_required": [
           "deployment_git_sha",
@@ -80,7 +80,19 @@
         "victor_report_card_target": "10/10",
         "victor_report_card_basis": "VERIFIED_DEPARTMENT_FINAL_OUTCOMES_ONLY",
         "direct_consequential_department_execution": false,
-        "governed_diagnostic_department_bridge": true
+        "governed_diagnostic_department_bridge": true,
+        "v2_runtime_wired": true,
+        "v2_founder_intent_gateway": "DETERMINISTIC_STOP_PAUSE_V1",
+        "v2_security_kernel_policy": "victor-security-policy-v1",
+        "v2_action_contract": "ACTION_CONTRACT_V1",
+        "v2_sandbox_profile": "victor-sandbox-v1",
+        "v2_capability_broker": "victor-capability-broker-v1",
+        "v2_watchdog": "victor-watchdog-v1",
+        "v2_promotion_gate": "victor-promotion-gate-v1",
+        "v2_rollback_contract": "victor-rollback-v1",
+        "v2_production_autonomy_enabled": false,
+        "v2_live_sandbox_verified": false,
+        "v2_live_rollback_verified": false
       }
     },
     "/core-health": {
