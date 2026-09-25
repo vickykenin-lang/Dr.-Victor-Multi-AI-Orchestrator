@@ -1,0 +1,137 @@
+name: END GAME Package 3 AURA3 RIO Certification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/endgame_package3_aura3_rio_certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  aura3-rio-live-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WORKER_BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
+      TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+      VICTOR_FOUNDER_CHAT_ID: ${{ secrets.VICTOR_FOUNDER_CHAT_ID }}
+    steps:
+      - name: Require protected Founder transport credentials
+        shell: bash
+        run: |
+          if [ -z "$TELEGRAM_WEBHOOK_SECRET" ] || [ -z "$VICTOR_FOUNDER_CHAT_ID" ]; then
+            echo 'Protected Founder transport secrets are not configured.' >&2
+            exit 42
+          fi
+      - name: Execute fresh AURA3 and RIO governed round-trips
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.request
+
+          base=os.environ['WORKER_BASE_URL'].rstrip('/')
+          founder=str(os.environ['VICTOR_FOUNDER_CHAT_ID'])
+
+          def dispatch(update_id, text, ua):
+              payload={
+                  'update_id': update_id,
+                  'message': {
+                      'message_id': 0,
+                      'from': {'id': int(founder)},
+                      'chat': {'id': int(founder), 'type': 'private'},
+                      'text': text,
+                  },
+              }
+              req=urllib.request.Request(
+                  base+'/telegram',
+                  data=json.dumps(payload).encode(),
+                  method='POST',
+                  headers={
+                      'Content-Type':'application/json',
+                      'X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],
+                      'User-Agent':ua,
+                  },
+              )
+              with urllib.request.urlopen(req,timeout=45) as r:
+                  return r.status, json.loads(r.read().decode())
+
+          def poll(url, task_id, ua):
+              for _ in range(30):
+                  try:
+                      req=urllib.request.Request(url+f'?t={int(time.time()*1000)}', headers={'User-Agent':ua,'Cache-Control':'no-cache'})
+                      with urllib.request.urlopen(req,timeout=20) as r:
+                          if r.status == 200:
+                              body=json.loads(r.read().decode())
+                              if body.get('task_id') == task_id:
+                                  return body
+                  except Exception:
+                      pass
+                  time.sleep(4)
+              return None
+
+          # AURA3
+          http,aura_dispatch=dispatch(
+              926092506,
+              'AURA3 ko task assign karo: PACKAGE3 PING execute karo aur strict revert Victor ko bhejo. Koi public, production, paid, destructive ya credential action mat karna.',
+              'Victor-ENDGAME-Package3-AURA3-Certification/1.0',
+          )
+          aura_safe={'http_status':http,'ok':aura_dispatch.get('ok'),'mode':aura_dispatch.get('mode'),'target':aura_dispatch.get('target'),'task_id':aura_dispatch.get('task_id')}
+          print('AURA3_DISPATCH='+json.dumps(aura_safe,sort_keys=True))
+          assert http == 200 and aura_dispatch.get('ok') is True and aura_dispatch.get('target') == 'aura3' and aura_dispatch.get('task_id'), aura_safe
+          aura_id=aura_dispatch['task_id']
+          aura_url='https://raw.githubusercontent.com/vickykenin-lang/aura-3.0/main/integration/results/tasks/'+aura_id+'.json'
+          aura=poll(aura_url,aura_id,'Victor-ENDGAME-Package3-AURA3-Result/1.0')
+          assert aura is not None, {'status':'AURA3_RESULT_TIMEOUT','task_id':aura_id}
+          s=aura.get('strict_supervision') or {}
+          aura_checks={
+              'task_id':aura.get('task_id')==aura_id,
+              'sender':aura.get('sender')=='aura3',
+              'recipient':aura.get('recipient')=='victor',
+              'message_type':aura.get('message_type')=='TASK_RESULT',
+              'no_public_action':aura.get('public_action_performed') is False,
+              'revert_to_victor':s.get('revert_to_victor') is True,
+              'objective_alignment':bool(s.get('objective_alignment')),
+              'status':bool(s.get('status')),
+              'solution':bool(s.get('solution')),
+              'next_action':bool(s.get('next_action')),
+              'evidence':isinstance(s.get('evidence'),list) and len(s.get('evidence'))>0,
+          }
+          print('AURA3_CERTIFICATION='+json.dumps({'status':'PASS' if all(aura_checks.values()) else 'FAIL','task_id':aura_id,'verification':aura_checks,'strict_status':s.get('status'),'evidence_count':len(s.get('evidence') or []),'secrets_exposed':False},indent=2))
+          assert all(aura_checks.values()), aura_checks
+
+          # RIO
+          http,rio_dispatch=dispatch(
+              926092507,
+              'RIO ko task assign karo: PACKAGE3 PING execute karo aur strict revert Victor ko bhejo. Koi public, production, paid, destructive ya credential action mat karna.',
+              'Victor-ENDGAME-Package3-RIO-Certification/1.0',
+          )
+          rio_safe={'http_status':http,'ok':rio_dispatch.get('ok'),'mode':rio_dispatch.get('mode'),'target':rio_dispatch.get('target'),'task_id':rio_dispatch.get('task_id')}
+          print('RIO_DISPATCH='+json.dumps(rio_safe,sort_keys=True))
+          assert http == 200 and rio_dispatch.get('ok') is True and rio_dispatch.get('target') == 'rio' and rio_dispatch.get('task_id'), rio_safe
+          rio_id=rio_dispatch['task_id']
+          rio_url='https://raw.githubusercontent.com/vickykenin-lang/rio-affiliate-engine/main/integration/results/victor_tasks/'+rio_id+'.json'
+          rio=poll(rio_url,rio_id,'Victor-ENDGAME-Package3-RIO-Result/1.0')
+          assert rio is not None, {'status':'RIO_RESULT_TIMEOUT','task_id':rio_id}
+          s=rio.get('strict_supervision') or {}
+          rio_checks={
+              'task_id':rio.get('task_id')==rio_id,
+              'sender':rio.get('sender')=='rio',
+              'recipient':rio.get('recipient')=='victor',
+              'message_type':rio.get('message_type')=='TASK_RESULT',
+              'no_public_action':rio.get('public_action_performed') is False,
+              'no_objective_change':rio.get('objective_changed') is False,
+              'no_credential_transfer':rio.get('credential_transfer_performed') is False,
+              'revert_to_victor':s.get('revert_to_victor') is True,
+              'objective_alignment':bool(s.get('objective_alignment')),
+              'status':bool(s.get('status')),
+              'solution':bool(s.get('solution')),
+              'next_action':bool(s.get('next_action')),
+              'evidence':isinstance(s.get('evidence'),list) and len(s.get('evidence'))>0,
+              'follow_up_explicit':isinstance(s.get('requires_follow_up'),bool),
+          }
+          print('RIO_CERTIFICATION='+json.dumps({'status':'PASS' if all(rio_checks.values()) else 'FAIL','task_id':rio_id,'verification':rio_checks,'strict_status':s.get('status'),'evidence_count':len(s.get('evidence') or []),'secrets_exposed':False},indent=2))
+          assert all(rio_checks.values()), rio_checks
+          PY
