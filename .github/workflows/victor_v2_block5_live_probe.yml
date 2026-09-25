@@ -1,0 +1,63 @@
+name: Victor V2 Block 5 Live Probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/victor_v2_block5_live_probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TELEGRAM_BOT_TOKEN_VICTOR: ${{ secrets.TELEGRAM_BOT_TOKEN_VICTOR }}
+    steps:
+      - name: Probe deployed Victor with explicit user agent
+        run: |
+          python - <<'PY'
+          import json, os, urllib.parse, urllib.request, urllib.error
+
+          token=(os.getenv('TELEGRAM_BOT_TOKEN_VICTOR') or '').strip()
+          if not token:
+              print(json.dumps({'ok':False,'reason':'BOT_TOKEN_MISSING','secrets_exposed':False}))
+              raise SystemExit(1)
+
+          def request_json(url):
+              req=urllib.request.Request(url,headers={'User-Agent':'Victor-V2-Cutover-Probe/1.0'})
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      raw=r.read().decode('utf-8',errors='replace')
+                      try: body=json.loads(raw)
+                      except Exception: body={'non_json':True,'body_prefix':raw[:120]}
+                      return {'http_status':r.status,'body':body}
+              except urllib.error.HTTPError as e:
+                  raw=e.read().decode('utf-8',errors='replace')
+                  try: body=json.loads(raw)
+                  except Exception: body={'non_json':True,'body_prefix':raw[:120]}
+                  return {'http_status':e.code,'body':body}
+              except Exception as e:
+                  return {'error':type(e).__name__}
+
+          hook=request_json(f'https://api.telegram.org/bot{token}/getWebhookInfo')
+          result=(hook.get('body') or {}).get('result') or {}
+          webhook_url=str(result.get('url') or '')
+          if not webhook_url:
+              print(json.dumps({'ok':False,'reason':'WEBHOOK_URL_MISSING','secrets_exposed':False}))
+              raise SystemExit(1)
+
+          p=urllib.parse.urlparse(webhook_url)
+          origin=f'{p.scheme}://{p.netloc}'
+          endpoints={}
+          for ep in ['/health','/core-health','/aura3-bridge-health','/tony-bridge-health']:
+              endpoints[ep]=request_json(origin+ep)
+          statuses={k:v.get('http_status',v.get('error')) for k,v in endpoints.items()}
+          ok=all(v.get('http_status')==200 for v in endpoints.values())
+          print(json.dumps({'ok':ok,'webhook_configured':True,'endpoint_statuses':statuses,'secrets_exposed':False}))
+          if not ok:
+              raise SystemExit(1)
+          PY
