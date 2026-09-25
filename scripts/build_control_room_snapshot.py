@@ -78,7 +78,8 @@ def main() -> int:
             "red_mode": "FOUNDER_GATED",
         },
         "safety": {
-            "emergency_pause_state": pause.get("state", pause.get("status", "UNKNOWN")),
+            "emergency_pause_state": pause.get("state") or pause.get("status") or pause.get("system_state") or "UNKNOWN",
+            "global_pause_active": pause.get("global_pause_active"),
             "package6_certification": package6.get("status", "UNKNOWN"),
             "package6_started_at_utc": package6.get("started_at_utc"),
             "package6_minimum_signals": package6.get("minimum_required_signals"),
