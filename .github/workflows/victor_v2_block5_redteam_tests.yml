@@ -1,0 +1,31 @@
+name: Victor V2 Block 5 Red-Team Tests
+
+on:
+  pull_request:
+    paths:
+      - 'brain/adaptive_security.mjs'
+      - 'brain/red_team_guards.mjs'
+      - 'brain/block5_redteam_security.test.mjs'
+      - '.github/workflows/victor_v2_block5_redteam_tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  red-team-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: |
+          node --check brain/adaptive_security.mjs
+          node --check brain/red_team_guards.mjs
+      - name: Run Block 5 red-team regression pack
+        run: node --test brain/block5_redteam_security.test.mjs
