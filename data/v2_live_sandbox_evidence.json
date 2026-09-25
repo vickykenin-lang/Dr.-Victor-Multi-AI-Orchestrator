@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "verified_at_utc": "2026-09-25T14:46:33Z",
+  "workflow_run_id": 36149717487,
+  "status": "LIVE_ISOLATED_SANDBOX_VERIFIED",
+  "runtime": "github-hosted-runner/docker",
+  "network_mode": "NONE",
+  "rootfs_read_only": true,
+  "tmpfs_mb": 32,
+  "memory_mb": 128,
+  "cpus": 0.5,
+  "pids_limit": 64,
+  "cap_drop": "ALL",
+  "no_new_privileges": true,
+  "repository_mount": "READ_ONLY",
+  "production_credentials_available": false,
+  "production_applied": false,
+  "sandbox_validation": "SANDBOX_SPEC_VALID",
+  "teardown_verified": true,
+  "evidence_persistence_note": "Sandbox execution and teardown verification steps passed. Workflow conclusion was failure only because a concurrent main-branch update caused the evidence commit push to be rejected; evidence was persisted subsequently without rerunning the isolated execution.",
+  "secrets_exposed": false
+}
