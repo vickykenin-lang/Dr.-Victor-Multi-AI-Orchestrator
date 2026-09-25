@@ -41,7 +41,7 @@ jobs:
           token = (os.getenv('TELEGRAM_BOT_TOKEN_VICTOR') or '').strip()
           webhook_secret = (os.getenv('TELEGRAM_WEBHOOK_SECRET') or '').strip()
           founder_chat = (os.getenv('VICTOR_FOUNDER_CHAT_ID') or os.getenv('TELEGRAM_CHAT_ID_VICTOR') or '').strip()
-          USER_AGENT = 'Victor-Production-Acceptance/2.0'
+          USER_AGENT = 'Victor-Production-Acceptance/2.1'
 
           report = {
               'schema_version': 2,
@@ -160,7 +160,9 @@ jobs:
                               body = {
                                   'update_id': now * 100 + idx,
                                   'message': {
-                                      'message_id': 900000000 + idx,
+                                      # Synthetic updates do not correspond to a real Telegram message.
+                                      # Use 0 so Worker reply logic does not attach an invalid reply_parameters.message_id.
+                                      'message_id': 0,
                                       'date': now,
                                       'chat': {'id': int(founder_chat), 'type': 'private'},
                                       'from': {'id': int(founder_chat), 'is_bot': False, 'first_name': 'Founder'},
