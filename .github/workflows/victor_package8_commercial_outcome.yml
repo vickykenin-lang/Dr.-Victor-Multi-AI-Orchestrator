@@ -27,7 +27,7 @@ jobs:
       - name: Build commercial closure status
         run: python3 scripts/package8_commercial_gate.py
       - name: Upload commercial truth evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: victor-commercial-outcome-${{ github.run_id }}
           path: data/package8_commercial_status.json
