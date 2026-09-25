@@ -1,5 +1,6 @@
 name: END GAME Package 3 AURA3 RIO Certification
 # Rerun after safe AURA3 dispatch diagnostic production deploy: 2026-09-25
+# Safe reason field enabled for dispatch diagnosis.
 
 on:
   push:
@@ -95,7 +96,7 @@ jobs:
           base=os.environ['WORKER_BASE_URL'].rstrip('/')
           founder=str(os.environ['VICTOR_FOUNDER_CHAT_ID'])
           payload={'update_id':926092511,'message':{'message_id':0,'from':{'id':int(founder)},'chat':{'id':int(founder),'type':'private'},'text':'ENDGAME DEPARTMENT CERTIFY AURA3'}}
-          req=urllib.request.Request(base+'/telegram',data=json.dumps(payload).encode(),method='POST',headers={'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],'User-Agent':'Victor-ENDGAME-Package3-AURA3-Certification/3.0'})
+          req=urllib.request.Request(base+'/telegram',data=json.dumps(payload).encode(),method='POST',headers={'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],'User-Agent':'Victor-ENDGAME-Package3-AURA3-Certification/4.0'})
           try:
               with urllib.request.urlopen(req,timeout=45) as r:
                   body=json.loads(r.read().decode()); code=r.status
@@ -106,7 +107,7 @@ jobs:
               safe={'http_status':e.code,'ok':parsed.get('ok'),'mode':parsed.get('mode'),'reason':parsed.get('reason') or parsed.get('error') or 'AURA3_DISPATCH_INTERNAL_ERROR'}
               print('AURA3_DISPATCH_BLOCKER='+json.dumps(safe,sort_keys=True))
               raise SystemExit(51)
-          safe={'http_status':code,'ok':body.get('ok'),'mode':body.get('mode'),'target':body.get('target'),'task_id':body.get('task_id')}
+          safe={'http_status':code,'ok':body.get('ok'),'mode':body.get('mode'),'target':body.get('target'),'task_id':body.get('task_id'),'reason':body.get('reason')}
           print('AURA3_DISPATCH='+json.dumps(safe,sort_keys=True))
           assert code==200 and body.get('ok') is True and body.get('mode')=='ENDGAME_DEPARTMENT_CERTIFICATION' and body.get('target')=='aura3' and body.get('task_id'), safe
           task_id=body['task_id']
@@ -114,7 +115,7 @@ jobs:
           result=None
           for _ in range(30):
               try:
-                  q=urllib.request.Request(url+f'?t={int(time.time()*1000)}',headers={'User-Agent':'Victor-ENDGAME-Package3-AURA3-Result/3.0','Cache-Control':'no-cache'})
+                  q=urllib.request.Request(url+f'?t={int(time.time()*1000)}',headers={'User-Agent':'Victor-ENDGAME-Package3-AURA3-Result/4.0','Cache-Control':'no-cache'})
                   with urllib.request.urlopen(q,timeout=20) as r:
                       candidate=json.loads(r.read().decode())
                       if candidate.get('task_id')==task_id: result=candidate; break
