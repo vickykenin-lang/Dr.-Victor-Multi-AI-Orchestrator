@@ -107,6 +107,8 @@ export default {
         deployment_git_sha: env.VICTOR_DEPLOY_GIT_SHA || null,
         deployment_build_uuid: env.VICTOR_BUILD_UUID || null,
         cloudflare_version_id: env.CF_VERSION_METADATA?.id || null,
+        deployment_identity_gate: (env.VICTOR_DEPLOY_GIT_SHA && (env.VICTOR_BUILD_UUID || env.CF_VERSION_METADATA?.id)) ? 'IDENTITY_PRESENT_NOT_LIVE_VERIFIED' : 'IDENTITY_INCOMPLETE',
+        deployment_identity_evidence_required: ['deployment_git_sha','deployment_build_uuid_or_cloudflare_version_id','fresh_health_receipt'],
         status: 'READY',
         core_mode: 'GOVERNED_CANONICAL_CONTEXT',
         precedence_mode: PRECEDENCE_VERSION,
