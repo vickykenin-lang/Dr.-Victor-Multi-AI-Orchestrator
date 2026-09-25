@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "status": "AWAITING_REAL_EXTERNAL_BUSINESS_OUTCOME",
+  "technical_validation": "PASS",
+  "verified_at_utc": "2026-09-25T21:37:00Z",
+  "canonical_revenue_source": "data/revenue_outcomes.json",
+  "verified_totals": {
+    "qualified_leads": 0,
+    "closed_won": 0,
+    "payments_received": 0,
+    "collected_revenue_inr": 0.0
+  },
+  "verified_business_outcome": false,
+  "external_dependency_required": true,
+  "required_external_proof_chain": [
+    "LEAD_CAPTURE",
+    "CONTACT",
+    "QUALIFICATION",
+    "CLOSE",
+    "PAYMENT_RECEIVED"
+  ],
+  "automatic_checks": {
+    "canonical_ledger_validation": "PASS",
+    "invalid_event_count": 0,
+    "synthetic_revenue_allowed": false
+  },
+  "truth_rule": "Engineering readiness, traffic, clicks, orders, estimates and workflow success are not revenue. Package 8 can become PASS only after independently verified PAYMENT_RECEIVED evidence exists."
+}
