@@ -33,15 +33,15 @@ jobs:
           node --check victor-telegram-worker/worker.js
           node --check victor-telegram-worker/endgame_runtime_acceptance.mjs
           node --test victor-telegram-worker/endgame_runtime_acceptance.test.mjs brain/procedure_registry.test.mjs brain/degraded_mode.test.mjs brain/truthful_telemetry.test.mjs brain/experience_ledger.test.mjs brain/endgame_runtime_gate.test.mjs
-      - name: Commit generated wiring
+      - name: Commit generated worker wiring
         shell: bash
         run: |
-          if git diff --quiet; then
-            echo 'No generated changes.'
+          if git diff --quiet -- victor-telegram-worker/worker.js; then
+            echo 'No generated worker changes.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add victor-telegram-worker/worker.js .github/workflows/victor_v2_block5_production_deploy.yml
+          git add victor-telegram-worker/worker.js
           git commit -m 'endgame: wire Package 2 runtime acceptance into production path'
           git push origin HEAD:endgame/package-2-runtime-completion
