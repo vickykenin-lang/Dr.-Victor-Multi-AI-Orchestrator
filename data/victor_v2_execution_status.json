@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "updated_at_utc": "2026-09-25T11:45:00Z",
+  "program": "VICTOR_AUTONOMOUS_V2",
+  "execution_model": "FIVE_BLOCK_AUDIT_GATED",
+  "baseline_main_sha": "0c8c5aa1809d2d15907667a96a5996a4642eeffb",
+  "production_autonomy_enabled": false,
+  "blocks": [
+    {
+      "block": 1,
+      "name": "Baseline Reconciliation & Security Gate",
+      "status": "AUDIT_PASS_WITH_CARRY_FORWARD_BLOCKERS",
+      "production_readiness": "NOT_VERIFIED",
+      "audit_doc": "docs/VICTOR_V2_BLOCK1_BASELINE_RECONCILIATION_AUDIT_2026-09-25.md"
+    },
+    {
+      "block": 2,
+      "name": "Deterministic Authority & Security Kernel",
+      "status": "AUTHORIZED_NEXT"
+    },
+    {
+      "block": 3,
+      "name": "Isolated Sandbox, Broker & Watchdog",
+      "status": "NOT_STARTED"
+    },
+    {
+      "block": 4,
+      "name": "Promotion, Rollback & Shadow Autonomy",
+      "status": "NOT_STARTED"
+    },
+    {
+      "block": 5,
+      "name": "Red-Team Acceptance & Controlled Cutover",
+      "status": "NOT_STARTED"
+    }
+  ],
+  "carry_forward_blockers": [
+    "LATEST_PRODUCTION_ACCEPTANCE_NOT_READY",
+    "SYNTHETIC_TELEGRAM_ACCEPTANCE_HTTP_403",
+    "HEALTH_AND_BRIDGE_PROBES_NOT_VERIFIED",
+    "RUNTIME_FEATURE_PARITY_NOT_VERIFIED",
+    "BRANCH_PROTECTION_RULESET_STATUS_UNKNOWN",
+    "FULL_SUPPLY_CHAIN_SECURITY_STATUS_UNKNOWN"
+  ]
+}
