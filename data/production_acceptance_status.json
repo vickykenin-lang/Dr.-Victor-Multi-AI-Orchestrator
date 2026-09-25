@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "checked_at_utc": "2026-09-25T17:41:49.499805+00:00",
-  "repository_sha_under_test": "124001a012b03f128b130b00f8f47857426b31c7",
+  "checked_at_utc": "2026-09-25T20:52:41.498098+00:00",
+  "repository_sha_under_test": "9706cffe9940383d67daa9589ed3b70cbf91c54d",
   "production_verification": {
     "telegram_webhook": {
       "api_http_status": 200,
@@ -437,11 +437,11 @@
       {
         "name": "short_followup",
         "http_status": 200,
-        "ok": false,
-        "mode": null,
-        "target": null,
+        "ok": true,
+        "mode": "CONTEXTUAL_EXPLANATION",
+        "target": "rio",
         "ignored": false,
-        "error": "SCRIPTED_REPLY_BLOCKED"
+        "error": null
       },
       {
         "name": "status_followup",
@@ -454,9 +454,7 @@
       }
     ]
   },
-  "critical_blockers": [
-    "LIVE_SYNTHETIC_TELEGRAM_ACCEPTANCE_FAILED"
-  ],
-  "ready_for_founder_test": false,
+  "critical_blockers": [],
+  "ready_for_founder_test": true,
   "secrets_exposed": false
 }
