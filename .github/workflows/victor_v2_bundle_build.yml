@@ -1,0 +1,58 @@
+name: Victor V2 Bundle Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/victor_v2_bundle_build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install pinned toolchain
+        run: npm ci
+      - name: Build Worker bundle without deployment
+        run: |
+          rm -rf dist/v2-block5
+          npx wrangler deploy --dry-run --outdir dist/v2-block5
+          test -s dist/v2-block5/worker.js
+          node --check dist/v2-block5/worker.js
+      - name: Record bundle manifest
+        run: |
+          python - <<'PY'
+          import hashlib, json, pathlib, subprocess, datetime
+          p=pathlib.Path('dist/v2-block5/worker.js')
+          sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          data={
+            'schema_version':1,
+            'source_git_sha':sha,
+            'bundle_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+            'bundle_bytes':p.stat().st_size,
+            'built_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'toolchain':'wrangler-4.128.0',
+            'status':'BUNDLE_BUILT_NOT_DEPLOYED'
+          }
+          pathlib.Path('data/v2_block5_bundle_manifest.json').write_text(json.dumps(data,indent=2)+'\n')
+          PY
+      - name: Commit bundle and manifest
+        run: |
+          git config user.name 'victor-security-ops'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -f dist/v2-block5/worker.js data/v2_block5_bundle_manifest.json
+          git commit -m 'build: record Victor V2 Block 5 Worker bundle'
+          git push origin HEAD:main
