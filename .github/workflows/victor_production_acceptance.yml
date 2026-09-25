@@ -41,9 +41,10 @@ jobs:
           token = (os.getenv('TELEGRAM_BOT_TOKEN_VICTOR') or '').strip()
           webhook_secret = (os.getenv('TELEGRAM_WEBHOOK_SECRET') or '').strip()
           founder_chat = (os.getenv('VICTOR_FOUNDER_CHAT_ID') or os.getenv('TELEGRAM_CHAT_ID_VICTOR') or '').strip()
+          USER_AGENT = 'Victor-Production-Acceptance/2.0'
 
           report = {
-              'schema_version': 1,
+              'schema_version': 2,
               'checked_at_utc': datetime.now(timezone.utc).isoformat(),
               'repository_sha_under_test': os.getenv('GITHUB_SHA'),
               'production_verification': {},
@@ -53,41 +54,50 @@ jobs:
               'secrets_exposed': False,
           }
 
+          def safe_parse(raw):
+              try:
+                  return json.loads(raw)
+              except Exception:
+                  return {'raw_response_type': 'non_json', 'body_prefix': raw[:120]}
+
           def get_json(url, headers=None, timeout=45):
-              req = urllib.request.Request(url, headers=headers or {}, method='GET')
-              with urllib.request.urlopen(req, timeout=timeout) as r:
-                  return r.status, json.load(r)
+              h = {'User-Agent': USER_AGENT, **(headers or {})}
+              req = urllib.request.Request(url, headers=h, method='GET')
+              try:
+                  with urllib.request.urlopen(req, timeout=timeout) as r:
+                      raw = r.read().decode('utf-8', errors='replace')
+                      return r.status, safe_parse(raw)
+              except urllib.error.HTTPError as e:
+                  raw = e.read().decode('utf-8', errors='replace')
+                  return e.code, safe_parse(raw)
 
           def post_json(url, body, headers=None, timeout=75):
               payload = json.dumps(body).encode('utf-8')
-              h = {'Content-Type': 'application/json', **(headers or {})}
+              h = {'Content-Type': 'application/json', 'User-Agent': USER_AGENT, **(headers or {})}
               req = urllib.request.Request(url, data=payload, headers=h, method='POST')
               try:
                   with urllib.request.urlopen(req, timeout=timeout) as r:
                       raw = r.read().decode('utf-8', errors='replace')
-                      try: parsed = json.loads(raw)
-                      except Exception: parsed = {'raw_response_type': 'non_json'}
-                      return r.status, parsed
+                      return r.status, safe_parse(raw)
               except urllib.error.HTTPError as e:
                   raw = e.read().decode('utf-8', errors='replace')
-                  try: parsed = json.loads(raw)
-                  except Exception: parsed = {'raw_response_type': 'non_json'}
-                  return e.code, parsed
+                  return e.code, safe_parse(raw)
 
           if not token:
               report['critical_blockers'].append('GITHUB_SECRET_TELEGRAM_BOT_TOKEN_VICTOR_MISSING')
           else:
               try:
-                  _, hook = get_json(f'https://api.telegram.org/bot{token}/getWebhookInfo')
+                  hook_code, hook = get_json(f'https://api.telegram.org/bot{token}/getWebhookInfo')
                   hook_result = hook.get('result') or {}
                   hook_url = str(hook_result.get('url') or '').strip()
                   report['production_verification']['telegram_webhook'] = {
+                      'api_http_status': hook_code,
                       'configured': bool(hook_url),
                       'pending_update_count': hook_result.get('pending_update_count'),
                       'last_error_date_present': bool(hook_result.get('last_error_date')),
                       'last_error_message_present': bool(hook_result.get('last_error_message')),
                   }
-                  if not hook_url:
+                  if hook_code != 200 or not hook_url:
                       report['critical_blockers'].append('TELEGRAM_WEBHOOK_URL_NOT_CONFIGURED')
                   else:
                       parsed = urllib.parse.urlparse(hook_url)
@@ -97,6 +107,8 @@ jobs:
                           try:
                               code, payload = get_json(worker_origin + endpoint)
                               report['production_verification'][key] = {'http_status': code, 'payload': payload}
+                              if code != 200:
+                                  report['critical_blockers'].append(f'{key.upper()}_PROBE_FAILED')
                           except Exception as exc:
                               report['production_verification'][key] = {'error': type(exc).__name__}
                               report['critical_blockers'].append(f'{key.upper()}_PROBE_FAILED')
@@ -117,6 +129,13 @@ jobs:
                               report['critical_blockers'].append(f'HEALTH_{field.upper()}_NOT_TRUE')
                       if health.get('active_thread_memory_durable') is not True:
                           report['critical_blockers'].append('DURABLE_CONVERSATION_STATE_NOT_ACTIVE')
+
+                      report['production_verification']['deployment_identity'] = {
+                          'deployment_git_sha': health.get('deployment_git_sha'),
+                          'deployment_build_uuid': health.get('deployment_build_uuid'),
+                          'cloudflare_version_id': health.get('cloudflare_version_id'),
+                          'deployment_identity_gate': health.get('deployment_identity_gate'),
+                      }
 
                       can_live_post = bool(webhook_secret and founder_chat)
                       report['live_acceptance']['synthetic_webhook_possible'] = can_live_post
@@ -177,6 +196,7 @@ jobs:
               'ready_for_founder_test': report['ready_for_founder_test'],
               'critical_blockers': report['critical_blockers'],
               'live_test_count': len((report.get('live_acceptance') or {}).get('tests') or []),
+              'endpoint_statuses': {k:(v.get('http_status') if isinstance(v,dict) else None) for k,v in report.get('production_verification',{}).items() if k in ['health','core_health','aura3_bridge','tony_bridge']},
               'secrets_exposed': False,
           }))
           PY
