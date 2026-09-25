@@ -1,5 +1,5 @@
 {
-  "schema_version": 11,
+  "schema_version": 12,
   "authority": "Founder Vicky",
   "orchestrator": "Dr. Victor",
   "credential_policy": "department_scoped_only",
@@ -44,14 +44,15 @@
       "contract_ref": "integration/victor_contract.json",
       "constitutional_ref": "constitution/SOUL.md",
       "victor_connection": "CONNECTED_VERIFIED",
-      "live_certification": "VERIFIED_HISTORICAL_PRE_V2",
+      "live_certification": "POST_V2_ROUNDTRIP_VERIFIED",
       "business_execution": "ENABLED_BY_FOUNDER",
       "certification_task_id": "victor-aura3-1787911287502-auto",
       "connection_verified_at": "2026-08-28T10:01:34Z",
-      "post_v2_recertification": "BLOCKED_AT_WORKFLOW_DISPATCH",
-      "post_v2_recertification_checked_at": "2026-09-25T16:46:56Z",
-      "post_v2_recertification_evidence": "Victor Package 3 run 36162930666; Founder-authorized exact AURA3 certification gate returned HTTP 500 before any fresh AURA3 workflow run was created.",
-      "notes": "Historical AURA3 LIVE_CERTIFIED evidence remains retained, but it is not substituted for a fresh post-V2 certification. Current post-V2 recertification is blocked at the workflow-dispatch boundary and requires exact dispatch-authority diagnosis before certification can be refreshed. No business outcome is inferred."
+      "post_v2_recertification": "VERIFIED",
+      "post_v2_recertification_checked_at": "2026-09-25T17:22:22Z",
+      "post_v2_recertification_run": 36166681319,
+      "post_v2_recertification_evidence": "AURA3 Victor transport workflow run 36166681319 completed successfully after repository Actions-write authorization was corrected.",
+      "notes": "Fresh post-V2 Victor→AURA3 governed transport round-trip is verified. This certifies the communication/transport path and supervised return of evidence; it does not imply that every AURA3 publishing or business capability is independently live-certified, and it does not establish business outcome."
     },
     {
       "id": "rio",
