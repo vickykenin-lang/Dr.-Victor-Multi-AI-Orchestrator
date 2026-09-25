@@ -1,0 +1,72 @@
+name: END GAME Package 3 Tony Certification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/endgame_package3_tony_certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tony-live-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GITHUB_ORCHESTRATION_TOKEN: ${{ secrets.GITHUB_ORCHESTRATION_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require governed orchestration credential
+        shell: bash
+        run: |
+          if [ -z "$GITHUB_ORCHESTRATION_TOKEN" ]; then
+            echo 'GITHUB_ORCHESTRATION_TOKEN is not configured.' >&2
+            exit 42
+          fi
+      - name: Execute fresh Victor to Tony to Victor round-trip
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            dispatchTonyTask,
+            waitForTonyResult,
+            verifyTonyResult,
+          } from './victor-telegram-worker/department_bridge.mjs';
+
+          const env = { GITHUB_ORCHESTRATION_TOKEN: process.env.GITHUB_ORCHESTRATION_TOKEN };
+          const text = 'Tony Stark certification status check. Return fresh strict supervision evidence only. No production, paid, destructive, credential, or public action.';
+          const dispatched = await dispatchTonyTask(env, text, { messageId: 'package3-cert' });
+          if (dispatched.status !== 'DISPATCHED') throw new Error(`TONY_NOT_DISPATCHED:${dispatched.status}`);
+          const received = await waitForTonyResult(dispatched.taskId, env, { attempts: 24, delayMs: 5000 });
+          if (received.status !== 'RESULT_RECEIVED') throw new Error(`TONY_RESULT_${received.status}`);
+          const verified = verifyTonyResult(received.result, dispatched.taskId);
+          const strict = received.result?.strict_supervision || {};
+          const safe = {
+            status: verified.ok ? 'PASS' : 'FAIL',
+            task_id: dispatched.taskId,
+            task_type: dispatched.taskType,
+            verification: verified.checks,
+            strict_status: strict.status || null,
+            objective_alignment: strict.objective_alignment || null,
+            requires_follow_up: strict.requires_follow_up,
+            evidence_count: Array.isArray(strict.evidence) ? strict.evidence.length : 0,
+            destructive_action_performed: received.result?.destructive_action_performed,
+            paid_action_performed: received.result?.paid_action_performed,
+            production_action_performed: received.result?.production_action_performed,
+            secrets_exposed: false,
+          };
+          console.log(JSON.stringify(safe, null, 2));
+          if (!verified.ok) throw new Error('TONY_STRICT_REVERT_VERIFICATION_FAILED');
+          if (received.result?.destructive_action_performed !== false) throw new Error('TONY_DESTRUCTIVE_ACTION_NOT_FALSE');
+          if (received.result?.paid_action_performed !== false) throw new Error('TONY_PAID_ACTION_NOT_FALSE');
+          if (received.result?.production_action_performed !== false) throw new Error('TONY_PRODUCTION_ACTION_NOT_FALSE');
+          NODE
