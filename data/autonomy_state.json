@@ -1,89 +1,91 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
+  "updated_at_utc": "2026-09-25T16:13:34Z",
   "requested_mode": "MANUAL_GOVERNED_ORCHESTRATOR",
   "decision_mode": "GOAL_DRIVEN_EXECUTIVE",
-  "runtime_status": "MANUAL_GOAL_CYCLE_SAFE_STOP",
-  "scheduler": "CLOUDFLARE_CRON_BOUND_LIVE_HEALTH_VERIFIED_PENDING_POST_PATCH_GOAL_CYCLE",
-  "heartbeat_role": "WATCHDOG_AND_WAKE_NOT_FIXED_DEPARTMENT_ROTATION",
-  "governed_dispatch": "DYNAMIC_GOAL_SELECTION_AND_ROUTE_DISPATCH_IMPLEMENTED",
-  "automatic_evidence_review": "IMPLEMENTED_AND_DETERMINISTIC_TESTED_PENDING_POST_PATCH_PRODUCTION_CYCLE",
-  "automatic_next_action_loop": "GOAL_SELECT_ROUTE_EXECUTE_VERIFY_MATERIAL_PROGRESS_REPLAN",
-  "founder_reporting_filter": "BOUNDARY_ESCALATION_VERIFIED_OUTCOME_DAILY_SUMMARY",
+  "runtime_status": "V2_RUNTIME_READY_MANUAL_ONLY",
+  "production_autonomy_enabled": false,
+  "scheduler_bound": false,
+  "allowed_trigger": "founder-command",
+  "heartbeat_role": "WATCHDOG_AND_WAKE_CAPABILITY_NOT_AUTHORIZED_FOR_AUTONOMOUS_PRODUCTION_EXECUTION",
+  "governed_dispatch": "FOUNDER_COMMAND_ONLY_WITH_V2_AUTHORITY_SECURITY_PREFLIGHT",
+  "automatic_evidence_review": "IMPLEMENTED_BUT_AUTONOMOUS_PRODUCTION_LOOP_NOT_ENABLED",
+  "automatic_next_action_loop": "NOT_PRODUCTION_ENABLED",
+  "founder_reporting_filter": "FOUNDER_COMMAND_RESULTS_AND_BOUNDARY_ESCALATIONS",
   "goal_registry": "data/goal_registry.json",
   "goal_runtime_state": "data/goal_runtime_state.json",
-  "last_verified_cycle": {
-    "checked_at_utc": "2026-09-23T16:30:12.168Z",
-    "cron": "30 16 * * *",
-    "status": "DAILY_REPORT_SENT",
-    "goal_id": "ORG-REVENUE-001",
-    "target": "tony_stark",
-    "task_id": null,
-    "evidence_received": true,
-    "progress_delta": null
+  "current_live_evidence": {
+    "verified_at_utc": "2026-09-25T14:48:45.844563+00:00",
+    "status": "LIVE_V2_RUNTIME_VERIFIED_POST_ROLLBACK_RESTORE",
+    "cloudflare_version_id": "1831689a-19fa-426d-8077-7678cb4ef184",
+    "v2_runtime_wired": true,
+    "production_autonomy_enabled": false,
+    "scheduler_bound": false,
+    "allowed_trigger": "founder-command",
+    "founder_authorization_verified": true,
+    "live_sandbox_verified": true,
+    "live_rollback_restore_verified": true,
+    "evidence_refs": [
+      "data/v2_live_runtime_evidence.json",
+      "data/v2_live_sandbox_evidence.json",
+      "data/v2_live_rollback_evidence.json",
+      "data/v2_block5_final_status.json",
+      "docs/VICTOR_V2_BLOCK5_FINAL_CLOSURE_AUDIT_2026-09-25.md"
+    ]
   },
-  "note": "Goal selection, production health and the governed Victor→RIO GOAL_EXECUTE bridge have been tested. Do not claim full production goal-loop certification until the Cloudflare scheduler performs a fresh post-patch cycle and persists Victor goal runtime state.",
-  "last_known_live_health_evidence": {
-    "checked_at": "2026-08-28",
-    "status": "READY",
-    "autonomy_runtime_configured": true,
-    "autonomy_scheduler_bound": true,
-    "bridges": {
-      "tony": true,
-      "rio": true,
-      "aura3": true
+  "autonomy_rollout_state": {
+    "green": "NOT_ENABLED_PENDING_PACKAGE_ACCEPTANCE",
+    "amber": "NOT_ENABLED",
+    "red": "FOUNDER_GATED",
+    "founder_unavailable_mode": "SAFE_HOLD_FOR_RED_CONTINUE_SAFE_DIAGNOSIS_ONLY"
+  },
+  "historical_pre_v2_state": {
+    "last_verified_cycle": {
+      "checked_at_utc": "2026-09-23T16:30:12.168Z",
+      "cron": "30 16 * * *",
+      "status": "DAILY_REPORT_SENT",
+      "goal_id": "ORG-REVENUE-001",
+      "target": "tony_stark",
+      "task_id": null,
+      "evidence_received": true,
+      "progress_delta": null
     },
-    "ai_inference_enabled": true
-  },
-  "implementation_evidence": {
-    "goal_driven_runtime_commit": "5154d072615b7b646e97c65faac937060b31c830",
-    "goal_driven_tests_commit": "89583e798b84829111dfcb3932f6abaad7da480b",
-    "github_actions_run_id": 33198453548,
-    "github_actions_conclusion": "success"
-  },
-  "goal_bridge_trial": {
-    "status": "PASS",
-    "repository": "vickykenin-lang/rio-affiliate-engine",
-    "workflow_run_id": 33199828729,
-    "goal_id": "ORG-REVENUE-001",
-    "task_type": "GOAL_EXECUTE",
-    "production_state": "ACTIVE",
-    "soul_gate": "PASS",
-    "governed_business_cycle_performed": true,
-    "goal_progress": "VERIFIED",
-    "public_action_performed": false,
-    "objective_changed": false,
-    "credential_transfer_performed": false,
-    "result_ref": "integration/results/victor_tasks/victor-rio-goal-bridge-trial.json",
-    "persistence": "PASS_AFTER_SHARED_RIO_HEARTBEAT_CONCURRENCY_FIX",
-    "final_business_outcome_verified": false,
-    "verified_revenue_inr": 0
-  },
-  "rollback": {
-    "branch": "backup/pre-goal-driven-victor-2026-08-28",
-    "commit": "9dc52fc8f5c71bb751739f118b6ce08abb8cf0fa",
-    "manifest": "backups/VICTOR_PRE_GOAL_DRIVEN_ARCHITECTURE_2026-08-28.md"
-  },
-  "last_cycle_attempt": {
-    "checked_at_utc": "2026-09-24T14:12:58.200Z",
-    "cron": "founder-command",
-    "status": "SAFE_STOP",
-    "goal_id": "ORG-REVENUE-001",
-    "target": "tony_stark",
-    "error_code": "AI_MODEL_ROUTER_EXHAUSTED",
-    "diagnostics": {
-      "stage": "EXECUTIVE_REASONING_BOUNDARY",
-      "validation_errors": [],
-      "secrets_exposed": false
+    "goal_bridge_trial": {
+      "status": "PASS",
+      "repository": "vickykenin-lang/rio-affiliate-engine",
+      "workflow_run_id": 33199828729,
+      "goal_id": "ORG-REVENUE-001",
+      "task_type": "GOAL_EXECUTE",
+      "production_state": "ACTIVE",
+      "soul_gate": "PASS",
+      "governed_business_cycle_performed": true,
+      "goal_progress": "VERIFIED",
+      "public_action_performed": false,
+      "objective_changed": false,
+      "credential_transfer_performed": false,
+      "result_ref": "integration/results/victor_tasks/victor-rio-goal-bridge-trial.json",
+      "persistence": "PASS_AFTER_SHARED_RIO_HEARTBEAT_CONCURRENCY_FIX",
+      "final_business_outcome_verified": false,
+      "verified_revenue_inr": 0
+    },
+    "last_cycle_attempt": {
+      "checked_at_utc": "2026-09-24T14:12:58.200Z",
+      "cron": "founder-command",
+      "status": "SAFE_STOP",
+      "goal_id": "ORG-REVENUE-001",
+      "target": "tony_stark",
+      "error_code": "AI_MODEL_ROUTER_EXHAUSTED",
+      "diagnostics": {
+        "stage": "EXECUTIVE_REASONING_BOUNDARY",
+        "validation_errors": [],
+        "secrets_exposed": false
+      }
+    },
+    "rollback": {
+      "branch": "backup/pre-goal-driven-victor-2026-08-28",
+      "commit": "9dc52fc8f5c71bb751739f118b6ce08abb8cf0fa",
+      "manifest": "backups/VICTOR_PRE_GOAL_DRIVEN_ARCHITECTURE_2026-08-28.md"
     }
   },
-  "report_card": null,
-  "last_observed_cycle": {
-    "checked_at_utc": "2026-09-24T14:12:58.200Z",
-    "cron": "founder-command",
-    "status": "SAFE_STOP",
-    "goal_id": "ORG-REVENUE-001",
-    "target": "tony_stark",
-    "task_id": null,
-    "progress_delta": null
-  }
+  "note": "Historical scheduler-bound evidence is retained as history only. Current verified V2 production posture is manual Founder-command-only with production autonomy OFF. No historical record grants present authority."
 }
