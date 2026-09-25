@@ -1,0 +1,66 @@
+name: Victor V2 Block 5 Live Verify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/victor_v2_block5_live_verify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Probe live Worker
+        run: |
+          python - <<'PY'
+          import json, time, urllib.request, pathlib, datetime
+          base='https://victor-telegram-webhook.vickykenin.workers.dev'
+          required=['/health','/v2-health','/core-health','/aura3-bridge-health','/tony-bridge-health','/telegram-webhook-health']
+          results={}
+          for path in required:
+            last=None
+            for _ in range(20):
+              try:
+                req=urllib.request.Request(base+path,headers={'User-Agent':'Victor-V2-Block5-Live-Verify/2.0','Cache-Control':'no-cache'})
+                with urllib.request.urlopen(req,timeout=20) as r:
+                  body=json.loads(r.read().decode())
+                  last={'http_status':r.status,'body':body}
+                  if r.status==200 and (path != '/v2-health' or body.get('runtime_wired') is True): break
+              except Exception as e:
+                last={'http_status':None,'error':str(e)[:300]}
+              time.sleep(3)
+            results[path]=last
+          assert all(v.get('http_status')==200 for v in results.values()), results
+          v2=results['/v2-health']['body']
+          assert v2.get('status')=='READY', v2
+          assert v2.get('runtime_wired') is True, v2
+          assert v2.get('founder_stop_precedence') is True, v2
+          assert v2.get('green_evidence_read')=='ALLOW', v2
+          assert v2.get('red_credential_without_founder')=='DENY', v2
+          assert v2.get('capability_lease_valid') is True, v2
+          assert v2.get('watchdog')=='CONTINUE_BOUNDED', v2
+          assert v2.get('production_autonomy_enabled') is False, v2
+          health=results['/health']['body']
+          assert health.get('v2_runtime_wired') is True, health
+          assert health.get('v2_production_autonomy_enabled') is False, health
+          evidence={'schema_version':1,'verified_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'LIVE_V2_RUNTIME_VERIFIED','secrets_exposed':False,'results':results}
+          pathlib.Path('data/v2_live_runtime_evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps({'status':evidence['status'],'v2':v2},indent=2))
+          PY
+      - name: Persist evidence
+        run: |
+          git config user.name 'victor-security-ops'
+          git config user.email 'actions@users.noreply.github.com'
+          git add data/v2_live_runtime_evidence.json
+          git commit -m 'evidence: verify Victor V2 live runtime'
+          git pull --rebase origin main
+          git push origin HEAD:main
