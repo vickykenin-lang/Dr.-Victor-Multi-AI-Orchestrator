@@ -1,0 +1,38 @@
+name: Victor Packages 7-10 Acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/build_control_room_snapshot.py'
+      - 'tests/test_control_room_snapshot.py'
+      - 'scripts/package8_commercial_readiness.py'
+      - 'scripts/package9_security_audit.py'
+      - 'scripts/package10_prefinal_audit.py'
+      - '.github/workflows/victor_packages7_10_acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Package 7 truthful control room
+        run: |
+          python3 scripts/build_control_room_snapshot.py
+          python3 -m unittest tests/test_control_room_snapshot.py
+          python3 -m unittest tests/test_founder_dashboard.py
+      - name: Package 8 commercial truth gate
+        run: |
+          python3 scripts/validate_revenue_outcomes.py
+          python3 -m unittest tests.test_revenue_evidence
+          python3 scripts/package8_commercial_readiness.py
+      - name: Package 9 security inventory
+        run: python3 scripts/package9_security_audit.py
+      - name: Package 10 pre-final audit
+        run: python3 scripts/package10_prefinal_audit.py
