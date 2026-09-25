@@ -41,14 +41,18 @@ def main() -> int:
     active_goal_id = goals.get("active_goal_id")
     active_goal = (goals.get("goals") or {}).get(active_goal_id, {}) if active_goal_id else {}
     rev = revenue.get("verified_totals") or {}
+    canonical_available = bool(canonical.get("precedence")) and canonical.get("schema_version") is not None
+    department_records = departments.get("departments", departments.get("registry", departments))
+    registry_available = isinstance(department_records, list) and len(department_records) > 0
 
     snapshot = {
         "schema_version": 1,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "truth_policy": "Missing evidence is UNKNOWN. Historical evidence cannot be presented as current live state. Engineering readiness is not business success.",
         "canonical": {
-            "status": canonical.get("status", "UNKNOWN"),
+            "status": canonical.get("status") or ("INDEX_AVAILABLE" if canonical_available else "UNKNOWN"),
             "source": "data/canonical_status_index.json",
+            "updated_at_utc": canonical.get("updated_at_utc"),
         },
         "objective": {
             "active_goal_id": active_goal_id,
@@ -78,11 +82,12 @@ def main() -> int:
             "package6_certification": package6.get("status", "UNKNOWN"),
             "package6_started_at_utc": package6.get("started_at_utc"),
             "package6_minimum_signals": package6.get("minimum_required_signals"),
+            "package6_consequential_execution_trigger": package6.get("consequential_execution_trigger", "UNKNOWN"),
         },
         "departments": {
             "source": "data/department_registry.json",
-            "registry_status": departments.get("status", departments.get("overall_status", "UNKNOWN")),
-            "records": departments.get("departments", departments.get("registry", departments)),
+            "registry_status": departments.get("status") or departments.get("overall_status") or ("REGISTRY_AVAILABLE" if registry_available else "UNKNOWN"),
+            "records": department_records,
         },
         "business_outcome": {
             "source": "data/revenue_outcomes.json",
