@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "updated_at_utc": "2026-09-25T14:49:00Z",
+  "block": "VICTOR_V2_BLOCK_5",
+  "runtime_cutover_status": "PASS",
+  "overall_status": "RUNTIME_COMPLETE_WITH_SECURITY_GOVERNANCE_CARRY_FORWARD",
+  "active_cloudflare_version_id": "1831689a-19fa-426d-8077-7678cb4ef184",
+  "live_runtime_verified": true,
+  "live_sandbox_verified": true,
+  "live_rollback_restore_verified": true,
+  "post_rollback_live_runtime_verified": true,
+  "founder_authorization_verified": true,
+  "production_autonomy_enabled": false,
+  "scheduler_bound": false,
+  "allowed_trigger": "founder-command",
+  "secrets_exposed_by_evidence": false,
+  "evidence": {
+    "live_runtime": "data/v2_live_runtime_evidence.json",
+    "live_sandbox": "data/v2_live_sandbox_evidence.json",
+    "live_rollback": "data/v2_live_rollback_evidence.json",
+    "audit": "docs/VICTOR_V2_BLOCK5_FINAL_CLOSURE_AUDIT_2026-09-25.md"
+  },
+  "carry_forward": [
+    "MAIN_BRANCH_PROTECTION_DISABLED",
+    "SUPPLY_CHAIN_FULL_SHA_PINNING_INCOMPLETE",
+    "NPM_AUDIT_HIGH_SEVERITY_FINDINGS_PRESENT",
+    "LEGACY_DEPLOYMENT_IDENTITY_VARS_STALE",
+    "FOUNDER_GATED_CREDENTIAL_ROTATION_NOT_PERFORMED"
+  ]
+}
