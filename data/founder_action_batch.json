@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "status": "CONSOLIDATED_NOT_YET_REQUESTED",
+  "generated_at_utc": "2026-09-25T21:36:30Z",
+  "principle": "Founder dependencies are batched only after all safely executable non-Founder work is exhausted.",
+  "actions": [
+    {
+      "id": "FOUNDER-GH-ADMIN-001",
+      "category": "GITHUB_ADMIN",
+      "action": "Enable main-branch protection or an equivalent ruleset with required status checks.",
+      "why_founder_required": "Current connected GitHub capability does not expose repository administration required for branch protection; main is presently unprotected.",
+      "current_state": "PENDING"
+    },
+    {
+      "id": "FOUNDER-GH-WORKFLOWS-002",
+      "category": "GITHUB_PERMISSION",
+      "action": "Grant a controlled token/App permission capable of updating workflow files so the remaining 69 legacy mutable GitHub Action refs can be pinned in one reviewed batch.",
+      "why_founder_required": "A controlled batch push was refused by GitHub because the acting App lacked workflows permission. Critical END GAME and production workflows are already pinned.",
+      "current_state": "PENDING"
+    },
+    {
+      "id": "FOUNDER-BUSINESS-003",
+      "category": "EXTERNAL_BUSINESS_EVIDENCE",
+      "action": "When a real merchant/affiliate payment exists, provide or authorize access to independently verifiable PAYMENT_RECEIVED evidence and its funnel evidence chain.",
+      "why_founder_required": "No synthetic revenue is allowed; current canonical verified revenue remains zero until an external business event actually occurs.",
+      "current_state": "WAITING_FOR_REAL_EVENT"
+    },
+    {
+      "id": "FOUNDER-CREDENTIAL-004",
+      "category": "CREDENTIAL_SECURITY",
+      "action": "Approve credential rotation only if the final security audit determines a specific rotation is still necessary.",
+      "why_founder_required": "Credential rotation is a RED Founder-gated action.",
+      "current_state": "NOT_CURRENTLY_REQUIRED"
+    }
+  ],
+  "time_dependency_not_founder_action": {
+    "package6": "Seven-day reliability certification must mature and be audited; initial fail-closed and GREEN-only recovery acceptance already passed."
+  }
+}
