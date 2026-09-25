@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "checked_at_utc": "2026-09-25T12:10:18.543780+00:00",
+  "checked_at_utc": "2026-09-25T13:53:25.501918+00:00",
   "repository_sha_under_test": "3f38dbb3e331bbbaa671b69751d40ad226f853d9",
   "production_verification": {
     "telegram_webhook": {
@@ -381,47 +381,47 @@
       {
         "name": "transport_hi",
         "http_status": 200,
-        "ok": true,
+        "ok": false,
         "mode": null,
         "target": null,
-        "ignored": true,
-        "error": null
+        "ignored": false,
+        "error": "TELEGRAM_DELIVERY_FAILED"
       },
       {
         "name": "fresh_multi_fact",
         "http_status": 200,
-        "ok": true,
+        "ok": false,
         "mode": null,
         "target": null,
-        "ignored": true,
-        "error": null
+        "ignored": false,
+        "error": "PROCESSING_FAILED"
       },
       {
         "name": "thread_anchor",
         "http_status": 200,
-        "ok": true,
+        "ok": false,
         "mode": null,
         "target": null,
-        "ignored": true,
-        "error": null
+        "ignored": false,
+        "error": "PROCESSING_FAILED"
       },
       {
         "name": "short_followup",
         "http_status": 200,
-        "ok": true,
+        "ok": false,
         "mode": null,
         "target": null,
-        "ignored": true,
-        "error": null
+        "ignored": false,
+        "error": "PROCESSING_FAILED"
       },
       {
         "name": "status_followup",
         "http_status": 200,
-        "ok": true,
+        "ok": false,
         "mode": null,
         "target": null,
-        "ignored": true,
-        "error": null
+        "ignored": false,
+        "error": "PROCESSING_FAILED"
       }
     ]
   },
