@@ -1,0 +1,55 @@
+name: Victor Package 5 Post-Rollback Health
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/victor_package5_postrollback_health.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WORKER_BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
+    steps:
+      - name: Verify post-rollback production health
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.request
+          base=os.environ['WORKER_BASE_URL'].rstrip('/')
+          required=['/health','/v2-health','/endgame-runtime-health','/core-health','/aura3-bridge-health','/tony-bridge-health','/telegram-webhook-health']
+          results={}
+          for path in required:
+              last=None
+              for _ in range(8):
+                  try:
+                      req=urllib.request.Request(base+path,headers={'User-Agent':'Victor-Package5-PostRollback-Health/1.0'})
+                      with urllib.request.urlopen(req,timeout=20) as r:
+                          body=json.loads(r.read().decode())
+                          last={'http_status':r.status,'body':body}
+                          if r.status==200: break
+                  except Exception as e:
+                      last={'http_status':None,'error':str(e)[:300]}
+                  time.sleep(3)
+              results[path]=last
+          assert all(v.get('http_status')==200 for v in results.values()), results
+          h=results['/health']['body']
+          v2=results['/v2-health']['body']
+          eg=results['/endgame-runtime-health']['body']
+          assert h.get('status')=='READY', h
+          assert h.get('v2_runtime_wired') is True, h
+          assert h.get('v2_production_autonomy_enabled') is False, h
+          assert v2.get('status')=='READY', v2
+          assert v2.get('runtime_wired') is True, v2
+          assert v2.get('production_autonomy_enabled') is False, v2
+          assert v2.get('red_credential_without_founder')=='DENY', v2
+          assert eg.get('status')=='READY', eg
+          assert eg.get('production_autonomy_enabled') is False, eg
+          print(json.dumps({'status':'PACKAGE5_POST_ROLLBACK_HEALTH_PASS','results':results,'secrets_exposed':False},indent=2))
+          PY
