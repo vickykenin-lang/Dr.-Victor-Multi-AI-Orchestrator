@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "verified_at_utc": "2026-09-25T14:47:42Z",
-  "status": "LIVE_ROLLBACK_AND_RESTORE_VERIFIED",
+  "verified_at_utc": "2026-09-25T14:48:45.844563+00:00",
+  "status": "LIVE_ROLLBACK_RESTORE_AND_POST_VERIFY_VERIFIED",
   "worker": "victor-telegram-webhook",
   "rollback": {
     "deployment_id": "f2bcee9d-3b7d-496b-9c6f-c2a73530d840",
@@ -17,7 +17,12 @@
     "created_on": "2026-09-25T14:47:42.757581Z",
     "api_status": 200
   },
+  "post_restore_live_verification": {
+    "status": "LIVE_V2_RUNTIME_VERIFIED_POST_ROLLBACK_RESTORE",
+    "evidence_path": "data/v2_live_runtime_evidence.json",
+    "verified_at_utc": "2026-09-25T14:48:45.844563+00:00"
+  },
   "production_autonomy_enabled": false,
   "secrets_exposed": false,
-  "post_restore_live_verification_required": true
+  "post_restore_live_verification_required": false
 }
