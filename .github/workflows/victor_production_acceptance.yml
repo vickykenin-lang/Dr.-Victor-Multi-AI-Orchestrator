@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/victor_production_acceptance.yml'
+      - 'brain/**'
+      - 'victor-telegram-worker/**'
+      - 'wrangler.toml'
+      - 'package.json'
   workflow_dispatch:
 
 permissions:
