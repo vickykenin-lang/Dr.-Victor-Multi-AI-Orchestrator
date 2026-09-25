@@ -1,0 +1,35 @@
+name: Package 3 Apply Department Certification Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/package3_apply_department_certification_gate.yml'
+      - 'scripts/apply_package3_department_certification_gate.py'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply deterministic Worker patch
+        run: python scripts/apply_package3_department_certification_gate.py
+      - name: Syntax check
+        run: node --check victor-telegram-worker/worker.js
+      - name: Commit Worker patch only
+        shell: bash
+        run: |
+          if git diff --quiet -- victor-telegram-worker/worker.js; then
+            echo 'No worker changes.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add victor-telegram-worker/worker.js
+          git commit -m 'certification: wire bounded Package 3 department gate'
+          git push origin HEAD:main
