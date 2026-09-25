@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "PASS_WITH_FOUNDER_ADMIN_CARRY_FORWARD",
+  "verified_at_utc": "2026-09-25T21:36:17Z",
+  "evidence": {
+    "security_workflow_run_id": 36192423442,
+    "security_workflow_conclusion": "success",
+    "critical_action_refs_immutable": true,
+    "dependency_audit": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "remaining_mutable_action_refs_repository_wide": 69,
+    "remaining_refs_scope": "LEGACY_NONCRITICAL_WORKFLOWS_PENDING_CONTROLLED_BATCH_PIN",
+    "production_deploy_workflow_pinned_and_live_reverified": true,
+    "production_deploy_verification_run_id": 36191922988,
+    "production_deploy_verification_conclusion": "success"
+  },
+  "admin_carry_forward": {
+    "main_branch_protection_enabled": false,
+    "required_status_checks_enabled": false,
+    "remaining_legacy_workflow_pin_batch_requires_workflows_permission": true,
+    "credential_rotation_performed": false,
+    "credential_rotation_requires_founder_approval": true
+  },
+  "truth_rule": "Critical END GAME and production workflows are pinned and dependency high/critical findings are zero. Repository-wide legacy mutable refs and main-branch protection remain explicit carry-forward and must not be represented as completed."
+}
