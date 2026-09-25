@@ -5,6 +5,13 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/victor_v2_block5_production_deploy.yml'
+      - 'victor-telegram-worker/worker.js'
+      - 'victor-telegram-worker/endgame_runtime_acceptance.mjs'
+      - 'brain/endgame_runtime_gate.mjs'
+      - 'brain/procedure_registry.mjs'
+      - 'brain/degraded_mode.mjs'
+      - 'brain/truthful_telemetry.mjs'
+      - 'brain/experience_ledger.mjs'
   workflow_dispatch:
 
 permissions:
@@ -19,6 +26,8 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       WORKER_NAME: victor-telegram-webhook
       WORKER_BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
+      TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+      VICTOR_FOUNDER_CHAT_ID: ${{ secrets.VICTOR_FOUNDER_CHAT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +50,8 @@ jobs:
       - name: Regression gate before production
         run: |
           node --check victor-telegram-worker/worker.js
-          node --test brain/founder_intent_gateway.test.mjs brain/security_kernel.test.mjs brain/action_contract.test.mjs brain/block3_sandbox_security.test.mjs brain/block4_promotion_shadow.test.mjs brain/block5_redteam_security.test.mjs
+          node --check victor-telegram-worker/endgame_runtime_acceptance.mjs
+          node --test brain/founder_intent_gateway.test.mjs brain/security_kernel.test.mjs brain/action_contract.test.mjs brain/block3_sandbox_security.test.mjs brain/block4_promotion_shadow.test.mjs brain/block5_redteam_security.test.mjs victor-telegram-worker/endgame_runtime_acceptance.test.mjs
       - name: Build exact Worker module bundle
         run: |
           rm -rf dist/v2-live
@@ -70,19 +80,19 @@ jobs:
           result=body.get('result') or {}
           print(json.dumps({'http_status':code,'success':True,'etag':result.get('etag'),'modified_on':result.get('modified_on'),'has_modules':result.get('has_modules')},indent=2))
           PY
-      - name: Verify live V2 runtime and legacy health surfaces
+      - name: Verify live V2 runtime and END GAME health surfaces
         shell: bash
         run: |
           python - <<'PY'
           import json, os, time, urllib.request
           base=os.environ['WORKER_BASE_URL'].rstrip('/')
-          required=['/health','/v2-health','/core-health','/aura3-bridge-health','/tony-bridge-health','/telegram-webhook-health']
+          required=['/health','/v2-health','/endgame-runtime-health','/core-health','/aura3-bridge-health','/tony-bridge-health','/telegram-webhook-health']
           results={}
           for path in required:
             last=None
             for _ in range(10):
               try:
-                req=urllib.request.Request(base+path,headers={'User-Agent':'Victor-V2-Block5-Live-Verify/1.0'})
+                req=urllib.request.Request(base+path,headers={'User-Agent':'Victor-ENDGAME-Package2-Live-Verify/1.0'})
                 with urllib.request.urlopen(req,timeout=20) as r:
                   body=json.loads(r.read().decode())
                   last={'http_status':r.status,'body':body}
@@ -98,8 +108,73 @@ jobs:
           assert v2.get('founder_stop_precedence') is True, v2
           assert v2.get('red_credential_without_founder')=='DENY', v2
           assert v2.get('production_autonomy_enabled') is False, v2
+          endgame=results['/endgame-runtime-health']['body']
+          assert endgame.get('status')=='READY', endgame
+          assert endgame.get('degraded_mode')=='DEGRADED_VERIFIED_PROCEDURE', endgame
+          assert endgame.get('truthful_telemetry_surface')=='LIVE', endgame
+          assert endgame.get('experience_ledger_durable') is True, endgame
+          assert endgame.get('production_autonomy_enabled') is False, endgame
           health=results['/health']['body']
           assert health.get('v2_runtime_wired') is True, health
           assert health.get('v2_production_autonomy_enabled') is False, health
-          print(json.dumps({'status':'LIVE_V2_RUNTIME_VERIFIED','source_git_sha':os.environ.get('GITHUB_SHA'),'results':results},indent=2))
+          print(json.dumps({'status':'LIVE_ENDGAME_PACKAGE2_HEALTH_VERIFIED','source_git_sha':os.environ.get('GITHUB_SHA'),'results':results},indent=2))
+          PY
+      - name: Founder-authorized END GAME Package 2 live acceptance
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          if not os.environ.get('TELEGRAM_WEBHOOK_SECRET') or not os.environ.get('VICTOR_FOUNDER_CHAT_ID'):
+              raise SystemExit('Protected Founder acceptance secrets are not configured')
+          base=os.environ['WORKER_BASE_URL'].rstrip('/')
+          founder=str(os.environ['VICTOR_FOUNDER_CHAT_ID'])
+          payload={
+              'update_id': 926092502,
+              'message': {
+                  'message_id': 0,
+                  'from': {'id': int(founder)},
+                  'chat': {'id': int(founder), 'type': 'private'},
+                  'text': 'ENDGAME RUNTIME ACCEPTANCE',
+              },
+          }
+          req=urllib.request.Request(
+              base+'/telegram',
+              data=json.dumps(payload).encode(),
+              method='POST',
+              headers={
+                  'Content-Type':'application/json',
+                  'X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],
+                  'User-Agent':'Victor-ENDGAME-Package2-Live-Acceptance/1.0',
+              },
+          )
+          with urllib.request.urlopen(req,timeout=45) as r:
+              body=json.loads(r.read().decode())
+              code=r.status
+          safe={
+              'http_status':code,
+              'mode':body.get('mode'),
+              'status':body.get('status'),
+              'procedure_registry_live':body.get('procedure_registry_live'),
+              'degraded_mode_live':body.get('degraded_mode_live'),
+              'truthful_telemetry_live':body.get('truthful_telemetry_live'),
+              'experience_ledger_readback_verified':body.get('experience_ledger_readback_verified'),
+              'experience_advisory_reuse_verified':body.get('experience_advisory_reuse_verified'),
+              'cognee_semantic_roundtrip_verified':body.get('cognee_semantic_roundtrip_verified'),
+              'cognee_result_count':body.get('cognee_result_count'),
+              'blockers':body.get('blockers'),
+              'production_autonomy_enabled':body.get('production_autonomy_enabled'),
+              'secrets_exposed':body.get('secrets_exposed'),
+          }
+          print(json.dumps(safe,indent=2))
+          assert code==200, safe
+          assert body.get('mode')=='ENDGAME_RUNTIME_ACCEPTANCE', safe
+          assert body.get('status')=='PASS', safe
+          assert body.get('procedure_registry_live') is True, safe
+          assert body.get('degraded_mode_live') is True, safe
+          assert body.get('truthful_telemetry_live') is True, safe
+          assert body.get('experience_ledger_readback_verified') is True, safe
+          assert body.get('experience_advisory_reuse_verified') is True, safe
+          assert body.get('cognee_semantic_roundtrip_verified') is True, safe
+          assert body.get('production_autonomy_enabled') is False, safe
+          assert body.get('secrets_exposed') is False, safe
           PY
