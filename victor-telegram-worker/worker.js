@@ -436,7 +436,15 @@ export default {
       let dispatch;
       if (department === 'AURA3') {
         if (!aura3BridgeConfigured(env)) return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target: 'aura3', reason: 'AURA3_BRIDGE_NOT_CONFIGURED' }, 200);
-        dispatch = await dispatchAura3Task(env, 'PACKAGE3 strict supervision certification probe. Return fresh evidence. No public, production, paid, destructive or credential action.', { messageId: message.message_id });
+        try {
+          dispatch = await dispatchAura3Task(env, 'PACKAGE3 strict supervision certification probe. Return fresh evidence. No public, production, paid, destructive or credential action.', { messageId: message.message_id });
+        } catch (error) {
+          const messageText = String(error?.message || 'AURA3 dispatch failed');
+          const httpMatch = messageText.match(/AURA3 dispatch HTTP\s+(\d{3})/i);
+          const reason = httpMatch ? `AURA3_DISPATCH_HTTP_${httpMatch[1]}` : 'AURA3_DISPATCH_FAILED';
+          console.error(JSON.stringify({ event: 'PACKAGE3_AURA3_DISPATCH_FAILED', reason, secrets_exposed: false }));
+          return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target: 'aura3', reason, secrets_exposed: false }, 200);
+        }
         ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
         await sendTelegramMessage(env, chatId, 'Package 3 AURA3 certification probe dispatched. Fresh verified revert follow karega.', message.message_id);
         return json({ ok: true, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target: 'aura3', task_id: dispatch.taskId, task_type: dispatch.taskType, production_autonomy_enabled: false, secrets_exposed: false }, 200);
