@@ -1,0 +1,61 @@
+name: Victor Package 4 GREEN Autonomy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'brain/green_autonomy_runtime.mjs'
+      - 'brain/green_autonomy_runtime.test.mjs'
+      - '.github/workflows/victor_package4_green_autonomy.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+
+env:
+  WORKER_BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
+
+jobs:
+  bounded-green-cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify GREEN-only policy
+        run: |
+          node --check brain/green_autonomy_runtime.mjs
+          node --test brain/green_autonomy_runtime.test.mjs brain/security_kernel.test.mjs brain/block3_sandbox_security.test.mjs brain/block4_promotion_shadow.test.mjs brain/block5_redteam_security.test.mjs
+      - name: Execute bounded GREEN evidence cycle
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.request
+          base='https://victor-telegram-webhook.vickykenin.workers.dev'
+          paths=['/health','/v2-health','/endgame-runtime-health','/core-health','/aura3-bridge-health','/tony-bridge-health']
+          evidence={}
+          for path in paths:
+            req=urllib.request.Request(base+path,headers={'User-Agent':'Victor-Package4-GREEN-Autonomy/1.0','Cache-Control':'no-cache'})
+            with urllib.request.urlopen(req,timeout=20) as r:
+              body=json.loads(r.read().decode())
+              evidence[path]={'http_status':r.status,'status':body.get('status'),'service':body.get('service')}
+          assert all(v['http_status']==200 for v in evidence.values()), evidence
+          print(json.dumps({
+            'status':'GREEN_AUTONOMY_CYCLE_VERIFIED',
+            'capabilities':['repo.read','evidence.read','sandbox.execute'],
+            'production_mutation_performed':False,
+            'public_action_performed':False,
+            'credential_action_performed':False,
+            'authority_expansion_performed':False,
+            'evidence':evidence,
+            'secrets_exposed':False,
+          },indent=2))
+          PY
