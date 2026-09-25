@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "checked_at_utc": "2026-09-25T07:14:22.920917+00:00",
-  "repository_sha_under_test": "333a42cc742f0a8894386023a03c1153b8423e74",
+  "checked_at_utc": "2026-09-25T10:44:53.823116+00:00",
+  "repository_sha_under_test": "3721bcfb2521122673423e15b05246e0a2e0beef",
   "production_verification": {
     "telegram_webhook": {
       "configured": true,
       "pending_update_count": 0,
-      "last_error_date_present": true,
-      "last_error_message_present": true
+      "last_error_date_present": false,
+      "last_error_message_present": false
     },
     "worker_host_present": true,
     "health": {
@@ -30,14 +30,60 @@
     }
   },
   "live_acceptance": {
-    "synthetic_webhook_possible": false
+    "synthetic_webhook_possible": true,
+    "tests": [
+      {
+        "name": "transport_hi",
+        "http_status": 403,
+        "ok": false,
+        "mode": null,
+        "target": null,
+        "ignored": false,
+        "error": null
+      },
+      {
+        "name": "fresh_multi_fact",
+        "http_status": 403,
+        "ok": false,
+        "mode": null,
+        "target": null,
+        "ignored": false,
+        "error": null
+      },
+      {
+        "name": "thread_anchor",
+        "http_status": 403,
+        "ok": false,
+        "mode": null,
+        "target": null,
+        "ignored": false,
+        "error": null
+      },
+      {
+        "name": "short_followup",
+        "http_status": 403,
+        "ok": false,
+        "mode": null,
+        "target": null,
+        "ignored": false,
+        "error": null
+      },
+      {
+        "name": "status_followup",
+        "http_status": 403,
+        "ok": false,
+        "mode": null,
+        "target": null,
+        "ignored": false,
+        "error": null
+      }
+    ]
   },
   "critical_blockers": [
     "AURA3_BRIDGE_PROBE_FAILED",
     "CORE_HEALTH_PROBE_FAILED",
     "DEPLOYED_WORKER_FEATURE_PARITY_FAILED",
     "DURABLE_CONVERSATION_STATE_NOT_ACTIVE",
-    "GITHUB_SECRET_TELEGRAM_WEBHOOK_SECRET_MISSING",
     "HEALTH_AI_INFERENCE_ENABLED_NOT_TRUE",
     "HEALTH_AURA3_BRIDGE_CONFIGURED_NOT_TRUE",
     "HEALTH_FOUNDER_CHAT_CONFIGURED_NOT_TRUE",
@@ -46,6 +92,7 @@
     "HEALTH_TELEGRAM_TOKEN_CONFIGURED_NOT_TRUE",
     "HEALTH_TONY_BRIDGE_CONFIGURED_NOT_TRUE",
     "HEALTH_WEBHOOK_SECRET_CONFIGURED_NOT_TRUE",
+    "LIVE_SYNTHETIC_TELEGRAM_ACCEPTANCE_FAILED",
     "TONY_BRIDGE_PROBE_FAILED"
   ],
   "ready_for_founder_test": false,
