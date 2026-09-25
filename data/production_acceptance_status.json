@@ -1,9 +1,10 @@
 {
-  "schema_version": 1,
-  "checked_at_utc": "2026-09-25T12:06:27.587699+00:00",
-  "repository_sha_under_test": "83eaf41ff98e04cdcae23884718135d5992e506c",
+  "schema_version": 2,
+  "checked_at_utc": "2026-09-25T12:10:18.543780+00:00",
+  "repository_sha_under_test": "3f38dbb3e331bbbaa671b69751d40ad226f853d9",
   "production_verification": {
     "telegram_webhook": {
+      "api_http_status": 200,
       "configured": true,
       "pending_update_count": 0,
       "last_error_date_present": false,
@@ -11,22 +12,367 @@
     },
     "worker_host_present": true,
     "health": {
-      "error": "HTTPError"
+      "http_status": 200,
+      "payload": {
+        "service": "victor-telegram-webhook",
+        "deployment_git_sha": "d22f433b84f7bbe9e3811e88549e149095943e43",
+        "deployment_build_uuid": "5e1c7da4-1bd9-4767-9229-73ff8d824b6d",
+        "cloudflare_version_id": "7855ca9f-4ce2-4dd8-b527-964924a99dd7",
+        "deployment_identity_gate": "IDENTITY_PRESENT_NOT_LIVE_VERIFIED",
+        "deployment_identity_evidence_required": [
+          "deployment_git_sha",
+          "deployment_build_uuid_or_cloudflare_version_id",
+          "fresh_health_receipt"
+        ],
+        "status": "READY",
+        "core_mode": "GOVERNED_CANONICAL_CONTEXT",
+        "precedence_mode": "DOMAIN_PRECEDENCE_V6",
+        "truth_guard": "DETERMINISTIC_V3",
+        "telegram_diagnostics": "ACTIONABLE_V4_GROUP_STATUS_FIX",
+        "operating_mode": "GOVERNED_SELF_MODE",
+        "founder_approval_gate": "CREDENTIAL_ADMINISTRATION_ONLY",
+        "memory_recall_mode": "LAYERED_REPO_MEMORY_V3",
+        "active_thread_memory": "DURABLE_CONVERSATION_STATE_V1",
+        "active_thread_memory_durable": true,
+        "active_thread_memory_reason": "KV_LIKE_GET_PUT_BINDING_AVAILABLE",
+        "founder_conversation_layer": "NATURAL_CONVERSATION_FIRST_V1",
+        "fact_evidence_runtime": "FRESH_GITHUB_FACTS_V1",
+        "founder_request_gateway": "STRUCTURED_REQUEST_GATEWAY_V1",
+        "memory_write_configured": true,
+        "memory_brain": {
+          "status": "READY",
+          "version": "MEMORY_BRAIN_V1",
+          "active_layer": "CLOUDFLARE_KV",
+          "canonical_layer": "GITHUB",
+          "semantic_provider": "COGNEE",
+          "semantic_provider_status": "CONFIGURED",
+          "semantic_provider_reason": null,
+          "observability": "STRUCTURED_CLOUDFLARE_LOGS_V1",
+          "provider_interface": "REMEMBER_RECALL_IMPROVE_HEALTH_V1"
+        },
+        "aura3_bridge_configured": true,
+        "tony_bridge_configured": true,
+        "tony_task_request_supported": true,
+        "tony_assignment_routing": "EXPLICIT_TONY_PRIORITY_V2",
+        "tony_payload_contract": "STRUCTURED_V5_REPO_NORMALIZED",
+        "rio_bridge_configured": true,
+        "telegram_token_configured": true,
+        "webhook_secret_configured": true,
+        "founder_chat_configured": true,
+        "management_chat_configured": true,
+        "ai_inference_enabled": true,
+        "ai_credential_configured": true,
+        "cognee_inference_credential_configured": true,
+        "cognee_inference_runtime": "COGNEE_CLOUD_MEMORY_API_V2",
+        "cognee_auth_circuit_breaker": "COGNEE_CLOUD_AUTH_401_403_HOLD_V3",
+        "telegram_webhook_ack_policy": "HANDLED_ERRORS_HTTP_200_V1",
+        "model_router": "BEDROCK_DISCOVERY_SPECIALIST_V1",
+        "anti_bogus_runtime": "DEAD_END_RECOVERY_V1",
+        "response_integrity": "INDEPENDENT_EVIDENCE_LOCK_V1",
+        "reply_style_guard": "NATURAL_DIRECT_V1",
+        "autonomy_requested_mode": "MANUAL_GOVERNED_ORCHESTRATOR",
+        "autonomy_runtime_configured": true,
+        "autonomy_scheduler_bound": false,
+        "autonomy_supervision_interval_minutes": null,
+        "autonomy_allowed_trigger": "founder-command",
+        "autonomy_evidence_persistence": "GITHUB_CANONICAL_STATE_V1",
+        "autonomy_reporting": "MANUAL_TRIGGER_RESULTS_AND_BOUNDARY_ESCALATIONS",
+        "telegram_brain_gateway": "BRAIN_FIRST_FOR_EXECUTIVE_AND_CROSS_DEPARTMENT_COMMANDS_V1",
+        "victor_report_card_target": "10/10",
+        "victor_report_card_basis": "VERIFIED_DEPARTMENT_FINAL_OUTCOMES_ONLY",
+        "direct_consequential_department_execution": false,
+        "governed_diagnostic_department_bridge": true
+      }
     },
     "core_health": {
-      "error": "HTTPError"
+      "http_status": 200,
+      "payload": {
+        "service": "victor-core-context",
+        "status": "READY",
+        "required_sources_ok": true,
+        "precedence_mode": "DOMAIN_PRECEDENCE_V6",
+        "truth_guard": "DETERMINISTIC_V3",
+        "memory_sources": [
+          {
+            "name": "FOUNDER_MEMORY",
+            "path": "memory/founder_memory.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "DECISIONS",
+            "path": "memory/decisions.jsonl",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "LONG_TERM_MEMORY",
+            "path": "memory/MEMORY.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "ACTIVE_PROJECTS_MEMORY",
+            "path": "memory/ACTIVE_PROJECTS.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "WORKING_MEMORY",
+            "path": "memory/WORKING_MEMORY.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "LEARNINGS_MEMORY",
+            "path": "memory/LEARNINGS.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "OPERATIONAL_MEMORY",
+            "path": "memory/operational_memory.jsonl",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "ACTIVITY_MEMORY",
+            "path": "memory/ACTIVITY_LOG.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "MEMORY_INDEX_MD",
+            "path": "memory/INDEX.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "MEMORY_INDEX",
+            "path": "memory/memory_index.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          }
+        ],
+        "resolved_runtime_rules": {
+          "architecture_runtime_standard": "For architecture/runtime behavior, the canonical Architecture Lock Index controls over stale legacy descriptions in lower-level implementation/context documents. Conflicts are surfaced, never silently blended.",
+          "authority_governance": "Latest active explicit Founder decisions plus constitutional hard gates remain supreme for approvals, security, secrets, cost, destructive actions and authority boundaries.",
+          "operational_truth": "Fresh verified runtime evidence controls observed live facts. Active Founder decisions and reconciled canonical state control intended/current governed state. Historical plans never override a newer active Founder decision.",
+          "heartbeat": "Current locked standard: production supervision defaults to 15 minutes, minimum recovery cadence is 2 minutes, and the only ladder is 15\u219210\u21925\u21923\u21922. Founder/authorized Victor command is immediate event wake but does not bypass gates. Department-internal heartbeats remain independently contracted.",
+          "department_connectivity": "Repository presence, registry presence or historical status does not prove fresh Victor\u2194department connectivity, capability LIVE state or communication certification.",
+          "telegram_role": "Telegram is Founder/management communication transport, not the internal department bus and not Victor identity itself.",
+          "execution_scope": "The Telegram Worker cannot claim a consequential department/external action executed unless a separately hosted governed executor path actually ran and evidence verified it.",
+          "founder_entity_resolution": "Bare AURA resolves to AURA3; AURA2 is selected only when Founder explicitly says AURA2 or AURA 2.",
+          "memory_truth_split": "Memory is decision/history evidence. Canonical state is current operational truth. A permanent Founder decision must influence effective current state even when an older business-plan document still contains stale wording.",
+          "executive_reply_style": "Founder replies are BRIEF by default: answer first, 1-3 short sentences, no status dump, no examples or follow-up prompt. DETAIL mode is allowed only when Founder explicitly asks for detail/full explanation."
+        },
+        "sources": [
+          {
+            "name": "ARCHITECTURE_LOCK",
+            "path": "docs/VICTOR_ARCHITECTURE_LOCK_INDEX.md",
+            "required": true,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "MASTER_RULE_BOOK",
+            "path": "VICTOR_MASTER_RULE_BOOK.md",
+            "required": true,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "SOUL",
+            "path": "VICTOR_SOUL.md",
+            "required": true,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "EXECUTIVE_CHARTER",
+            "path": "VICTOR_EXECUTIVE_CHARTER.md",
+            "required": true,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "BUSINESS_PLAN",
+            "path": "BUSINESS_PLAN.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "SYSTEM_STATE",
+            "path": "data/system_state.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "DEPARTMENT_REGISTRY",
+            "path": "data/department_registry.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "REPORT_CARD_POLICY",
+            "path": "data/victor_report_card_policy.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "RUNTIME_OWNERSHIP",
+            "path": "data/runtime_ownership.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "REVENUE_OUTCOMES",
+            "path": "data/revenue_outcomes.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "AI_RUNTIME_STATUS",
+            "path": "data/ai_runtime_status.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "TELEGRAM_RUNTIME_STATUS",
+            "path": "data/telegram_runtime_status.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "FOUNDER_MEMORY",
+            "path": "memory/founder_memory.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "DECISIONS",
+            "path": "memory/decisions.jsonl",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "LONG_TERM_MEMORY",
+            "path": "memory/MEMORY.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "ACTIVE_PROJECTS_MEMORY",
+            "path": "memory/ACTIVE_PROJECTS.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "WORKING_MEMORY",
+            "path": "memory/WORKING_MEMORY.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "LEARNINGS_MEMORY",
+            "path": "memory/LEARNINGS.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "OPERATIONAL_MEMORY",
+            "path": "memory/operational_memory.jsonl",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "ACTIVITY_MEMORY",
+            "path": "memory/ACTIVITY_LOG.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "MEMORY_INDEX_MD",
+            "path": "memory/INDEX.md",
+            "required": false,
+            "ok": true,
+            "status": 200
+          },
+          {
+            "name": "MEMORY_INDEX",
+            "path": "memory/memory_index.json",
+            "required": false,
+            "ok": true,
+            "status": 200
+          }
+        ]
+      }
     },
     "aura3_bridge": {
-      "error": "HTTPError"
+      "http_status": 200,
+      "payload": {
+        "service": "aura3-bridge",
+        "status": "READ_PATH_VERIFIED",
+        "token_present": true,
+        "repository_access_http": 200,
+        "workflow_access_http": 200,
+        "workflow_dispatch_write": "NOT_TESTED_BY_READ_ONLY_HEALTH_CHECK",
+        "expected_actions_permission": "READ_AND_WRITE",
+        "expected_contents_permission": "READ_ONLY_OR_HIGHER",
+        "secrets_exposed": false
+      }
     },
     "tony_bridge": {
-      "error": "HTTPError"
+      "http_status": 200,
+      "payload": {
+        "service": "tony-bridge",
+        "status": "READ_PATH_VERIFIED",
+        "token_present": true,
+        "repository_access_http": 200,
+        "workflow_access_http": 200,
+        "workflow_dispatch_write": "NOT_TESTED_BY_READ_ONLY_HEALTH_CHECK",
+        "expected_actions_permission": "READ_AND_WRITE",
+        "expected_contents_permission": "READ_ONLY_OR_HIGHER",
+        "secrets_exposed": false
+      }
     },
     "runtime_feature_parity": {
-      "status": false,
-      "founder_request_gateway": false,
-      "fact_evidence_runtime": false,
-      "founder_conversation_layer": false
+      "status": true,
+      "founder_request_gateway": true,
+      "fact_evidence_runtime": true,
+      "founder_conversation_layer": true
+    },
+    "deployment_identity": {
+      "deployment_git_sha": "d22f433b84f7bbe9e3811e88549e149095943e43",
+      "deployment_build_uuid": "5e1c7da4-1bd9-4767-9229-73ff8d824b6d",
+      "cloudflare_version_id": "7855ca9f-4ce2-4dd8-b527-964924a99dd7",
+      "deployment_identity_gate": "IDENTITY_PRESENT_NOT_LIVE_VERIFIED"
     }
   },
   "live_acceptance": {
@@ -34,66 +380,53 @@
     "tests": [
       {
         "name": "transport_hi",
-        "http_status": 403,
-        "ok": false,
+        "http_status": 200,
+        "ok": true,
         "mode": null,
         "target": null,
-        "ignored": false,
+        "ignored": true,
         "error": null
       },
       {
         "name": "fresh_multi_fact",
-        "http_status": 403,
-        "ok": false,
+        "http_status": 200,
+        "ok": true,
         "mode": null,
         "target": null,
-        "ignored": false,
+        "ignored": true,
         "error": null
       },
       {
         "name": "thread_anchor",
-        "http_status": 403,
-        "ok": false,
+        "http_status": 200,
+        "ok": true,
         "mode": null,
         "target": null,
-        "ignored": false,
+        "ignored": true,
         "error": null
       },
       {
         "name": "short_followup",
-        "http_status": 403,
-        "ok": false,
+        "http_status": 200,
+        "ok": true,
         "mode": null,
         "target": null,
-        "ignored": false,
+        "ignored": true,
         "error": null
       },
       {
         "name": "status_followup",
-        "http_status": 403,
-        "ok": false,
+        "http_status": 200,
+        "ok": true,
         "mode": null,
         "target": null,
-        "ignored": false,
+        "ignored": true,
         "error": null
       }
     ]
   },
   "critical_blockers": [
-    "AURA3_BRIDGE_PROBE_FAILED",
-    "CORE_HEALTH_PROBE_FAILED",
-    "DEPLOYED_WORKER_FEATURE_PARITY_FAILED",
-    "DURABLE_CONVERSATION_STATE_NOT_ACTIVE",
-    "HEALTH_AI_INFERENCE_ENABLED_NOT_TRUE",
-    "HEALTH_AURA3_BRIDGE_CONFIGURED_NOT_TRUE",
-    "HEALTH_FOUNDER_CHAT_CONFIGURED_NOT_TRUE",
-    "HEALTH_PROBE_FAILED",
-    "HEALTH_RIO_BRIDGE_CONFIGURED_NOT_TRUE",
-    "HEALTH_TELEGRAM_TOKEN_CONFIGURED_NOT_TRUE",
-    "HEALTH_TONY_BRIDGE_CONFIGURED_NOT_TRUE",
-    "HEALTH_WEBHOOK_SECRET_CONFIGURED_NOT_TRUE",
-    "LIVE_SYNTHETIC_TELEGRAM_ACCEPTANCE_FAILED",
-    "TONY_BRIDGE_PROBE_FAILED"
+    "LIVE_SYNTHETIC_TELEGRAM_ACCEPTANCE_FAILED"
   ],
   "ready_for_founder_test": false,
   "secrets_exposed": false
