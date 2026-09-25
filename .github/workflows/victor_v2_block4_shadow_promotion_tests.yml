@@ -1,0 +1,33 @@
+name: Victor V2 Block 4 Shadow Promotion Tests
+
+on:
+  pull_request:
+    paths:
+      - 'brain/rollback_contract.mjs'
+      - 'brain/promotion_gate.mjs'
+      - 'brain/shadow_autonomy_runtime.mjs'
+      - 'brain/block4_promotion_shadow.test.mjs'
+      - '.github/workflows/victor_v2_block4_shadow_promotion_tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shadow-promotion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: |
+          node --check brain/rollback_contract.mjs
+          node --check brain/promotion_gate.mjs
+          node --check brain/shadow_autonomy_runtime.mjs
+      - name: Run Block 4 regression pack
+        run: node --test brain/block4_promotion_shadow.test.mjs
