@@ -1,0 +1,35 @@
+name: Victor Package 7 Truthful Control Room
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/build_control_room_snapshot.py'
+      - 'tests/test_control_room_snapshot.py'
+      - 'data/*.json'
+      - '.github/workflows/victor_package7_control_room.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  truthful-control-room:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build canonical control room snapshot
+        run: python3 scripts/build_control_room_snapshot.py
+      - name: Verify truth boundaries
+        run: python3 -m unittest tests/test_control_room_snapshot.py
+      - name: Verify Founder dashboard contract
+        run: python3 -m unittest tests/test_founder_dashboard.py
+      - name: Upload snapshot evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: victor-control-room-${{ github.run_id }}
+          path: data/control_room_snapshot.json
+          retention-days: 30
