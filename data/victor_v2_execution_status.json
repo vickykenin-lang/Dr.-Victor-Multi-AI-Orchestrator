@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-25T11:45:00Z",
+  "updated_at_utc": "2026-09-25T11:58:00Z",
   "program": "VICTOR_AUTONOMOUS_V2",
   "execution_model": "FIVE_BLOCK_AUDIT_GATED",
   "baseline_main_sha": "0c8c5aa1809d2d15907667a96a5996a4642eeffb",
@@ -16,12 +16,16 @@
     {
       "block": 2,
       "name": "Deterministic Authority & Security Kernel",
-      "status": "AUTHORIZED_NEXT"
+      "status": "AUDIT_PASS",
+      "test_run": 36131827238,
+      "precommercial_run": 36131827057,
+      "audit_doc": "docs/VICTOR_V2_BLOCK2_AUTHORITY_SECURITY_AUDIT_2026-09-25.md",
+      "production_live_enforcement": "NOT_VERIFIED"
     },
     {
       "block": 3,
       "name": "Isolated Sandbox, Broker & Watchdog",
-      "status": "NOT_STARTED"
+      "status": "AUTHORIZED_NEXT"
     },
     {
       "block": 4,
@@ -40,6 +44,7 @@
     "HEALTH_AND_BRIDGE_PROBES_NOT_VERIFIED",
     "RUNTIME_FEATURE_PARITY_NOT_VERIFIED",
     "BRANCH_PROTECTION_RULESET_STATUS_UNKNOWN",
-    "FULL_SUPPLY_CHAIN_SECURITY_STATUS_UNKNOWN"
+    "FULL_SUPPLY_CHAIN_SECURITY_STATUS_UNKNOWN",
+    "BLOCK2_PRIMITIVES_NOT_YET_LIVE_WIRED"
   ]
 }
