@@ -1,0 +1,54 @@
+name: Victor Package 5 AMBER Autonomy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'brain/amber_autonomy.mjs'
+      - 'brain/amber_autonomy.test.mjs'
+      - '.github/workflows/victor_package5_amber_autonomy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  governed-amber-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate AMBER controller
+        run: node brain/amber_autonomy.test.mjs
+      - name: Verify AMBER boundaries remain fail-closed
+        run: |
+          node - <<'NODE'
+          import { evaluateSecurityRequest } from './brain/security_kernel.mjs';
+          const red=['credential.rotate','security.policy.change','authority.expand','production.destructive_change','pause.override'];
+          for (const capability_id of red) {
+            const r=evaluateSecurityRequest({actor:'victor',capability_id,founder_approved:false,action_contract_authorized:true});
+            if (r.decision !== 'DENY') throw new Error(`RED_NOT_DENIED:${capability_id}`);
+          }
+          console.log('RED_BOUNDARIES_DENIED');
+          NODE
+      - name: Verify rollback path is mandatory
+        run: |
+          node - <<'NODE'
+          import { buildAmberExecutionLease, evaluateAmberAction } from './brain/amber_autonomy.mjs';
+          const now=Date.now();
+          const lease=buildAmberExecutionLease({leaseId:'ci-amber',expiresAtUtc:new Date(now+3600000).toISOString()});
+          const r=evaluateAmberAction({
+            capabilityId:'production.reversible_change',
+            actionContractAuthorized:true,
+            lease,
+            rollback:null,
+            sandboxReceipt:{status:'TEST_PASSED',evidence_refs:['ci'],production_applied:false,promotion_required:true},
+            deploymentIdentity:{source_sha:process.env.GITHUB_SHA,build_id:process.env.GITHUB_RUN_ID},
+            nowMs:now,
+          });
+          if (r.decision !== 'DENY') throw new Error('ROLLBACK_CONTRACT_NOT_ENFORCED');
+          console.log('ROLLBACK_CONTRACT_ENFORCED');
+          NODE
