@@ -1,0 +1,40 @@
+name: One-Off Update Wrangler 4.141.0
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/oneoff_update_wrangler_4_141.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-dependency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Update Wrangler without lifecycle scripts
+        run: npm install --save-dev --ignore-scripts wrangler@4.141.0
+      - name: Verify dependency audit and core security tests
+        run: |
+          npm audit --audit-level=high
+          node --test brain/security_kernel.test.mjs brain/action_contract.test.mjs brain/block5_redteam_security.test.mjs
+      - name: Commit dependency update only
+        run: |
+          git config user.name 'victor-security-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo 'NO_DEPENDENCY_CHANGE'
+            exit 0
+          fi
+          git commit -m 'security: update wrangler to 4.141.0'
+          git push origin HEAD:main
