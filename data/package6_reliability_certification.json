@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "package": "VICTOR_ENDGAME_PACKAGE_6",
+  "status": "SEVEN_DAY_CERTIFICATION_RUNNING",
+  "supervision_mode": "READ_ONLY_BOUNDED_RELIABILITY",
+  "supervision_owner": ".github/workflows/victor_package6_reliability_supervision.yml",
+  "interval_minutes": 15,
+  "window_started_at_utc": "2026-09-25T20:53:03Z",
+  "minimum_window_days": 7,
+  "minimum_expected_scheduled_signals": 672,
+  "initial_acceptance_run_id": 36188397116,
+  "initial_acceptance_result": "PASS",
+  "verified_initial_checks": [
+    "SUPERVISOR_FAIL_CLOSED_TESTS_PASS",
+    "LIVE_RUNTIME_SURFACES_HTTP_200",
+    "STALE_SIGNAL_SAFE_HOLD_PASS",
+    "HEALTHY_GREEN_ONLY_RECOVERY_PASS",
+    "PRODUCTION_AUTONOMY_REMAINS_FALSE",
+    "CONSEQUENTIAL_EXECUTION_TRIGGER_REMAINS_FOUNDER_COMMAND"
+  ],
+  "allowed_recovery_capabilities": [
+    "repo.read",
+    "evidence.read",
+    "sandbox.execute"
+  ],
+  "amber_unattended_allowed": false,
+  "red_unattended_allowed": false,
+  "production_action_allowed_by_supervisor": false,
+  "completion_rule": "Do not mark Package 6 fully certified until the seven-day scheduled run history is audited for continuity, failures, recovery behavior, and boundary preservation.",
+  "secrets_exposed": false
+}
