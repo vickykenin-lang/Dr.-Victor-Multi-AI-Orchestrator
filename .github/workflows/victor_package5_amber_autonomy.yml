@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   governed-amber-validation:
@@ -18,6 +18,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -52,3 +55,25 @@ jobs:
           if (r.decision !== 'DENY') throw new Error('ROLLBACK_CONTRACT_NOT_ENFORCED');
           console.log('ROLLBACK_CONTRACT_ENFORCED');
           NODE
+      - name: Execute reversible AMBER branch canary
+        env:
+          CANARY_BRANCH: victor-amber-canary-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          trap 'git push origin --delete "$CANARY_BRANCH" >/dev/null 2>&1 || true' EXIT
+          git config user.name "Victor AMBER Canary"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -b "$CANARY_BRANCH"
+          mkdir -p .victor-canary
+          printf '%s\n' "run_id=${GITHUB_RUN_ID}" "source_sha=${GITHUB_SHA}" "scope=repo.branch.write" > .victor-canary/amber.txt
+          git add .victor-canary/amber.txt
+          git commit -m "test: Victor AMBER reversible branch canary"
+          git push origin HEAD:"$CANARY_BRANCH"
+          git ls-remote --exit-code --heads origin "$CANARY_BRANCH" >/dev/null
+          git push origin --delete "$CANARY_BRANCH"
+          if git ls-remote --heads origin "$CANARY_BRANCH" | grep -q .; then
+            echo 'AMBER_ROLLBACK_FAILED: branch still exists' >&2
+            exit 1
+          fi
+          trap - EXIT
+          echo 'AMBER_BRANCH_CANARY_AND_ROLLBACK_VERIFIED'
