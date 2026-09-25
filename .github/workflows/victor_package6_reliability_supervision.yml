@@ -1,0 +1,81 @@
+name: Victor Package 6 Reliability Supervision
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'brain/reliability_supervisor.mjs'
+      - 'brain/reliability_supervisor.test.mjs'
+      - '.github/workflows/victor_package6_reliability_supervision.yml'
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: victor-package6-reliability-supervision
+  cancel-in-progress: false
+
+jobs:
+  bounded-supervision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate supervisor fail-closed behavior
+        run: node brain/reliability_supervisor.test.mjs
+      - name: Probe live Victor surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://victor-telegram-webhook.vickykenin.workers.dev'
+          for p in health v2-health endgame-runtime-health core-health aura3-bridge-health tony-bridge-health telegram-webhook-health; do
+            code=$(curl -sS -o "/tmp/${p}.json" -w '%{http_code}' -A 'Victor-Package6-Reliability/1.0' "${BASE}/${p}")
+            test "$code" = '200'
+          done
+          node - <<'NODE'
+          const fs = require('fs');
+          const health = JSON.parse(fs.readFileSync('/tmp/health.json','utf8'));
+          const v2 = JSON.parse(fs.readFileSync('/tmp/v2-health.json','utf8'));
+          const endgame = JSON.parse(fs.readFileSync('/tmp/endgame-runtime-health.json','utf8'));
+          const ready = health.status === 'READY' && v2.status === 'READY' && endgame.status === 'READY';
+          if (!ready) throw new Error('LIVE_RUNTIME_NOT_READY');
+          if (health.v2_production_autonomy_enabled === true || v2.production_autonomy_enabled === true || endgame.production_autonomy_enabled === true) {
+            throw new Error('PRODUCTION_AUTONOMY_BOUNDARY_CHANGED');
+          }
+          const trigger = health.autonomy_allowed_trigger || 'founder-command';
+          if (trigger !== 'founder-command') throw new Error(`TRIGGER_BOUNDARY_CHANGED:${trigger}`);
+          console.log(JSON.stringify({
+            status:'LIVE_SUPERVISION_SIGNAL_PASS',
+            production_autonomy_enabled:false,
+            consequential_execution_trigger:'founder-command',
+            secrets_exposed:false,
+          }));
+          NODE
+      - name: Exercise stale signal SAFE_HOLD drill
+        run: |
+          node --input-type=module - <<'NODE'
+          import { evaluateSupervisionSignal } from './brain/reliability_supervisor.mjs';
+          const now=Date.now();
+          const result=evaluateSupervisionSignal({observed_at_ms:now,signal_at_ms:now-(31*60*1000),health_ok:true,v2_ready:true,endgame_ready:true,production_autonomy_enabled:false,consequential_trigger:'founder-command'});
+          if (result.decision !== 'SAFE_HOLD' || result.production_action_allowed !== false) throw new Error('SAFE_HOLD_DRILL_FAILED');
+          console.log(JSON.stringify(result));
+          NODE
+      - name: Exercise healthy GREEN-only recovery drill
+        run: |
+          node --input-type=module - <<'NODE'
+          import { evaluateSupervisionSignal } from './brain/reliability_supervisor.mjs';
+          const now=Date.now();
+          const result=evaluateSupervisionSignal({observed_at_ms:now,signal_at_ms:now,health_ok:true,v2_ready:true,endgame_ready:true,production_autonomy_enabled:false,consequential_trigger:'founder-command'});
+          const allowed=['repo.read','evidence.read','sandbox.execute'];
+          if (result.decision !== 'CONTINUE_BOUNDED' || result.production_action_allowed !== false) throw new Error('GREEN_RECOVERY_NOT_BOUNDED');
+          if (result.recovery_capabilities.some(x => !allowed.includes(x))) throw new Error('NON_GREEN_RECOVERY_CAPABILITY');
+          console.log(JSON.stringify(result));
+          NODE
