@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "verified_at_utc": "2026-09-25T21:29:36Z",
+  "workflow_run_id": 36191830137,
+  "workflow_conclusion": "success",
+  "verified": {
+    "canonical_control_room_snapshot": true,
+    "truth_boundaries": true,
+    "founder_dashboard_contract": true,
+    "evidence_artifact_uploaded": true,
+    "engineering_business_outcome_separation": true,
+    "unknown_when_evidence_missing": true
+  },
+  "current_truth": {
+    "production_autonomy_enabled": false,
+    "consequential_execution_trigger": "founder-command",
+    "package6_reliability": "SEVEN_DAY_CERTIFICATION_RUNNING",
+    "revenue_status": "NO_VERIFIED_REVENUE_EVENT"
+  },
+  "truth_rule": "Historical or stale state may be displayed only with freshness/state labeling and may not be represented as current verified progress."
+}
