@@ -1,0 +1,37 @@
+name: Patch Package 3 AURA3 Dispatch Diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch_package3_aura_dispatch_diagnostic.yml'
+      - 'scripts/patch_package3_aura_dispatch_diagnostic.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply bounded diagnostic patch
+        run: python scripts/patch_package3_aura_dispatch_diagnostic.py
+      - name: Syntax check
+        run: node --check victor-telegram-worker/worker.js
+      - name: Commit Worker patch only
+        shell: bash
+        run: |
+          if git diff --quiet -- victor-telegram-worker/worker.js; then
+            echo 'No worker changes.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add victor-telegram-worker/worker.js
+          git commit -m 'diagnostic: surface AURA3 dispatch HTTP blocker safely'
+          git push origin HEAD:main
