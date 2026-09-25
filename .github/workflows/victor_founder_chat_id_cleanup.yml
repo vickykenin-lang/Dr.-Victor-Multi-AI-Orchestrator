@@ -1,0 +1,44 @@
+name: Victor Founder Chat ID Diagnostic Cleanup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/victor_founder_chat_id_cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove temporary MY CHAT ID diagnostic
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('victor-telegram-worker/worker.js')
+          text = path.read_text(encoding='utf-8')
+          block = '''    // Temporary self-diagnostic: returns only the sender's own Telegram chat ID.\n    // It grants no Founder authority and runs before authorization solely so an\n    // unregistered Founder chat can bootstrap the protected VICTOR_FOUNDER_CHAT_ID.\n    if (/^MY CHAT ID$/i.test(text)) {\n      await sendTelegramMessage(env, chatId, `Your Telegram Chat ID: ${chatId}`, message.message_id);\n      return json({ ok: true, mode: 'CHAT_ID_DIAGNOSTIC', delivered: true, secrets_exposed: false });\n    }\n\n'''
+          if block not in text:
+              raise SystemExit('Expected temporary diagnostic block not found; refusing ambiguous cleanup')
+          path.write_text(text.replace(block, '', 1), encoding='utf-8')
+          PY
+          node --check victor-telegram-worker/worker.js
+
+      - name: Remove one-shot diagnostic workflows and commit cleanup
+        run: |
+          git config user.name "victor-security-ops"
+          git config user.email "actions@users.noreply.github.com"
+          git rm -f .github/workflows/victor_founder_chat_id_diagnostic_patch.yml
+          git rm -f .github/workflows/victor_founder_chat_id_cleanup.yml
+          git add victor-telegram-worker/worker.js
+          git diff --cached --quiet && exit 0
+          git commit -m "security: remove temporary Founder chat id diagnostic"
+          git push origin HEAD:main
