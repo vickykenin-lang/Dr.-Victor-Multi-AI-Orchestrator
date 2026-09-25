@@ -1,4 +1,5 @@
 name: Victor V2 Block 5 Production Deploy
+# Package 3 certification gate deployment refresh: 2026-09-25
 
 on:
   push:
