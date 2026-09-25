@@ -1,4 +1,5 @@
 name: Victor V2 Block 5 Live Verify
+# run-marker: post-rollback-restore-2026-09-25
 
 on:
   push:
@@ -52,7 +53,7 @@ jobs:
           health=results['/health']['body']
           assert health.get('v2_runtime_wired') is True, health
           assert health.get('v2_production_autonomy_enabled') is False, health
-          evidence={'schema_version':1,'verified_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'LIVE_V2_RUNTIME_VERIFIED','secrets_exposed':False,'results':results}
+          evidence={'schema_version':1,'verified_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'LIVE_V2_RUNTIME_VERIFIED_POST_ROLLBACK_RESTORE','secrets_exposed':False,'results':results}
           pathlib.Path('data/v2_live_runtime_evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
           print(json.dumps({'status':evidence['status'],'v2':v2},indent=2))
           PY
@@ -61,6 +62,6 @@ jobs:
           git config user.name 'victor-security-ops'
           git config user.email 'actions@users.noreply.github.com'
           git add data/v2_live_runtime_evidence.json
-          git commit -m 'evidence: verify Victor V2 live runtime'
+          git commit -m 'evidence: verify Victor V2 live runtime post rollback'
           git pull --rebase origin main
           git push origin HEAD:main
