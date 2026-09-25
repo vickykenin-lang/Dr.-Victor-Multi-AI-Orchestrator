@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "checked_at_utc": "2026-09-25T12:01:19.477788+00:00",
-  "repository_sha_under_test": "74885d822bdb548247abea25a52c7fed0b09f32b",
+  "checked_at_utc": "2026-09-25T12:06:27.587699+00:00",
+  "repository_sha_under_test": "83eaf41ff98e04cdcae23884718135d5992e506c",
   "production_verification": {
     "telegram_webhook": {
       "configured": true,
