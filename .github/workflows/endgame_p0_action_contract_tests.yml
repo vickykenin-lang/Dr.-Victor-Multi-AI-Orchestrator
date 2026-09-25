@@ -13,6 +13,17 @@ on:
       - 'brain/executive_reasoning.test.mjs'
       - 'brain/founder_guidance.mjs'
       - 'brain/founder_guidance.test.mjs'
+      - 'brain/experience_ledger.mjs'
+      - 'brain/experience_ledger.test.mjs'
+      - 'brain/cognee_advisory.mjs'
+      - 'brain/cognee_advisory.test.mjs'
+      - 'brain/procedure_registry.mjs'
+      - 'brain/procedure_registry.test.mjs'
+      - 'brain/degraded_mode.mjs'
+      - 'brain/degraded_mode.test.mjs'
+      - 'brain/truthful_telemetry.mjs'
+      - 'brain/truthful_telemetry.test.mjs'
+      - 'brain/deployment_identity_gate.test.mjs'
       - 'victor-telegram-worker/autonomy_runtime.mjs'
       - 'victor-telegram-worker/autonomy_runtime.test.mjs'
       - 'victor-telegram-worker/department_bridge.mjs'
@@ -41,6 +52,12 @@ jobs:
           brain/progress_contract.test.mjs
           brain/executive_reasoning.test.mjs
           brain/founder_guidance.test.mjs
+          brain/experience_ledger.test.mjs
+          brain/cognee_advisory.test.mjs
+          brain/procedure_registry.test.mjs
+          brain/degraded_mode.test.mjs
+          brain/truthful_telemetry.test.mjs
+          brain/deployment_identity_gate.test.mjs
           victor-telegram-worker/department_bridge.test.mjs
           victor-telegram-worker/autonomy_runtime.test.mjs
       - name: Syntax check END GAME runtime modules
@@ -49,6 +66,11 @@ jobs:
           node --check brain/progress_contract.mjs
           node --check brain/executive_reasoning.mjs
           node --check brain/founder_guidance.mjs
+          node --check brain/experience_ledger.mjs
+          node --check brain/cognee_advisory.mjs
+          node --check brain/procedure_registry.mjs
+          node --check brain/degraded_mode.mjs
+          node --check brain/truthful_telemetry.mjs
           node --check victor-telegram-worker/department_bridge.mjs
           node --check victor-telegram-worker/autonomy_runtime.mjs
           node --check victor-telegram-worker/worker.js
