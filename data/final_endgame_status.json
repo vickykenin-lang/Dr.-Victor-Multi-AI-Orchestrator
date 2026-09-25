@@ -1,0 +1,39 @@
+{
+  "schema_version": 2,
+  "status": "FINAL_ENDGAME_NOT_READY",
+  "verified_at_utc": "2026-09-25T21:39:51Z",
+  "workflow_run_id": 36192746652,
+  "checks": {
+    "canonical_truth_available": true,
+    "package6_seven_day_reliability_pass": false,
+    "package7_truthful_control_room_pass": true,
+    "package8_real_business_outcome_pass": false,
+    "package9_security_pass_without_admin_carry_forward": false,
+    "verified_payment_exists": false,
+    "production_autonomy_not_unrestricted": true,
+    "red_remains_founder_gated": true
+  },
+  "pending_checks": [
+    "package6_seven_day_reliability_pass",
+    "package8_real_business_outcome_pass",
+    "package9_security_pass_without_admin_carry_forward",
+    "verified_payment_exists"
+  ],
+  "package_states": {
+    "package6": "SEVEN_DAY_CERTIFICATION_RUNNING",
+    "package7": "PASS",
+    "package8": "AWAITING_REAL_EXTERNAL_BUSINESS_OUTCOME",
+    "package9": "PASS_WITH_FOUNDER_ADMIN_CARRY_FORWARD"
+  },
+  "founder_action_batch_status": "CONSOLIDATED_NOT_YET_REQUESTED",
+  "acceptance_chain": [
+    "CONFIG_OR_CREDENTIAL_AVAILABLE",
+    "SOURCE_IMPLEMENTED",
+    "TEST_PASSED",
+    "PRODUCTION_DEPLOYED",
+    "LIVE_REQUEST_VERIFIED",
+    "REAL_OUTPUT_VERIFIED",
+    "REAL_BUSINESS_OUTCOME_VERIFIED"
+  ],
+  "truth_rule": "No earlier stage implies a later stage. Missing evidence is UNKNOWN/NOT_READY. Founder/admin carry-forward prevents final PASS until explicitly resolved."
+}
