@@ -24,6 +24,8 @@ on:
       - 'brain/truthful_telemetry.mjs'
       - 'brain/truthful_telemetry.test.mjs'
       - 'brain/deployment_identity_gate.test.mjs'
+      - 'brain/endgame_runtime_gate.mjs'
+      - 'brain/endgame_runtime_gate.test.mjs'
       - 'victor-telegram-worker/autonomy_runtime.mjs'
       - 'victor-telegram-worker/autonomy_runtime.test.mjs'
       - 'victor-telegram-worker/department_bridge.mjs'
@@ -58,6 +60,7 @@ jobs:
           brain/degraded_mode.test.mjs
           brain/truthful_telemetry.test.mjs
           brain/deployment_identity_gate.test.mjs
+          brain/endgame_runtime_gate.test.mjs
           victor-telegram-worker/department_bridge.test.mjs
           victor-telegram-worker/autonomy_runtime.test.mjs
       - name: Syntax check END GAME runtime modules
@@ -71,6 +74,7 @@ jobs:
           node --check brain/procedure_registry.mjs
           node --check brain/degraded_mode.mjs
           node --check brain/truthful_telemetry.mjs
+          node --check brain/endgame_runtime_gate.mjs
           node --check victor-telegram-worker/department_bridge.mjs
           node --check victor-telegram-worker/autonomy_runtime.mjs
           node --check victor-telegram-worker/worker.js
