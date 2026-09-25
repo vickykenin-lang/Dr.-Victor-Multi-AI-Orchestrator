@@ -20,6 +20,7 @@ import { buildStrategyFingerprint, evaluateProgressDelta, nextConvergenceState, 
 import { shouldInvokeExecutiveReasoner, requestExecutivePlan } from '../brain/executive_reasoning.mjs';
 import { buildFounderGuidanceRequest, persistFounderGuidanceRequest, readFounderGuidance, attachFounderGuidanceMessage, founderGuidanceContext, consumeFounderGuidance, formatFounderGuidanceQuestion } from '../brain/founder_guidance.mjs';
 import { callVictorModel } from './model_router.mjs';
+import { buildExperienceEpisode, appendExperienceEpisode } from '../brain/experience_ledger.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 const MANUAL_FOUNDER_TRIGGER = 'founder-command';
@@ -36,6 +37,21 @@ export function safeRouterDiagnostics(error) {
       ...(item?.code ? { code: safeToken(item.code) } : {}),
     })),
   };
+}
+
+export async function persistCycleExperience(env, entries = []) {
+  const receipts = [];
+  for (const entry of entries) {
+    if (!entry.actionContract?.action_id) continue;
+    try {
+      const episode = buildExperienceEpisode(entry);
+      const result = await appendExperienceEpisode(env, episode);
+      receipts.push({ episode_id: episode.episode_id, status: result.status, reason: result.reason || null });
+    } catch (error) {
+      receipts.push({ episode_id: entry.actionContract.action_id, status: 'FAILED', reason: error?.code || 'EXPERIENCE_WRITE_FAILED' });
+    }
+  }
+  return receipts;
 }
 const VICTOR_REPO = 'vickykenin-lang/Dr.-Victor-Multi-AI-Orchestrator';
 const AUTONOMY_STATE_PATH = 'data/autonomy_state.json';
@@ -370,6 +386,7 @@ export function buildAutonomyEvidence(previous, result, controller, checkedAt = 
       target: result?.target || null,
       task_id: result?.result?.taskId || null,
       progress_delta: result?.result?.progressDelta || null,
+      experience_ledger: Array.isArray(result?.result?.experienceLedger) ? result.result.experienceLedger : [],
     },
     last_cycle_attempt: {
       checked_at_utc: checkedAt,
@@ -690,6 +707,7 @@ export async function runAutonomousCycle(controller, env) {
   }
 
   let outcome = await superviseGoal(selection, env, initialPhase);
+  const experienceEntries = [];
   if (executiveReasoning) outcome = { ...outcome, executiveReasoning };
   if (answeredGuidance && executiveReasoning && outcome?.actionContract?.action_id) {
     await consumeFounderGuidance(env, selection.goal.goal_id, {
@@ -698,6 +716,9 @@ export async function runAutonomousCycle(controller, env) {
     });
   }
   state = buildGoalRuntimeState(state, selection, outcome);
+  experienceEntries.push({ goal: selection.goal, actionContract: outcome.actionContract, outcome: {
+    ...outcome, progressDelta: state.goals?.[selection.goal.goal_id]?.last_progress_delta,
+  }, runtimeGoal: state.goals?.[selection.goal.goal_id], founderGuidance: answeredGuidance });
 
   if (
     outcome.verified &&
@@ -714,11 +735,15 @@ export async function runAutonomousCycle(controller, env) {
         : 'REPLAN_EXECUTE';
       const followUp = await superviseGoal(selection, env, followUpPhase);
       state = buildGoalRuntimeState(state, selection, followUp);
+      experienceEntries.push({ goal: selection.goal, actionContract: followUp.actionContract, outcome: {
+        ...followUp, progressDelta: state.goals?.[selection.goal.goal_id]?.last_progress_delta,
+      }, runtimeGoal: state.goals?.[selection.goal.goal_id] });
       outcome = { ...followUp, previousTaskId: outcome.taskId, automaticReplan: true };
     }
   }
 
   await persistGoalRuntimeState(env, state, selection.goal.goal_id);
+  const experienceLedger = await persistCycleExperience(env, experienceEntries);
 
   if (outcome.assessment.founderGate) {
     await sendFounder(env, [
@@ -754,6 +779,7 @@ export async function runAutonomousCycle(controller, env) {
       ...outcome,
       progressDelta: finalRuntimeGoal.last_progress_delta || null,
       executiveReasoning: outcome.executiveReasoning || executiveReasoning || null,
+      experienceLedger,
     },
   };
 }
