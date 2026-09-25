@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "status": "SEVEN_DAY_CERTIFICATION_RUNNING",
+  "started_at_utc": "2026-09-25T20:53:03Z",
+  "target_window_days": 7,
+  "supervision_interval_minutes": 15,
+  "minimum_required_signals": 672,
+  "supervision_scope": "READ_ONLY_NON_CONSEQUENTIAL",
+  "green_recovery_scope": [
+    "repo.read",
+    "evidence.read",
+    "sandbox.execute"
+  ],
+  "stale_or_failed_signal_action": "SAFE_HOLD",
+  "production_autonomy_enabled": false,
+  "consequential_execution_trigger": "founder-command",
+  "amber_mode": "GOVERNED_REVERSIBLE_ONLY",
+  "red_mode": "FOUNDER_GATED",
+  "initial_acceptance": {
+    "workflow_run_id": 36188397116,
+    "conclusion": "success",
+    "fail_closed_verified": true,
+    "live_probe_verified": true,
+    "stale_signal_safe_hold_verified": true,
+    "healthy_green_only_recovery_verified": true
+  },
+  "final_certification": "PENDING_WINDOW_MATURITY",
+  "truth_rule": "Do not mark Package 6 PASS until the full seven-day supervision window has matured and continuity evidence is audited."
+}
