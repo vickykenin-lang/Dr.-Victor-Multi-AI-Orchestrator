@@ -11,6 +11,7 @@ import {
   classifyAutonomyResult,
   runAutonomousCycle,
   safeRouterDiagnostics,
+  persistCycleExperience,
   scoreGoal,
   selectAutonomyGoal,
 } from './autonomy_runtime.mjs';
@@ -27,6 +28,33 @@ const revenueGoal = {
   allowed_departments: ['rio', 'tony_stark', 'aura3'],
   hard_boundaries: ['NO_RAW_SECRET_DISCLOSURE'],
 };
+
+test('cycle records each dispatched action as an idempotent durable episode', async () => {
+  const data = new Map();
+  const env = { VICTOR_CONVERSATION_STATE: {
+    async get(key, options) {
+      const raw = data.get(key) || null;
+      return options?.type === 'json' && raw ? JSON.parse(raw) : raw;
+    },
+    async put(key, value) { data.set(key, value); },
+  } };
+  const entries = ['diagnose-1', 'repair-2'].map(actionId => ({
+    goal: revenueGoal,
+    actionContract: { action_id: actionId, phase: 'CORRECTIVE_EXECUTE', target: 'tony_stark' },
+    outcome: { verified: true, assessment: { status: 'BLOCKED', evidence: [] }, progressDelta: { material: false } },
+    runtimeGoal: {},
+  }));
+  const first = await persistCycleExperience(env, entries);
+  assert.deepEqual(first.map(item => item.status), ['APPENDED', 'APPENDED']);
+  const repeat = await persistCycleExperience(env, entries);
+  assert.deepEqual(repeat.map(item => item.status), ['ALREADY_EXISTS', 'ALREADY_EXISTS']);
+  assert.equal(data.size, 3);
+  const observed = buildAutonomyEvidence({}, {
+    status: 'GOAL_NO_PROGRESS_VERIFIED', goalId: revenueGoal.goal_id, target: 'tony_stark',
+    result: { taskId: 'repair-2', experienceLedger: first },
+  }, { cron: 'founder-command' });
+  assert.deepEqual(observed.last_observed_cycle.experience_ledger, first);
+});
 
 test('router evidence is bounded and excludes arbitrary error text and secrets', () => {
   const evidence = safeRouterDiagnostics({
