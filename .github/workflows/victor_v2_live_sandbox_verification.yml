@@ -1,5 +1,5 @@
 name: Victor V2 Live Sandbox Verification
-# run-marker: 2026-09-25-block5-final
+# run-marker: 2026-09-25-block5-final-evidence-permission-fix
 
 on:
   push:
@@ -25,6 +25,7 @@ jobs:
       - name: Execute isolated disposable sandbox
         run: |
           mkdir -p /tmp/victor-v2-sandbox-evidence
+          chmod 0777 /tmp/victor-v2-sandbox-evidence
           docker run --rm \
             --name victor-v2-live-sandbox \
             --network none \
@@ -50,6 +51,7 @@ jobs:
               const evidence = { schema_version: 1, verified_at_utc: new Date().toISOString(), runtime: 'github-hosted-runner/docker', network_mode: 'NONE', rootfs_read_only: true, tmpfs_mb: 32, memory_mb: 128, cpus: 0.5, pids_limit: 64, cap_drop: 'ALL', no_new_privileges: true, secret_like_env_present: false, sandbox_validation: validation, receipt, production_credentials_available: false, production_applied: false, teardown: 'AUTO_REMOVE_ON_EXIT', status: 'LIVE_ISOLATED_SANDBOX_VERIFIED' };
               await import('node:fs').then(fs => fs.writeFileSync('/evidence/evidence.json', JSON.stringify(evidence, null, 2)));
             "
+          test -s /tmp/victor-v2-sandbox-evidence/evidence.json
       - name: Verify teardown and persist evidence
         run: |
           if docker ps -a --format '{{.Names}}' | grep -qx 'victor-v2-live-sandbox'; then
