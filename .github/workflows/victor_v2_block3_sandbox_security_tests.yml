@@ -1,0 +1,33 @@
+name: Victor V2 Block 3 Sandbox Security Tests
+
+on:
+  pull_request:
+    paths:
+      - 'brain/sandbox_manager.mjs'
+      - 'brain/capability_broker.mjs'
+      - 'brain/safety_watchdog.mjs'
+      - 'brain/block3_sandbox_security.test.mjs'
+      - '.github/workflows/victor_v2_block3_sandbox_security_tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: |
+          node --check brain/sandbox_manager.mjs
+          node --check brain/capability_broker.mjs
+          node --check brain/safety_watchdog.mjs
+      - name: Run Block 3 regression pack
+        run: node --test brain/block3_sandbox_security.test.mjs

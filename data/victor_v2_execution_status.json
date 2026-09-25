@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-25T11:58:00Z",
+  "updated_at_utc": "2026-09-25T12:02:00Z",
   "program": "VICTOR_AUTONOMOUS_V2",
   "execution_model": "FIVE_BLOCK_AUDIT_GATED",
   "baseline_main_sha": "0c8c5aa1809d2d15907667a96a5996a4642eeffb",
@@ -25,12 +25,16 @@
     {
       "block": 3,
       "name": "Isolated Sandbox, Broker & Watchdog",
-      "status": "AUTHORIZED_NEXT"
+      "status": "AUDIT_PASS_SOURCE_TEST",
+      "test_run": 36132133895,
+      "precommercial_run": 36132133834,
+      "audit_doc": "docs/VICTOR_V2_BLOCK3_SANDBOX_BROKER_WATCHDOG_AUDIT_2026-09-25.md",
+      "live_sandbox_infrastructure": "NOT_VERIFIED"
     },
     {
       "block": 4,
       "name": "Promotion, Rollback & Shadow Autonomy",
-      "status": "NOT_STARTED"
+      "status": "AUTHORIZED_NEXT"
     },
     {
       "block": 5,
@@ -43,8 +47,9 @@
     "SYNTHETIC_TELEGRAM_ACCEPTANCE_HTTP_403",
     "HEALTH_AND_BRIDGE_PROBES_NOT_VERIFIED",
     "RUNTIME_FEATURE_PARITY_NOT_VERIFIED",
-    "BRANCH_PROTECTION_RULESET_STATUS_UNKNOWN",
+    "MAIN_BRANCH_PROTECTION_DISABLED_VERIFIED",
     "FULL_SUPPLY_CHAIN_SECURITY_STATUS_UNKNOWN",
-    "BLOCK2_PRIMITIVES_NOT_YET_LIVE_WIRED"
+    "BLOCK2_PRIMITIVES_NOT_YET_LIVE_WIRED",
+    "LIVE_SANDBOX_ISOLATION_NOT_VERIFIED"
   ]
 }
