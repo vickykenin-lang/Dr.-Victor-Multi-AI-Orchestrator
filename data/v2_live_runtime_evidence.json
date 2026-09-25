@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "verified_at_utc": "2026-09-25T14:46:47.504605+00:00",
-  "status": "LIVE_V2_RUNTIME_VERIFIED",
+  "verified_at_utc": "2026-09-25T14:48:45.844563+00:00",
+  "status": "LIVE_V2_RUNTIME_VERIFIED_POST_ROLLBACK_RESTORE",
   "secrets_exposed": false,
   "results": {
     "/health": {
