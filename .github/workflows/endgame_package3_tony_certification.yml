@@ -35,12 +35,12 @@ jobs:
           base=os.environ['WORKER_BASE_URL'].rstrip('/')
           founder=str(os.environ['VICTOR_FOUNDER_CHAT_ID'])
           payload={
-              'update_id': 926092503,
+              'update_id': 926092504,
               'message': {
                   'message_id': 0,
                   'from': {'id': int(founder)},
                   'chat': {'id': int(founder), 'type': 'private'},
-                  'text': 'Tony Stark ko fresh certification communication status check execute karo. Strict supervision evidence return karo. No production, paid, destructive, credential or public action.',
+                  'text': 'Tony Stark ko task assign karo: strict supervision round-trip certification execute karo aur fresh evidence Victor ko return karo. Sirf read/analyze/status evidence. Production, paid, destructive, credential aur public action bilkul nahi.',
               },
           }
           req=urllib.request.Request(
@@ -50,7 +50,7 @@ jobs:
               headers={
                   'Content-Type':'application/json',
                   'X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],
-                  'User-Agent':'Victor-ENDGAME-Package3-Tony-Certification/1.0',
+                  'User-Agent':'Victor-ENDGAME-Package3-Tony-Certification/1.1',
               },
           )
           with urllib.request.urlopen(req, timeout=45) as response:
@@ -76,7 +76,7 @@ jobs:
           for attempt in range(30):
               try:
                   r=urllib.request.Request(result_url+f'?t={int(time.time()*1000)}', headers={
-                      'User-Agent':'Victor-ENDGAME-Package3-Tony-Result/1.0',
+                      'User-Agent':'Victor-ENDGAME-Package3-Tony-Result/1.1',
                       'Cache-Control':'no-cache',
                   })
                   with urllib.request.urlopen(r,timeout=20) as response:
