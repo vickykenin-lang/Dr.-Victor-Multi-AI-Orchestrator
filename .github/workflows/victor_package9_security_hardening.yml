@@ -1,0 +1,71 @@
+name: Victor Package 9 Security Hardening
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-hardening-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify critical autonomy workflows use immutable action refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in \
+            .github/workflows/victor_package4_green_autonomy.yml \
+            .github/workflows/victor_package5_amber_autonomy.yml \
+            .github/workflows/victor_package6_reliability_supervision.yml \
+            .github/workflows/victor_package7_control_room.yml \
+            .github/workflows/victor_package8_commercial_outcome.yml \
+            .github/workflows/victor_package9_security_hardening.yml; do
+            if grep -En 'uses: (actions/checkout|actions/setup-node)@v[0-9]+' "$f"; then
+              echo "MUTABLE_CRITICAL_ACTION_REF:$f" >&2
+              exit 1
+            fi
+          done
+          echo 'CRITICAL_ACTION_REFS_IMMUTABLE'
+      - name: Inventory remaining mutable action refs repository-wide
+        shell: bash
+        run: |
+          set +e
+          grep -RInE 'uses: [A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@v[0-9]+' .github/workflows > /tmp/mutable-action-refs.txt
+          count=$(wc -l < /tmp/mutable-action-refs.txt | tr -d ' ')
+          echo "remaining_mutable_action_refs=$count"
+          cat /tmp/mutable-action-refs.txt || true
+          exit 0
+      - name: Run dependency audit without automatic mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+          npm audit --json > /tmp/npm-audit.json || true
+          node - <<'NODE'
+          const fs=require('fs');
+          const p='/tmp/npm-audit.json';
+          const j=JSON.parse(fs.readFileSync(p,'utf8'));
+          console.log(JSON.stringify({status:'DEPENDENCY_AUDIT_CAPTURED',metadata:j.metadata||{},automatic_fix_performed:false},null,2));
+          NODE
+      - name: Upload security evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: victor-package9-security-${{ github.run_id }}
+          path: |
+            /tmp/mutable-action-refs.txt
+            /tmp/npm-audit.json
+          retention-days: 30
