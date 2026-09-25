@@ -1,16 +1,21 @@
 {
-  "schema_version": 1,
-  "updated_at_utc": "2026-09-25T12:13:00Z",
+  "schema_version": 2,
+  "updated_at_utc": "2026-09-25T16:13:34Z",
   "program": "VICTOR_AUTONOMOUS_V2",
   "execution_model": "FIVE_BLOCK_AUDIT_GATED",
   "baseline_main_sha": "0c8c5aa1809d2d15907667a96a5996a4642eeffb",
+  "latest_reconciled_main_sha": "b89e9268918b80afd239abbfdca7f48fa9d36227",
+  "runtime_cutover_status": "PASS",
+  "overall_status": "RUNTIME_COMPLETE_WITH_SECURITY_GOVERNANCE_CARRY_FORWARD",
+  "active_cloudflare_version_id": "1831689a-19fa-426d-8077-7678cb4ef184",
   "production_autonomy_enabled": false,
+  "scheduler_bound": false,
+  "allowed_trigger": "founder-command",
   "blocks": [
     {
       "block": 1,
       "name": "Baseline Reconciliation & Security Gate",
       "status": "AUDIT_PASS_WITH_CARRY_FORWARD_BLOCKERS",
-      "production_readiness": "NOT_VERIFIED",
       "audit_doc": "docs/VICTOR_V2_BLOCK1_BASELINE_RECONCILIATION_AUDIT_2026-09-25.md"
     },
     {
@@ -19,54 +24,68 @@
       "status": "AUDIT_PASS",
       "test_run": 36131827238,
       "precommercial_run": 36131827057,
-      "audit_doc": "docs/VICTOR_V2_BLOCK2_AUTHORITY_SECURITY_AUDIT_2026-09-25.md",
-      "production_live_enforcement": "NOT_VERIFIED"
+      "live_enforcement_verified_in_block5": true,
+      "audit_doc": "docs/VICTOR_V2_BLOCK2_AUTHORITY_SECURITY_AUDIT_2026-09-25.md"
     },
     {
       "block": 3,
       "name": "Isolated Sandbox, Broker & Watchdog",
-      "status": "AUDIT_PASS_SOURCE_TEST",
+      "status": "AUDIT_PASS_LIVE_VERIFIED",
       "test_run": 36132133895,
       "precommercial_run": 36132133834,
-      "audit_doc": "docs/VICTOR_V2_BLOCK3_SANDBOX_BROKER_WATCHDOG_AUDIT_2026-09-25.md",
-      "live_sandbox_infrastructure": "NOT_VERIFIED"
+      "live_sandbox_verified": true,
+      "evidence": "data/v2_live_sandbox_evidence.json",
+      "audit_doc": "docs/VICTOR_V2_BLOCK3_SANDBOX_BROKER_WATCHDOG_AUDIT_2026-09-25.md"
     },
     {
       "block": 4,
       "name": "Promotion, Rollback & Shadow Autonomy",
-      "status": "AUDIT_PASS_SHADOW_CONTROL_PLANE",
+      "status": "AUDIT_PASS_LIVE_ROLLBACK_VERIFIED",
       "test_run": 36132447089,
       "precommercial_run": 36132446999,
-      "audit_doc": "docs/VICTOR_V2_BLOCK4_PROMOTION_SHADOW_AUDIT_2026-09-25.md",
-      "production_live_enforcement": "NOT_VERIFIED"
+      "live_rollback_restore_verified": true,
+      "evidence": "data/v2_live_rollback_evidence.json",
+      "audit_doc": "docs/VICTOR_V2_BLOCK4_PROMOTION_SHADOW_AUDIT_2026-09-25.md"
     },
     {
       "block": 5,
       "name": "Red-Team Acceptance & Controlled Cutover",
-      "status": "SOURCE_REDTEAM_PASS_CUTOVER_BLOCKED",
+      "status": "PRODUCTION_RUNTIME_CUTOVER_PASS",
       "redteam_test_run": 36132980442,
       "precommercial_run": 36132980508,
       "live_probe_run": 36133045160,
       "production_acceptance_run": 36133399381,
-      "audit_doc": "docs/VICTOR_V2_BLOCK5_REDTEAM_CUTOVER_AUDIT_2026-09-25.md",
-      "production_cutover": "BLOCKED",
-      "production_autonomy": "OFF"
+      "production_cutover": "PASS",
+      "founder_authorization_verified": true,
+      "live_runtime_verified": true,
+      "post_rollback_live_runtime_verified": true,
+      "production_autonomy": "OFF",
+      "evidence": "data/v2_block5_final_status.json",
+      "audit_doc": "docs/VICTOR_V2_BLOCK5_FINAL_CLOSURE_AUDIT_2026-09-25.md"
     }
   ],
-  "resolved_during_block5": [
+  "resolved": [
     "HEALTH_ENDPOINT_HTTPERROR_CLIENT_BUG_FIXED",
     "HEALTH_AND_BRIDGE_ENDPOINTS_LIVE_HTTP_200",
     "RUNTIME_FEATURE_PARITY_VERIFIED",
     "DURABLE_CONVERSATION_STATE_VERIFIED_ACTIVE",
-    "SYNTHETIC_WEBHOOK_UPSTREAM_HTTP_403_RESOLVED"
+    "SYNTHETIC_WEBHOOK_UPSTREAM_HTTP_403_RESOLVED",
+    "FOUNDER_SYNTHETIC_AUTHORIZATION_VERIFIED",
+    "V2_PRIMITIVES_LIVE_WIRED",
+    "LIVE_SANDBOX_ISOLATION_VERIFIED",
+    "LIVE_ROLLBACK_RESTORE_VERIFIED",
+    "POST_ROLLBACK_V2_RUNTIME_VERIFIED"
   ],
-  "carry_forward_blockers": [
-    "LIVE_SYNTHETIC_TELEGRAM_FOUNDER_AUTHORIZATION_NOT_VERIFIED",
-    "GITHUB_VICTOR_FOUNDER_CHAT_ID_SECRET_MISSING_OR_NOT_CONFIGURED",
-    "MAIN_BRANCH_PROTECTION_DISABLED_VERIFIED",
-    "V2_PRIMITIVES_NOT_YET_LIVE_WIRED",
-    "LIVE_SANDBOX_ISOLATION_NOT_VERIFIED",
-    "LIVE_ROLLBACK_NOT_VERIFIED",
-    "FINAL_WEBHOOK_SECRET_ROTATION_REQUIRED_AFTER_DEBUGGING"
-  ]
+  "carry_forward": [
+    "MAIN_BRANCH_PROTECTION_DISABLED",
+    "SUPPLY_CHAIN_FULL_SHA_PINNING_INCOMPLETE",
+    "NPM_AUDIT_HIGH_SEVERITY_FINDINGS_PRESENT",
+    "LEGACY_DEPLOYMENT_IDENTITY_VARS_STALE",
+    "FOUNDER_GATED_CREDENTIAL_ROTATION_NOT_PERFORMED",
+    "ENDGAME_RUNTIME_LIVE_ACCEPTANCE_PARTIAL",
+    "GREEN_AUTONOMY_NOT_ENABLED",
+    "UNATTENDED_RELIABILITY_CERTIFICATION_PENDING",
+    "REAL_BUSINESS_OUTCOME_NOT_VERIFIED"
+  ],
+  "truth_rule": "Later verified evidence supersedes stale earlier status, but historical audit receipts remain immutable evidence of their observation time."
 }
