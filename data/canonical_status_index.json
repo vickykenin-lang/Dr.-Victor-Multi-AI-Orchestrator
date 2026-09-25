@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "updated_at_utc": "2026-09-25T16:13:34Z",
+  "purpose": "Define current operational status sources and prevent stale historical receipts from overriding later verified evidence.",
+  "precedence": [
+    {
+      "rank": 1,
+      "domain": "V2_CURRENT_RUNTIME_CUTOVER",
+      "source": "data/v2_block5_final_status.json",
+      "status": "CURRENT_VERIFIED",
+      "rule": "Controls current V2 runtime cutover, autonomy posture, sandbox and rollback verification state."
+    },
+    {
+      "rank": 2,
+      "domain": "V2_LIVE_RUNTIME_EVIDENCE",
+      "source": "data/v2_live_runtime_evidence.json",
+      "status": "CURRENT_VERIFIED",
+      "rule": "Fresh live endpoint evidence controls observed runtime facts."
+    },
+    {
+      "rank": 3,
+      "domain": "V2_EXECUTION_SUMMARY",
+      "source": "data/victor_v2_execution_status.json",
+      "status": "RECONCILED_CURRENT",
+      "rule": "Summary must agree with later Block 5 closure evidence and may not resurrect earlier blockers."
+    },
+    {
+      "rank": 4,
+      "domain": "AUTONOMY_AUTHORITY",
+      "source": "data/autonomy_state.json",
+      "status": "RECONCILED_CURRENT",
+      "rule": "Current authority is production autonomy OFF, scheduler unbound, Founder-command-only. Historical scheduler evidence is history only."
+    },
+    {
+      "rank": 5,
+      "domain": "BUSINESS_OUTCOME",
+      "source": "data/revenue_outcomes.json",
+      "status": "CANONICAL_CURRENT",
+      "rule": "Only independently verified revenue/payment events count as business outcome."
+    }
+  ],
+  "historical_only_sources": [
+    {
+      "source": "data/victor_correction_backlog.json",
+      "reason": "Locked baseline/correction backlog; module states are not a current production runtime verdict."
+    },
+    {
+      "source": "docs/VICTOR_V2_BLOCK5_REDTEAM_CUTOVER_AUDIT_2026-09-25.md",
+      "reason": "Historical pre-closure audit; later final closure audit supersedes its cutover-blocked observation for current-state reporting."
+    }
+  ],
+  "hard_rules": [
+    "NO_EARLIER_STAGE_IMPLIES_A_LATER_STAGE",
+    "FRESH_VERIFIED_RUNTIME_EVIDENCE_OVERRIDES_STALE_STATUS_SUMMARIES",
+    "HISTORICAL_RECEIPTS_REMAIN_IMMUTABLE_HISTORY",
+    "HISTORICAL_AUTONOMY_EVIDENCE_DOES_NOT_GRANT_CURRENT_AUTHORITY",
+    "MISSING_EVIDENCE_IS_UNKNOWN_NOT_SUCCESS"
+  ]
+}
