@@ -1,0 +1,84 @@
+name: Victor V2 Block 5 Production Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/victor_v2_block5_production_deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: d027de83cb964eb66fa56ffed27c0b27
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WORKER_BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Require protected Cloudflare deploy credential
+        shell: bash
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo 'CLOUDFLARE_API_TOKEN repository secret is not configured.' >&2
+            exit 42
+          fi
+      - name: Install pinned toolchain
+        run: npm ci
+      - name: Regression gate before production
+        run: |
+          node --check victor-telegram-worker/worker.js
+          node --test brain/founder_intent_gateway.test.mjs brain/security_kernel.test.mjs brain/action_contract.test.mjs brain/block3_sandbox_security.test.mjs brain/block4_promotion_shadow.test.mjs brain/block5_redteam_security.test.mjs
+      - name: Deploy Worker with current V2 source
+        shell: bash
+        run: |
+          export WORKERS_CI_COMMIT_SHA="$GITHUB_SHA"
+          export WORKERS_CI_BUILD_UUID="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          npx wrangler deploy --strict \
+            --var "VICTOR_DEPLOY_GIT_SHA:${WORKERS_CI_COMMIT_SHA}" \
+            --var "VICTOR_BUILD_UUID:${WORKERS_CI_BUILD_UUID}"
+      - name: Verify live V2 runtime and legacy health surfaces
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.request
+          base=os.environ['WORKER_BASE_URL'].rstrip('/')
+          required=['/health','/v2-health','/core-health','/aura3-bridge-health','/tony-bridge-health','/telegram-webhook-health']
+          results={}
+          for path in required:
+            last=None
+            for _ in range(6):
+              try:
+                req=urllib.request.Request(base+path,headers={'User-Agent':'Victor-V2-Block5-Live-Verify/1.0'})
+                with urllib.request.urlopen(req,timeout=20) as r:
+                  body=json.loads(r.read().decode())
+                  last={'http_status':r.status,'body':body}
+                  if r.status==200: break
+              except Exception as e:
+                last={'http_status':None,'error':str(e)[:300]}
+              time.sleep(3)
+            results[path]=last
+          assert all(v.get('http_status')==200 for v in results.values()), results
+          v2=results['/v2-health']['body']
+          assert v2.get('status')=='READY', v2
+          assert v2.get('runtime_wired') is True, v2
+          assert v2.get('founder_stop_precedence') is True, v2
+          assert v2.get('red_credential_without_founder')=='DENY', v2
+          assert v2.get('production_autonomy_enabled') is False, v2
+          health=results['/health']['body']
+          assert health.get('v2_runtime_wired') is True, health
+          assert health.get('v2_production_autonomy_enabled') is False, health
+          print(json.dumps({'status':'LIVE_V2_RUNTIME_VERIFIED','results':results},indent=2))
+          PY
