@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Verify critical autonomy workflows use immutable action refs
+      - name: Verify critical autonomy and production workflows use immutable action refs
         shell: bash
         run: |
           set -euo pipefail
@@ -33,8 +33,10 @@ jobs:
             .github/workflows/victor_package6_reliability_supervision.yml \
             .github/workflows/victor_package7_control_room.yml \
             .github/workflows/victor_package8_commercial_outcome.yml \
-            .github/workflows/victor_package9_security_hardening.yml; do
-            if grep -En 'uses: (actions/checkout|actions/setup-node)@v[0-9]+' "$f"; then
+            .github/workflows/victor_package9_security_hardening.yml \
+            .github/workflows/victor_package10_final_endgame_gate.yml \
+            .github/workflows/victor_v2_block5_production_deploy.yml; do
+            if grep -En 'uses: (actions/checkout|actions/setup-node|actions/setup-python|actions/upload-artifact)@v[0-9]+' "$f"; then
               echo "MUTABLE_CRITICAL_ACTION_REF:$f" >&2
               exit 1
             fi
@@ -49,7 +51,7 @@ jobs:
           echo "remaining_mutable_action_refs=$count"
           cat /tmp/mutable-action-refs.txt || true
           exit 0
-      - name: Run dependency audit without automatic mutation
+      - name: Verify high and critical dependency findings are remediated
         shell: bash
         run: |
           set -euo pipefail
@@ -57,9 +59,13 @@ jobs:
           npm audit --json > /tmp/npm-audit.json || true
           node - <<'NODE'
           const fs=require('fs');
-          const p='/tmp/npm-audit.json';
-          const j=JSON.parse(fs.readFileSync(p,'utf8'));
-          console.log(JSON.stringify({status:'DEPENDENCY_AUDIT_CAPTURED',metadata:j.metadata||{},automatic_fix_performed:false},null,2));
+          const j=JSON.parse(fs.readFileSync('/tmp/npm-audit.json','utf8'));
+          const v=(j.metadata&&j.metadata.vulnerabilities)||{};
+          console.log(JSON.stringify({status:'DEPENDENCY_AUDIT_CAPTURED',metadata:j.metadata||{},automatic_force_fix_performed:false},null,2));
+          if ((v.high||0)>0 || (v.critical||0)>0) {
+            throw new Error(`HIGH_OR_CRITICAL_DEPENDENCY_FINDINGS_REMAIN:${v.high||0}:${v.critical||0}`);
+          }
+          console.log('DEPENDENCY_HIGH_CRITICAL_ZERO');
           NODE
       - name: Upload security evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
