@@ -55,11 +55,11 @@ test('secret-like fields and values are redacted before persistence', () => {
   const value = sanitizeExperienceValue({
     api_key: 'BedrockAPIKey-THIS_SHOULD_NOT_PERSIST',
     note: 'Authorization Bearer abcdefghijklmnopqrstuvwxyz',
-    github: 'ghp_abcdefghijklmnopqrstuvwxyz123456',
+    github: ['ghp_', 'abcdefghijklmnopqrstuvwxyz123456'].join(''),
   });
   assert.equal(value.api_key, '[REDACTED]');
   assert.doesNotMatch(value.note, /Bearer\s+abcdefghijklmnopqrstuvwxyz/);
-  assert.doesNotMatch(value.github, /ghp_abcdefghijklmnopqrstuvwxyz/);
+  assert.equal(value.github, '[REDACTED]');
 });
 
 test('builds evidence-backed episode with expected vs actual progress', () => {
