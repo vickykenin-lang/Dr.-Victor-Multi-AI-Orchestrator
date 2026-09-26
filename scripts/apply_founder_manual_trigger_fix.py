@@ -4,6 +4,20 @@ RUNTIME = Path('victor-telegram-worker/autonomy_runtime.mjs')
 TEST = Path('victor-telegram-worker/autonomy_runtime.test.mjs')
 
 runtime = RUNTIME.read_text(encoding='utf-8')
+
+# Current V2 runtime already implements a stricter Founder-command-only gate.
+# Treat this evolved implementation as converged instead of trying to reapply
+# the older SUPERVISION_CRON-era patch.
+current_markers = [
+    "const MANUAL_FOUNDER_TRIGGER = 'founder-command';",
+    "if (controller?.cron !== MANUAL_FOUNDER_TRIGGER)",
+    "error_code: 'MANUAL_TRIGGER_REQUIRED'",
+]
+
+if all(marker in runtime for marker in current_markers):
+    print('NO_CHANGES_ALREADY_APPLIED:FOUNDER_MANUAL_TRIGGER_CONVERGED')
+    raise SystemExit(0)
+
 old = "  if (controller.cron !== SUPERVISION_CRON) return { status: 'IGNORED_UNKNOWN_CRON', cron: controller.cron };\n"
 new = "  const manualFounderTrigger = controller?.cron === 'founder-command';\n  if (controller.cron !== SUPERVISION_CRON && !manualFounderTrigger) return { status: 'IGNORED_UNKNOWN_CRON', cron: controller.cron };\n"
 if new not in runtime:
