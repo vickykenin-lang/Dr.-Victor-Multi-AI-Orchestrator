@@ -1,4 +1,5 @@
 name: END GAME Package 3 Tony Certification
+# Step-8 recertification trigger after verified Victor runtime integration.
 
 on:
   push:
