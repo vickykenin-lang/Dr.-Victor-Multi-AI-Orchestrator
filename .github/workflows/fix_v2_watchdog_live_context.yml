@@ -1,0 +1,40 @@
+name: Fix V2 Watchdog Live Context
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fix_v2_watchdog_live_context.py'
+      - '.github/workflows/fix_v2_watchdog_live_context.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  converge-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Converge Worker watchdog context
+        run: python scripts/fix_v2_watchdog_live_context.py
+      - name: Verify syntax and fail-closed watchdog tests
+        run: |
+          node --check victor-telegram-worker/worker.js
+          node --test brain/safety_watchdog.test.mjs brain/founder_intent_gateway.test.mjs
+      - name: Persist Worker repair if changed
+        shell: bash
+        run: |
+          git config user.name "victor-governed-runtime"
+          git config user.email "actions@users.noreply.github.com"
+          git add victor-telegram-worker/worker.js
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(v2): wire explicit live watchdog context"
+          git pull --rebase --autostash
+          git push
