@@ -1,0 +1,49 @@
+name: Step 9 Branch Protection Readiness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-direct-main-writers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Audit workflow write permissions and direct main pushes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,re
+          findings=[]
+          inventory=[]
+          for path in sorted(Path('.github/workflows').glob('*.y*ml')):
+              text=path.read_text(encoding='utf-8')
+              has_write=bool(re.search(r'(?m)^\s*contents:\s*write\s*$',text))
+              pushes=[]
+              for no,line in enumerate(text.splitlines(),1):
+                  s=line.strip()
+                  if re.search(r'\bgit\s+push\b',s):
+                      pushes.append({'line':no,'command':s[:240]})
+              if has_write or pushes:
+                  inventory.append({'file':str(path),'contents_write':has_write,'git_pushes':pushes})
+              for item in pushes:
+                  cmd=item['command']
+                  safe_non_main=('vision-runtime-state' in cmd)
+                  if not safe_non_main:
+                      findings.append({'file':str(path),'line':item['line'],'command':cmd,'reason':'DIRECT_OR_AMBIGUOUS_GIT_PUSH_FROM_WORKFLOW'})
+          print(json.dumps({'inventory':inventory,'blocking_findings':findings},indent=2))
+          Path('/tmp/step9-direct-writer-audit.json').write_text(json.dumps({'inventory':inventory,'blocking_findings':findings},indent=2)+'\n')
+          if findings:
+              raise SystemExit(f'STEP9_DIRECT_MAIN_WRITERS_REMAIN:{len(findings)}')
+          print('STEP9_DIRECT_MAIN_WRITER_AUDIT_PASS')
+          PY
