@@ -1,8 +1,8 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "status": "COMMERCIAL_PIPELINE_ACTIVE_AWAITING_REAL_EXTERNAL_BUSINESS_OUTCOME",
   "technical_validation": "PASS",
-  "verified_at_utc": "2026-09-26T03:38:17Z",
+  "verified_at_utc": "2026-09-26T03:52:18Z",
   "canonical_revenue_source": "data/revenue_outcomes.json",
   "rio_execution_source": "vickykenin-lang/rio-affiliate-engine",
   "m0_live_funnel": {
@@ -15,9 +15,21 @@
       "TROLLEY_001"
     ],
     "verified_scope": "LIVE_BUYER_INTENT_PAGE_TO_DISCLOSED_TAGGED_MERCHANT_DESTINATION",
-    "outbound_click_event_collection_verified": false,
-    "merchant_report_ingestion_verified": false,
     "revenue_claimed": false
+  },
+  "m0b_outbound_click_collection": {
+    "status": "PASS",
+    "rio_workflow_run_id": 36216128628,
+    "collector": "rio-click-telemetry",
+    "collector_backend": "Cloudflare Worker + KV",
+    "privacy_posture": "NO_IP_OR_USER_IDENTIFIER_STORED",
+    "live_page_instrumentation_verified": true,
+    "synthetic_acceptance_verified": true,
+    "synthetic_test_persisted": false,
+    "outbound_click_event_collection_verified": true,
+    "real_outbound_click_observed": false,
+    "merchant_report_ingestion_verified": false,
+    "truth_rule": "M0B proves the production click-collection path. It does not claim that a real visitor click, merchant order, commission, or payment has occurred."
   },
   "verified_totals": {
     "qualified_leads": 0,
@@ -27,9 +39,9 @@
   },
   "verified_business_outcome": false,
   "external_dependency_required": true,
-  "current_external_evidence_state": "AWAITING_AFFILIATE_SOURCE_REPORT",
+  "current_external_evidence_state": "AWAITING_REAL_CLICK_AND_AFFILIATE_SOURCE_REPORT",
   "next_evidence_milestones": [
-    "M0B_OUTBOUND_CLICK_EVIDENCE",
+    "M0C_REAL_OUTBOUND_CLICK_OBSERVED",
     "M1_MERCHANT_REPORTED_QUALIFYING_ORDER",
     "M2_APPROVED_COMMISSION",
     "M3_SETTLED_INR_GT_0"
@@ -45,7 +57,8 @@
     "canonical_ledger_validation": "PASS",
     "invalid_event_count": 0,
     "synthetic_revenue_allowed": false,
-    "hourly_rio_live_funnel_probe_enabled": true
+    "hourly_rio_live_funnel_probe_enabled": true,
+    "click_collector_live": true
   },
-  "truth_rule": "The live three-offer affiliate funnel is now freshly verified, but engineering readiness, page availability, traffic, clicks, orders, estimates and workflow success are not revenue. Package 8 becomes PASS only after independently verified PAYMENT_RECEIVED evidence exists."
+  "truth_rule": "The live three-offer affiliate funnel and outbound click collection path are freshly verified, but engineering readiness, page availability, telemetry capability, traffic, clicks, orders, estimates and workflow success are not revenue. Package 8 becomes PASS only after independently verified PAYMENT_RECEIVED evidence exists."
 }
