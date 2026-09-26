@@ -1,5 +1,5 @@
 name: END GAME Package 3 Tony Certification
-# Step-8 post-deploy substantive recertification trigger after production run 36253189361 succeeded.
+# Step-8 exact bounded certification command after production run 36254135110 succeeded.
 
 on:
   push:
@@ -35,13 +35,7 @@ jobs:
 
           base=os.environ['WORKER_BASE_URL'].rstrip('/')
           founder=str(os.environ['VICTOR_FOUNDER_CHAT_ID'])
-          objective=(
-            'Tony Stark ko bounded substantive certification task assign karo: '
-            'Dr.-Victor-Multi-AI-Orchestrator repository ko read/analyze karke current END GAME Step-8 Tony certification workflow ka '
-            'evidence-backed engineering assessment karo. At least one concrete finding aur one actionable recommendation return karo, '
-            'with inspected repository evidence and explicit execution completion. Koi production deployment, paid, destructive, credential, '
-            'public action, repository mutation, authority change ya secret access mat karna. Strict result Victor ko return karo.'
-          )
+          objective='ENDGAME DEPARTMENT CERTIFY TONY'
           payload={
               'update_id': int(time.time()*1000) % 2147483647,
               'message': {
@@ -53,13 +47,14 @@ jobs:
           }
           req=urllib.request.Request(
               base+'/telegram', data=json.dumps(payload).encode(), method='POST',
-              headers={'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],'User-Agent':'Victor-ENDGAME-Step8-Tony-Substantive/2.0'},
+              headers={'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],'User-Agent':'Victor-ENDGAME-Step8-Tony-Substantive/3.0'},
           )
           with urllib.request.urlopen(req, timeout=45) as response:
               dispatch_body=json.loads(response.read().decode()); dispatch_http=response.status
           safe_dispatch={'http_status':dispatch_http,'ok':dispatch_body.get('ok'),'mode':dispatch_body.get('mode'),'target':dispatch_body.get('target'),'task_id':dispatch_body.get('task_id')}
           print('DISPATCH='+json.dumps(safe_dispatch,sort_keys=True))
           assert dispatch_http == 200 and dispatch_body.get('ok') is True, safe_dispatch
+          assert dispatch_body.get('mode') == 'ENDGAME_DEPARTMENT_CERTIFICATION', safe_dispatch
           assert dispatch_body.get('target') == 'tony_stark', safe_dispatch
           task_id=dispatch_body.get('task_id'); assert task_id, safe_dispatch
 
@@ -68,7 +63,7 @@ jobs:
           result=None
           for attempt in range(45):
               try:
-                  r=urllib.request.Request(result_url+f'?t={int(time.time()*1000)}',headers={'User-Agent':'Victor-ENDGAME-Step8-Tony-Result/2.0','Cache-Control':'no-cache'})
+                  r=urllib.request.Request(result_url+f'?t={int(time.time()*1000)}',headers={'User-Agent':'Victor-ENDGAME-Step8-Tony-Result/3.0','Cache-Control':'no-cache'})
                   with urllib.request.urlopen(r,timeout=20) as response:
                       if response.status == 200:
                           candidate=json.loads(response.read().decode())
