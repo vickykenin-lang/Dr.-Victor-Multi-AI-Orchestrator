@@ -26,7 +26,7 @@ jobs:
             echo 'Protected Founder transport secrets are not configured.' >&2
             exit 42
           fi
-      - name: Execute fresh Founder to Victor to Tony to Victor round-trip
+      - name: Execute substantive Founder to Victor to Tony to Victor round-trip
         shell: bash
         run: |
           python - <<'PY'
@@ -34,92 +34,69 @@ jobs:
 
           base=os.environ['WORKER_BASE_URL'].rstrip('/')
           founder=str(os.environ['VICTOR_FOUNDER_CHAT_ID'])
+          objective=(
+            'Tony Stark ko bounded substantive certification task assign karo: '
+            'Dr.-Victor-Multi-AI-Orchestrator repository ko read/analyze karke current END GAME Step-8 Tony certification workflow ka '
+            'evidence-backed engineering assessment karo. At least one concrete finding aur one actionable recommendation return karo, '
+            'with inspected repository evidence and explicit execution completion. Koi production deployment, paid, destructive, credential, '
+            'public action, repository mutation, authority change ya secret access mat karna. Strict result Victor ko return karo.'
+          )
           payload={
-              'update_id': 926092505,
+              'update_id': int(time.time()*1000) % 2147483647,
               'message': {
                   'message_id': 0,
                   'from': {'id': int(founder)},
                   'chat': {'id': int(founder), 'type': 'private'},
-                  'text': 'Tony Stark ko task assign karo: PACKAGE3 PING execute karo aur strict revert Victor ko bhejo. Koi production, paid, destructive, credential ya public action mat karna.',
+                  'text': objective,
               },
           }
           req=urllib.request.Request(
-              base+'/telegram',
-              data=json.dumps(payload).encode(),
-              method='POST',
-              headers={
-                  'Content-Type':'application/json',
-                  'X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],
-                  'User-Agent':'Victor-ENDGAME-Package3-Tony-Certification/1.2',
-              },
+              base+'/telegram', data=json.dumps(payload).encode(), method='POST',
+              headers={'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],'User-Agent':'Victor-ENDGAME-Step8-Tony-Substantive/2.0'},
           )
           with urllib.request.urlopen(req, timeout=45) as response:
-              dispatch_body=json.loads(response.read().decode())
-              dispatch_http=response.status
-          safe_dispatch={
-              'http_status':dispatch_http,
-              'ok':dispatch_body.get('ok'),
-              'mode':dispatch_body.get('mode'),
-              'target':dispatch_body.get('target'),
-              'task_id':dispatch_body.get('task_id'),
-          }
-          print('DISPATCH='+json.dumps(safe_dispatch, sort_keys=True))
-          assert dispatch_http == 200, safe_dispatch
-          assert dispatch_body.get('ok') is True, safe_dispatch
+              dispatch_body=json.loads(response.read().decode()); dispatch_http=response.status
+          safe_dispatch={'http_status':dispatch_http,'ok':dispatch_body.get('ok'),'mode':dispatch_body.get('mode'),'target':dispatch_body.get('target'),'task_id':dispatch_body.get('task_id')}
+          print('DISPATCH='+json.dumps(safe_dispatch,sort_keys=True))
+          assert dispatch_http == 200 and dispatch_body.get('ok') is True, safe_dispatch
           assert dispatch_body.get('target') == 'tony_stark', safe_dispatch
-          task_id=dispatch_body.get('task_id')
-          assert task_id, safe_dispatch
+          task_id=dispatch_body.get('task_id'); assert task_id, safe_dispatch
 
           safe_id=''.join(c if (c.isalnum() or c in '._-') else '-' for c in str(task_id)).strip('-')[:120]
           result_url=f'https://raw.githubusercontent.com/vickykenin-lang/tony-stark-engineering/main/integration/results/tasks/{safe_id}.json'
           result=None
-          for attempt in range(30):
+          for attempt in range(45):
               try:
-                  r=urllib.request.Request(result_url+f'?t={int(time.time()*1000)}', headers={
-                      'User-Agent':'Victor-ENDGAME-Package3-Tony-Result/1.2',
-                      'Cache-Control':'no-cache',
-                  })
+                  r=urllib.request.Request(result_url+f'?t={int(time.time()*1000)}',headers={'User-Agent':'Victor-ENDGAME-Step8-Tony-Result/2.0','Cache-Control':'no-cache'})
                   with urllib.request.urlopen(r,timeout=20) as response:
                       if response.status == 200:
                           candidate=json.loads(response.read().decode())
                           if candidate.get('task_id') == task_id:
-                              result=candidate
-                              break
-              except Exception:
-                  pass
+                              result=candidate; break
+              except Exception: pass
               time.sleep(4)
           assert result is not None, {'status':'TONY_RESULT_TIMEOUT','task_id':task_id}
 
           strict=result.get('strict_supervision') or {}
+          execution_status=str(result.get('execution_status') or '')
+          evidence=strict.get('evidence') or []
           checks={
-              'task_id': result.get('task_id') == task_id,
+              'task_correlation': result.get('task_id') == task_id,
               'sender': result.get('sender') == 'tony_stark',
               'recipient': result.get('recipient') == 'victor',
-              'message_type': result.get('message_type') == 'TASK_RESULT',
+              'task_result': result.get('message_type') == 'TASK_RESULT',
+              'execution_completed': execution_status not in ('','ACCEPTED_PENDING_EXECUTION_EVIDENCE','PENDING','ACCEPTED'),
+              'not_merely_accepted': strict.get('status') not in ('TASK_ACCEPTED_GOVERNED','ACCEPTED_PENDING_EXECUTION_EVIDENCE'),
+              'objective_alignment': bool(strict.get('objective_alignment')),
+              'solution': bool(strict.get('solution')),
+              'next_action': bool(strict.get('next_action')),
+              'evidence': isinstance(evidence,list) and len(evidence) > 0,
               'no_destructive_action': result.get('destructive_action_performed') is False,
               'no_paid_action': result.get('paid_action_performed') is False,
               'no_production_action': result.get('production_action_performed') is False,
               'revert_to_victor': strict.get('revert_to_victor') is True,
-              'objective_alignment': bool(strict.get('objective_alignment')),
-              'status': bool(strict.get('status')),
-              'solution': bool(strict.get('solution')),
-              'next_action': bool(strict.get('next_action')),
-              'evidence': isinstance(strict.get('evidence'),list) and len(strict.get('evidence')) > 0,
-              'follow_up_explicit': isinstance(strict.get('requires_follow_up'),bool),
           }
-          safe_result={
-              'status':'PASS' if all(checks.values()) else 'FAIL',
-              'task_id':task_id,
-              'verification':checks,
-              'strict_status':strict.get('status'),
-              'objective_alignment':strict.get('objective_alignment'),
-              'requires_follow_up':strict.get('requires_follow_up'),
-              'evidence_count':len(strict.get('evidence') or []),
-              'destructive_action_performed':result.get('destructive_action_performed'),
-              'paid_action_performed':result.get('paid_action_performed'),
-              'production_action_performed':result.get('production_action_performed'),
-              'secrets_exposed':False,
-          }
-          print('TONY_CERTIFICATION='+json.dumps(safe_result,indent=2))
+          safe_result={'status':'PASS' if all(checks.values()) else 'FAIL','task_id':task_id,'execution_status':execution_status,'strict_status':strict.get('status'),'verification':checks,'evidence_count':len(evidence),'requires_follow_up':strict.get('requires_follow_up'),'secrets_exposed':False}
+          print('TONY_SUBSTANTIVE_CERTIFICATION='+json.dumps(safe_result,indent=2))
           assert all(checks.values()), safe_result
           PY
