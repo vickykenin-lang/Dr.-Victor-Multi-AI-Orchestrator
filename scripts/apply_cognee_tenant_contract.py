@@ -163,7 +163,16 @@ new_memory_recall = """  let memory = buildMemoryContext(userMessage, core.sourc
 if old_memory_recall in worker:
     worker = worker.replace(old_memory_recall, new_memory_recall, 1)
 elif new_memory_recall not in worker:
-    raise RuntimeError('WORKER_MEMORY_RECALL_ANCHOR_NOT_FOUND')
+    # The current worker may have evolved from the original two-line patch into
+    # an inline semantic-memory flow. Treat that as converged when the same
+    # governed recall call is already wired to canonical memory context.
+    evolved_memory_recall_markers = (
+        "const semanticMemory = await recallVictorMemory(",
+        "buildMemoryContext(userMessage, core.sourceRecords, 6)",
+        "{ topK: 5 },",
+    )
+    if not all(marker in worker for marker in evolved_memory_recall_markers):
+        raise RuntimeError('WORKER_MEMORY_RECALL_ANCHOR_NOT_FOUND')
 
 # Hard guards: generator success must imply a deployable single diagnostic path.
 if worker.count(legacy_marker) != 1:
