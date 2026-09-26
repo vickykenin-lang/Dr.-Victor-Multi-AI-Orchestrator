@@ -62,6 +62,7 @@ import { buildActionContract, validateActionContract } from '../brain/action_con
 import { createSandboxSpec, validateSandboxSpec, SANDBOX_PROFILE_VERSION } from '../brain/sandbox_manager.mjs';
 import { issueCapabilityLease, validateCapabilityLease, BROKER_VERSION } from '../brain/capability_broker.mjs';
 import { evaluateWatchdog, WATCHDOG_VERSION } from '../brain/safety_watchdog.mjs';
+import { parseDepartmentCertificationCommand, certificationAllowedDuringWatchdog } from '../brain/department_certification_gate.mjs';
 import { PROMOTION_GATE_VERSION } from '../brain/promotion_gate.mjs';
 import { ROLLBACK_CONTRACT_VERSION } from '../brain/rollback_contract.mjs';
 
@@ -397,6 +398,63 @@ export default {
 
     const v2Intent = classifyV2FounderIntent(text);
     const v2Watchdog = evaluateWatchdog({ watchdog_available: true, watchdog_healthy: true, heartbeat_age_seconds: 0 });
+    const departmentCertification = parseDepartmentCertificationCommand(text);
+
+    if (departmentCertification) {
+      if (!certificationAllowedDuringWatchdog(v2Watchdog)) {
+        await sendTelegramMessage(env, chatId, 'Department certification evidence path SAFE_HOLD me unavailable hai; no dispatch attempted.', message.message_id);
+        return json({ ok: true, mode: 'V2_SAFE_HOLD', dispatch: 'BLOCKED', watchdog: v2Watchdog.triggers, certification_scope: departmentCertification.scope });
+      }
+
+      const target = departmentCertification.target;
+      const preflight = buildV2DispatchPreflight(target, `cert:${message.message_id || 'none'}:${target}`);
+      if (!preflight.allowed) {
+        return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target, reason: preflight.reason, certification_scope: departmentCertification.scope, secrets_exposed: false }, 200);
+      }
+
+      const pause = await isExecutionPaused(env, target);
+      if (pause.paused) {
+        return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target, reason: 'EMERGENCY_PAUSE_ACTIVE', certification_scope: departmentCertification.scope, secrets_exposed: false }, 200);
+      }
+
+      let dispatch;
+      try {
+        if (target === 'tony_stark') {
+          if (!tonyBridgeConfigured(env)) return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target, reason: 'TONY_BRIDGE_NOT_CONFIGURED' }, 200);
+          dispatch = await dispatchTonyTask(env, departmentCertification.prompt, { messageId: message.message_id, actionContract: preflight.contract });
+          ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
+        } else if (target === 'aura3') {
+          if (!aura3BridgeConfigured(env)) return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target, reason: 'AURA3_BRIDGE_NOT_CONFIGURED' }, 200);
+          dispatch = await dispatchAura3Task(env, departmentCertification.prompt, { messageId: message.message_id, actionContract: preflight.contract });
+          ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
+        } else if (target === 'rio') {
+          if (!rioBridgeConfigured(env)) return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target, reason: 'RIO_BRIDGE_NOT_CONFIGURED' }, 200);
+          dispatch = await dispatchRioTask(env, departmentCertification.prompt, { messageId: message.message_id, actionContract: preflight.contract });
+          ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
+        } else {
+          return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target, reason: 'CERTIFICATION_TARGET_UNSUPPORTED' }, 200);
+        }
+      } catch (error) {
+        console.error(JSON.stringify({ event: 'ENDGAME_DEPARTMENT_CERTIFICATION_DISPATCH_FAILED', target, reason: safeErrorMessage(error), secrets_exposed: false }));
+        return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target, reason: 'CERTIFICATION_DISPATCH_FAILED', certification_scope: departmentCertification.scope, secrets_exposed: false }, 200);
+      }
+
+      await sendTelegramMessage(env, chatId, `${departmentCertification.department} evidence-only certification probe dispatched. Fresh verified result follow karega.`, message.message_id);
+      return json({
+        ok: true,
+        mode: 'ENDGAME_DEPARTMENT_CERTIFICATION',
+        target,
+        task_id: dispatch.taskId,
+        task_type: dispatch.taskType,
+        certification_scope: departmentCertification.scope,
+        watchdog_decision: v2Watchdog.decision,
+        watchdog_new_execution_allowed: v2Watchdog.allow_new_execution,
+        watchdog_evidence_collection_allowed: v2Watchdog.allow_evidence_collection,
+        production_autonomy_enabled: false,
+        secrets_exposed: false,
+      }, 200);
+    }
+
     if (v2Watchdog.decision === 'SAFE_HOLD') {
       await sendTelegramMessage(env, chatId, 'Victor V2 watchdog SAFE_HOLD active hai; new execution dispatch blocked hai.', message.message_id);
       return json({ ok: true, mode: 'V2_SAFE_HOLD', dispatch: 'BLOCKED', watchdog: v2Watchdog.triggers });
@@ -428,32 +486,6 @@ export default {
       ].join('\n');
       await sendTelegramMessage(env, chatId, reply, message.message_id);
       return json({ ok: acceptance.status === 'PASS', mode: 'ENDGAME_RUNTIME_ACCEPTANCE', ...acceptance }, 200);
-    }
-
-    const package3Match = text.match(/^\s*ENDGAME DEPARTMENT CERTIFY\s+(AURA3|RIO)\s*$/i);
-    if (package3Match) {
-      const department = package3Match[1].toUpperCase();
-      let dispatch;
-      if (department === 'AURA3') {
-        if (!aura3BridgeConfigured(env)) return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target: 'aura3', reason: 'AURA3_BRIDGE_NOT_CONFIGURED' }, 200);
-        try {
-          dispatch = await dispatchAura3Task(env, 'PACKAGE3 strict supervision certification probe. Return fresh evidence. No public, production, paid, destructive or credential action.', { messageId: message.message_id });
-        } catch (error) {
-          const messageText = String(error?.message || 'AURA3 dispatch failed');
-          const httpMatch = messageText.match(/AURA3 dispatch HTTP\s+(\d{3})/i);
-          const reason = httpMatch ? `AURA3_DISPATCH_HTTP_${httpMatch[1]}` : 'AURA3_DISPATCH_FAILED';
-          console.error(JSON.stringify({ event: 'PACKAGE3_AURA3_DISPATCH_FAILED', reason, secrets_exposed: false }));
-          return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target: 'aura3', reason, secrets_exposed: false }, 200);
-        }
-        ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
-        await sendTelegramMessage(env, chatId, 'Package 3 AURA3 certification probe dispatched. Fresh verified revert follow karega.', message.message_id);
-        return json({ ok: true, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target: 'aura3', task_id: dispatch.taskId, task_type: dispatch.taskType, production_autonomy_enabled: false, secrets_exposed: false }, 200);
-      }
-      if (!rioBridgeConfigured(env)) return json({ ok: false, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target: 'rio', reason: 'RIO_BRIDGE_NOT_CONFIGURED' }, 200);
-      dispatch = await dispatchRioTask(env, 'PACKAGE3 strict supervision certification probe. Return fresh evidence. No public, production, paid, destructive or credential action.', { messageId: message.message_id });
-      ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
-      await sendTelegramMessage(env, chatId, 'Package 3 RIO certification probe dispatched. Fresh verified revert follow karega.', message.message_id);
-      return json({ ok: true, mode: 'ENDGAME_DEPARTMENT_CERTIFICATION', target: 'rio', task_id: dispatch.taskId, task_type: dispatch.taskType, production_autonomy_enabled: false, secrets_exposed: false }, 200);
     }
 
     const emergencyCommand = parseEmergencyCommand(text);
