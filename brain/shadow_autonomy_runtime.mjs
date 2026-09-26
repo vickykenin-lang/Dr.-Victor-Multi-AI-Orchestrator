@@ -25,6 +25,7 @@ export function runShadowAutonomy({
       intent,
       department_dispatch_allowed: false,
       production_apply_allowed: false,
+      continuation_allowed: false,
       reason: 'FOUNDER_STOP_PAUSE',
     };
   }
@@ -36,6 +37,7 @@ export function runShadowAutonomy({
       intent,
       department_dispatch_allowed: false,
       production_apply_allowed: false,
+      continuation_allowed: false,
       reason: 'NON_EXECUTION_INTENT',
     };
   }
@@ -47,6 +49,7 @@ export function runShadowAutonomy({
       intent,
       department_dispatch_allowed: false,
       production_apply_allowed: false,
+      continuation_allowed: false,
       reason: 'OBJECTIVE_ACTION_REQUIRED',
     };
   }
@@ -56,15 +59,26 @@ export function runShadowAutonomy({
   const watchdog = evaluateWatchdog({ ...watchdog_input, budget_result: budget });
   const effective = watchdogOverridesVictor('CONTINUE', watchdog);
   if (effective.effective_decision === 'SAFE_HOLD') {
+    const sandbox_receipt = budget.safe_hold === true
+      ? buildSandboxEvidenceReceipt({
+          spec: sandbox,
+          status: 'SAFE_HOLD_BUDGET_EXCEEDED',
+          evidence_refs: (budget.exceeded || []).map(item => `budget:${item}`),
+          notes: [budget.reason],
+        })
+      : null;
     return {
       mode: 'SHADOW',
       decision: 'SAFE_HOLD',
       intent,
       sandbox,
+      budget,
       watchdog,
+      sandbox_receipt,
       department_dispatch_allowed: false,
       production_apply_allowed: false,
-      reason: 'WATCHDOG_SAFE_HOLD',
+      continuation_allowed: false,
+      reason: budget.safe_hold === true ? 'RESOURCE_BUDGET_SAFE_HOLD' : 'WATCHDOG_SAFE_HOLD',
     };
   }
 
@@ -86,9 +100,11 @@ export function runShadowAutonomy({
       decision: 'SAFE_HOLD',
       intent,
       sandbox,
+      budget,
       lease,
       department_dispatch_allowed: false,
       production_apply_allowed: false,
+      continuation_allowed: false,
       reason: redFounderWait ? 'FOUNDER_UNAVAILABLE_RED_BOUNDARY' : `CAPABILITY_DENIED:${lease.reason}`,
     };
   }
@@ -104,10 +120,12 @@ export function runShadowAutonomy({
     decision: 'SANDBOX_EXECUTION_AUTHORIZED',
     intent,
     sandbox,
+    budget,
     lease,
     sandbox_receipt,
     department_dispatch_allowed: true,
     production_apply_allowed: false,
+    continuation_allowed: true,
     reason: 'SHADOW_ONLY_NO_PRODUCTION_PROMOTION',
   };
 }
