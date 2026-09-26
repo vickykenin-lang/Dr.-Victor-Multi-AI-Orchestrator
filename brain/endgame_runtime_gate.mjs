@@ -1,3 +1,4 @@
+// Step-8 production routing refresh trigger: redeploy current governed main bundle without changing runtime behavior.
 import {buildProcedureExecutionPlan} from "./procedure_registry.mjs";
 import {resolveDegradedMode} from "./degraded_mode.mjs";
 import {makeTelemetryEvent,classifyTelemetryFreshness} from "./truthful_telemetry.mjs";
