@@ -1,0 +1,41 @@
+name: Fix Step8 Certification Anchor
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/patch_step8_certification_anchor.py'
+      - '.github/workflows/fix_step8_certification_anchor.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  converge-and-apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Converge Step8 anchor
+        run: python scripts/patch_step8_certification_anchor.py
+      - name: Apply Step8 certification migration
+        run: python scripts/apply_step8_certification_safehold.py
+      - name: Verify Step8 boundary and Worker syntax
+        run: |
+          node --test brain/department_certification_gate.test.mjs brain/safety_watchdog.test.mjs brain/founder_intent_gateway.test.mjs
+          node --check victor-telegram-worker/worker.js
+      - name: Persist bounded Step8 Worker change
+        run: |
+          git config user.name "victor-governed-runtime"
+          git config user.email "actions@users.noreply.github.com"
+          git add scripts/apply_step8_certification_safehold.py victor-telegram-worker/worker.js
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(step8): apply bounded certification gate on hardened watchdog runtime"
+          git pull --rebase --autostash
+          git push
