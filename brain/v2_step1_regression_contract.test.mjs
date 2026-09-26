@@ -5,6 +5,7 @@ import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } fr
 import { classifyFounderIntent, FOUNDER_INTENT, mayCreateExecutionContract } from './founder_intent_gateway.mjs';
 import { runShadowAutonomy } from './shadow_autonomy_runtime.mjs';
 
+// Locked Step 1 regression retest: cases 2, 7 and 8.
 // Case 2: a natural follow-up must keep the immediately preceding conversational origin
 // available to the response layer rather than resetting the thread.
 test('CASE 2: joke origin follow-up retains the preceding joke turn in active context', () => {
@@ -12,7 +13,8 @@ test('CASE 2: joke origin follow-up retains the preceding joke turn in active co
   session = appendRecentTurn(session, 'founder', 'Dark humor sunao', '2026-09-26T00:00:00Z');
   session = appendRecentTurn(session, 'victor', 'Ek dark joke response', '2026-09-26T00:00:01Z');
 
-  const next = buildActiveContext(session, { founderText: 'Ye joke tumhe kaha mila?', messageId: 2 });
+  const activePatch = buildActiveContext(session, { founderText: 'Ye joke tumhe kaha mila?', messageId: 2 });
+  const next = { ...session, ...activePatch };
   const withFollowUp = appendRecentTurn(next, 'founder', 'Ye joke tumhe kaha mila?', '2026-09-26T00:00:02Z');
   const promptContext = formatActiveContextForPrompt(withFollowUp);
 
