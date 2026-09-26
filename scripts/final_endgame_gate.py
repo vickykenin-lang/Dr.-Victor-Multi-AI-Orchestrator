@@ -25,6 +25,8 @@ def main() -> int:
     autonomy = read('autonomy_state.json')
     founder = read('founder_action_batch.json')
 
+    p6_prequalified = (p6.get('prequalification') or {}).get('status') == 'PASS_FOR_FORWARD_EXECUTION_ONLY'
+
     checks = {
         'canonical_truth_available': bool(canonical),
         'package6_seven_day_reliability_pass': p6.get('status') == 'PASS',
@@ -37,9 +39,23 @@ def main() -> int:
     }
     ready = all(checks.values())
     pending = [k for k, v in checks.items() if not v]
+
+    forward_execution_allowed = all([
+        bool(canonical),
+        p6_prequalified or p6.get('status') == 'PASS',
+        p7.get('status') == 'PASS',
+        autonomy.get('production_autonomy_enabled', False) is False,
+        (autonomy.get('autonomy_rollout_state') or {}).get('red') == 'FOUNDER_GATED',
+    ])
+
     result = {
-        'schema_version': 2,
+        'schema_version': 3,
         'status': 'FINAL_ENDGAME_PASS' if ready else 'FINAL_ENDGAME_NOT_READY',
+        'forward_execution': {
+            'allowed': forward_execution_allowed,
+            'package6_prequalified_only': p6_prequalified and p6.get('status') != 'PASS',
+            'constraint': 'Forward execution does not convert Package 6 into final PASS; seven-day recertification remains mandatory.',
+        },
         'checks': checks,
         'pending_checks': pending,
         'package_states': {
@@ -58,7 +74,7 @@ def main() -> int:
             'REAL_OUTPUT_VERIFIED',
             'REAL_BUSINESS_OUTCOME_VERIFIED',
         ],
-        'truth_rule': 'No earlier stage implies a later stage. Missing evidence is UNKNOWN/NOT_READY. Founder/admin carry-forward prevents final PASS until explicitly resolved.',
+        'truth_rule': 'Prequalification may permit downstream work but never substitutes for final certification. No earlier stage implies a later stage. Missing evidence is UNKNOWN/NOT_READY.',
     }
     (DATA / 'final_endgame_status.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(result, indent=2))
