@@ -1,9 +1,24 @@
 {
-  "schema_version": 1,
-  "status": "AWAITING_REAL_EXTERNAL_BUSINESS_OUTCOME",
+  "schema_version": 2,
+  "status": "COMMERCIAL_PIPELINE_ACTIVE_AWAITING_REAL_EXTERNAL_BUSINESS_OUTCOME",
   "technical_validation": "PASS",
-  "verified_at_utc": "2026-09-25T21:37:00Z",
+  "verified_at_utc": "2026-09-26T03:38:17Z",
   "canonical_revenue_source": "data/revenue_outcomes.json",
+  "rio_execution_source": "vickykenin-lang/rio-affiliate-engine",
+  "m0_live_funnel": {
+    "status": "PASS",
+    "rio_workflow_run_id": 36215412497,
+    "evidence_file": "data/revenue_m0_live_probe.json",
+    "offers_verified": [
+      "SPICE_RACK_001",
+      "UNDER_SINK_001",
+      "TROLLEY_001"
+    ],
+    "verified_scope": "LIVE_BUYER_INTENT_PAGE_TO_DISCLOSED_TAGGED_MERCHANT_DESTINATION",
+    "outbound_click_event_collection_verified": false,
+    "merchant_report_ingestion_verified": false,
+    "revenue_claimed": false
+  },
   "verified_totals": {
     "qualified_leads": 0,
     "closed_won": 0,
@@ -12,6 +27,13 @@
   },
   "verified_business_outcome": false,
   "external_dependency_required": true,
+  "current_external_evidence_state": "AWAITING_AFFILIATE_SOURCE_REPORT",
+  "next_evidence_milestones": [
+    "M0B_OUTBOUND_CLICK_EVIDENCE",
+    "M1_MERCHANT_REPORTED_QUALIFYING_ORDER",
+    "M2_APPROVED_COMMISSION",
+    "M3_SETTLED_INR_GT_0"
+  ],
   "required_external_proof_chain": [
     "LEAD_CAPTURE",
     "CONTACT",
@@ -22,7 +44,8 @@
   "automatic_checks": {
     "canonical_ledger_validation": "PASS",
     "invalid_event_count": 0,
-    "synthetic_revenue_allowed": false
+    "synthetic_revenue_allowed": false,
+    "hourly_rio_live_funnel_probe_enabled": true
   },
-  "truth_rule": "Engineering readiness, traffic, clicks, orders, estimates and workflow success are not revenue. Package 8 can become PASS only after independently verified PAYMENT_RECEIVED evidence exists."
+  "truth_rule": "The live three-offer affiliate funnel is now freshly verified, but engineering readiness, page availability, traffic, clicks, orders, estimates and workflow success are not revenue. Package 8 becomes PASS only after independently verified PAYMENT_RECEIVED evidence exists."
 }
