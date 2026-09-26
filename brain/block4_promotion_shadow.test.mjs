@@ -4,6 +4,8 @@ import { createRollbackContract } from './rollback_contract.mjs';
 import { evaluatePromotion, evaluatePostPromotionVerification } from './promotion_gate.mjs';
 import { runShadowAutonomy } from './shadow_autonomy_runtime.mjs';
 
+const HEALTHY_WATCHDOG = { watchdog_available: true, watchdog_healthy: true, heartbeat_age_seconds: 5 };
+
 test('sandbox success alone cannot promote without evidence, security, contract and identity', () => {
   const r = evaluatePromotion({
     sandbox_receipt: { status: 'TEST_PASSED', evidence_refs: [], production_applied: false, promotion_required: true },
@@ -79,6 +81,7 @@ test('shadow runtime can authorize sandbox execution but never production apply'
     objective_id: 'OBJ',
     action_id: 'ACT',
     capability_id: 'sandbox.execute',
+    watchdog_input: HEALTHY_WATCHDOG,
     now_utc: '2026-09-25T12:00:00Z',
   });
   assert.equal(r.decision, 'SANDBOX_EXECUTION_AUTHORIZED');
@@ -92,10 +95,11 @@ test('watchdog blocks shadow execution on anomaly', () => {
     founder_text: 'Victor execute block 4',
     objective_id: 'OBJ',
     action_id: 'ACT',
-    watchdog_input: { credential_or_security_anomaly: true },
+    watchdog_input: { ...HEALTHY_WATCHDOG, credential_or_security_anomaly: true },
   });
   assert.equal(r.decision, 'SAFE_HOLD');
   assert.equal(r.reason, 'WATCHDOG_SAFE_HOLD');
+  assert.ok(r.watchdog.triggers.includes('CREDENTIAL_SECURITY_ANOMALY'));
 });
 
 test('Founder unavailable at RED boundary safe-holds', () => {
@@ -107,8 +111,10 @@ test('Founder unavailable at RED boundary safe-holds', () => {
     founder_available: false,
     founder_approved: false,
     action_contract_authorized: true,
+    watchdog_input: HEALTHY_WATCHDOG,
     now_utc: '2026-09-25T12:00:00Z',
   });
   assert.equal(r.decision, 'SAFE_HOLD');
+  assert.equal(r.reason, 'FOUNDER_UNAVAILABLE_RED_BOUNDARY');
   assert.equal(r.production_apply_allowed, false);
 });
