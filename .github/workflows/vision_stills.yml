@@ -15,7 +15,7 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
 
@@ -45,7 +45,7 @@ jobs:
 
       - name: Upload stills + log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ep001-stills
           path: vision/episodes/EP001_Last_Delivery/stills/
