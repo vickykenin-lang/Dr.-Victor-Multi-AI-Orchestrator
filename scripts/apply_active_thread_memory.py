@@ -3,6 +3,25 @@ from pathlib import Path
 path = Path('victor-telegram-worker/worker.js')
 text = path.read_text(encoding='utf-8')
 
+# Current Victor V2 has moved beyond the original active-thread patch layout.
+# Treat the complete evolved capability set as converged so deployment migrations
+# do not fail on obsolete exact anchors (for example the planner assignment form).
+CONVERGED_ACTIVE_THREAD_MARKERS = [
+    "import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } from '../brain/active_context.mjs';",
+    "const activePatch = buildActiveContext(",
+    "sessionWithFounderTurn = appendRecentTurn(",
+    "classifyConversationFollowUp(text, sessionWithFounderTurn)",
+    "await planFounderRequest(env, text, replyContext, sessionWithFounderTurn)",
+    "async function planFounderRequest(env, text, replyContext = '', activeSession = {})",
+    "ACTIVE WORKING THREAD:\n${formatActiveContextForPrompt(activeSession)}",
+    "async function callVictorCore(env, userMessage, requestFacts, activeSession = {})",
+    "THREAD CONTINUITY CONTRACT:",
+    "active_thread_memory:",
+]
+if all(marker in text for marker in CONVERGED_ACTIVE_THREAD_MARKERS):
+    print('NO_CHANGES_ALREADY_APPLIED:ACTIVE_THREAD_MEMORY_CONVERGED')
+    raise SystemExit(0)
+
 conv_import = "import { classifyConversationFollowUp, formatPendingTaskStatus } from '../brain/conversation_runtime.mjs';\n"
 active_import = "import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } from '../brain/active_context.mjs';\n"
 if active_import not in text:
@@ -31,7 +50,7 @@ text = text.replace("task_id: session.last_task_id", "task_id: sessionWithFounde
 
 old_plan_call = "      const plan = await planFounderRequest(env, text, replyContext);\n"
 new_plan_call = "      const plan = await planFounderRequest(env, text, replyContext, sessionWithFounderTurn);\n"
-if new_plan_call not in text:
+if "await planFounderRequest(env, text, replyContext, sessionWithFounderTurn)" not in text:
     if old_plan_call not in text:
         raise SystemExit('planner call anchor missing')
     text = text.replace(old_plan_call, new_plan_call, 1)
