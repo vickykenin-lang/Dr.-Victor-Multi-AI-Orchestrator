@@ -880,25 +880,6 @@ ${JSON.stringify(semanticResults)}`,
         return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, parent_task_id: contextualFollowUp.parent_task_id || null, task_id: dispatch.taskId });
       }
 
-      if (!memoryDirective && contextualFollowUp.mode === 'CONTEXTUAL_INVESTIGATION') {
-        const investigationText = buildInvestigationTaskText(contextualFollowUp, sessionWithFounderTurn);
-        const dispatch = await dispatchContextualInvestigation(env, contextualFollowUp.target, investigationText, { messageId: message.message_id });
-        await writeConversationSession(chatId, {
-          last_target: contextualFollowUp.target,
-          last_task_id: dispatch.taskId,
-          parent_task_id: contextualFollowUp.parent_task_id || contextualFollowUp.task_id || null,
-          last_task_type: 'CONTEXTUAL_INVESTIGATION',
-          active_issue: contextualFollowUp.query || text,
-          unresolved_question: contextualFollowUp.query || text,
-          task_state: 'PENDING_INVESTIGATION',
-        }, env);
-        await sendTelegramMessage(env, chatId, `${String(contextualFollowUp.target || '').toUpperCase()} ko specific follow-up investigation di hai. Parent task: ${contextualFollowUp.parent_task_id || contextualFollowUp.task_id || 'none'}. Investigation task: ${dispatch.taskId}. Purani report repeat nahi karni; fresh evidence ya evidence-gap ka root cause return karna hai.`, message.message_id);
-        if (contextualFollowUp.target === 'rio') ctx?.waitUntil(handleRioRoundTrip(env, chatId, dispatch, message.message_id));
-        else if (contextualFollowUp.target === 'tony_stark') ctx?.waitUntil(handleTonyRoundTrip(env, chatId, dispatch, message.message_id));
-        else if (contextualFollowUp.target === 'aura3') ctx?.waitUntil(handleAura3RoundTrip(env, chatId, dispatch, message.message_id));
-        return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, parent_task_id: contextualFollowUp.parent_task_id || null, task_id: dispatch.taskId });
-      }
-
       if (!memoryDirective && contextualFollowUp.mode) {
         const handled = await answerExistingDepartmentTask(env, chatId, contextualFollowUp, sessionWithFounderTurn, message.message_id);
         if (handled) return json({ ok: true, mode: contextualFollowUp.mode, target: contextualFollowUp.target, task_id: contextualFollowUp.task_id });
