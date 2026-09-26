@@ -37,9 +37,8 @@ else:
     print('CONVERGENCE_GUARD_MISSING=' + ','.join(missing))
     runpy.run_path(str(LEGACY_PATCH), run_name='__main__')
 
-# Step 8 department certification is intentionally chained from this canonical
-# convergence entrypoint so the existing Apply Victor Brain Runtime workflow
-# applies the evidence-only SAFE_HOLD exception deterministically.
+# Step 8 certification convergence must preserve the current explicit local
+# watchdog evaluator context while adding the exact evidence-only command gate.
 if not STEP8_CERT_PATCH.exists():
     raise SystemExit('STEP8_CERTIFICATION_PATCH_MISSING')
 runpy.run_path(str(STEP8_CERT_PATCH), run_name='__main__')
