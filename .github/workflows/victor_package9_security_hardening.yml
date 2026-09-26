@@ -42,15 +42,23 @@ jobs:
             fi
           done
           echo 'CRITICAL_ACTION_REFS_IMMUTABLE'
-      - name: Inventory remaining mutable action refs repository-wide
+      - name: Require zero mutable action refs repository-wide
         shell: bash
         run: |
+          set -euo pipefail
           set +e
           grep -RInE 'uses: [A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@v[0-9]+' .github/workflows > /tmp/mutable-action-refs.txt
+          grep_status=$?
+          set -e
           count=$(wc -l < /tmp/mutable-action-refs.txt | tr -d ' ')
           echo "remaining_mutable_action_refs=$count"
           cat /tmp/mutable-action-refs.txt || true
-          exit 0
+          if [ "$count" -ne 0 ]; then
+            echo 'MUTABLE_ACTION_REFS_REMAIN' >&2
+            exit 1
+          fi
+          [ "$grep_status" -eq 1 ] || { echo 'ACTION_REF_SCAN_ERROR' >&2; exit 1; }
+          echo 'REPOSITORY_ACTION_REFS_IMMUTABLE'
       - name: Verify high and critical dependency findings are remediated
         shell: bash
         run: |
