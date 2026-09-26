@@ -5,6 +5,8 @@ import { buildActionContract, validateActionContract } from './action_contract.m
 import { classifyConversationFollowUp } from './conversation_runtime.mjs';
 import { runShadowAutonomy } from './shadow_autonomy_runtime.mjs';
 
+const HEALTHY_WATCHDOG = { watchdog_available: true, watchdog_healthy: true, heartbeat_age_seconds: 5 };
+
 const rioGoal = {
   goal_id: 'OBJ-RIO-REVENUE-001',
   allowed_departments: ['rio'],
@@ -32,6 +34,7 @@ test('PHASE-C 1/7: real objective handling stays objective-bound and sandbox-onl
     action_id: contract.action_id,
     capability_id: 'sandbox.execute',
     active_target: 'rio',
+    watchdog_input: HEALTHY_WATCHDOG,
     now_utc: '2026-09-26T08:00:00Z',
   });
   assert.equal(result.mode, 'SHADOW');
@@ -50,7 +53,7 @@ test('PHASE-C 2/7: retry and failure limits fail closed', () => {
     founder_text: 'Victor execute this objective',
     objective_id: 'OBJ-RETRY',
     action_id: 'ACT-RETRY',
-    watchdog_input: { transient_retry_count: 3 },
+    watchdog_input: { ...HEALTHY_WATCHDOG, transient_retry_count: 3 },
   });
   assert.equal(retryHold.decision, 'SAFE_HOLD');
   assert.ok(retryHold.watchdog.triggers.includes('TRANSIENT_RETRY_LIMIT'));
@@ -61,6 +64,7 @@ test('PHASE-C 2/7: retry and failure limits fail closed', () => {
     objective_id: 'OBJ-BUDGET',
     action_id: 'ACT-BUDGET',
     budget_usage: { retry_count: 4 },
+    watchdog_input: HEALTHY_WATCHDOG,
   });
   assert.equal(budgetHold.decision, 'SAFE_HOLD');
   assert.ok(budgetHold.watchdog.triggers.includes('RESOURCE_BUDGET_BLOCK'));
@@ -74,7 +78,7 @@ test('PHASE-C 3/7: semantic no-progress forces independent watchdog hold', () =>
     founder_text: 'Victor execute this objective',
     objective_id: 'OBJ-NOPROGRESS',
     action_id: 'ACT-NOPROGRESS',
-    watchdog_input: { semantic_no_progress_count: 3 },
+    watchdog_input: { ...HEALTHY_WATCHDOG, semantic_no_progress_count: 3 },
   });
   assert.equal(result.decision, 'SAFE_HOLD');
   assert.ok(result.watchdog.triggers.includes('SEMANTIC_NO_PROGRESS_LIMIT'));
@@ -122,7 +126,7 @@ test('PHASE-C 5/7: offline/degraded reasoning remains deterministic and fail-clo
       founder_text: 'Victor execute this objective',
       objective_id: 'OBJ-OFFLINE',
       action_id: 'ACT-OFFLINE',
-      watchdog_input: { material_environment_mismatch: true, authority_ambiguity: true },
+      watchdog_input: { ...HEALTHY_WATCHDOG, material_environment_mismatch: true, authority_ambiguity: true },
     });
     assert.equal(result.decision, 'SAFE_HOLD');
     assert.ok(result.watchdog.triggers.includes('ENVIRONMENT_MISMATCH'));
@@ -165,8 +169,8 @@ test('PHASE-C 6/7: Founder transcript context is preserved and STOP wins', () =>
 // shadow runtime can never silently promote or claim a production application.
 test('PHASE-C 7/7: shadow acceptance has zero implicit production mutation', () => {
   const cases = [
-    runShadowAutonomy({ founder_text: 'Victor execute this objective', objective_id: 'OBJ-A', action_id: 'ACT-A' }),
-    runShadowAutonomy({ founder_text: 'Victor execute this objective', objective_id: 'OBJ-B', action_id: 'ACT-B', watchdog_input: { verification_failed_after_change: true } }),
+    runShadowAutonomy({ founder_text: 'Victor execute this objective', objective_id: 'OBJ-A', action_id: 'ACT-A', watchdog_input: HEALTHY_WATCHDOG }),
+    runShadowAutonomy({ founder_text: 'Victor execute this objective', objective_id: 'OBJ-B', action_id: 'ACT-B', watchdog_input: { ...HEALTHY_WATCHDOG, verification_failed_after_change: true } }),
     runShadowAutonomy({ founder_text: 'RIO par kaam band karo', objective_id: 'OBJ-C', action_id: 'ACT-C', active_target: 'rio' }),
     runShadowAutonomy({ founder_text: 'I want to test you', objective_id: 'OBJ-D', action_id: 'ACT-D' }),
   ];
