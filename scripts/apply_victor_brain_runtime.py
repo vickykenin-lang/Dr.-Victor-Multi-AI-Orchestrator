@@ -4,7 +4,7 @@ PATH = Path('victor-telegram-worker/autonomy_runtime.mjs')
 text = PATH.read_text(encoding='utf-8')
 original = text
 
-# These markers describe the current/evolved runtime state.  Apply scripts are
+# These markers describe the current/evolved runtime state. Apply scripts are
 # migrations, so rerunning them against a runtime that has already moved beyond
 # the original replacement text must be a safe no-op rather than a deployment
 # failure.
@@ -15,10 +15,17 @@ ALREADY_APPLIED_MARKERS = {
     'department_recommendation': "departmentCapabilityFit('tony_stark', text)",
     'brain_review_calculation': "const brainReview = reviewOutcome({",
     'brain_runtime_state': "brain_required_mode: fiveWhysRequired ? 'FIVE_WHYS_BEFORE_NEXT_DISPATCH' : 'NORMAL_EXECUTION'",
-    'initial_phase': "const initialPhase = selection.runtimeGoal?.brain_required_mode",
+    'initial_phase': "let initialPhase = (",
     'followup_phase': "const followUpPhase = nextRuntimeGoal.brain_required_mode",
     'supervise_prompt': "buildGoalTaskPrompt(selection.goal, phase, selection.runtimeGoal || {})",
 }
+
+# Whole-script convergence guard. If every semantic capability this migration
+# owns is already present, stop before evaluating any legacy anchor. This keeps
+# deployment idempotent even when the runtime has evolved beyond old snippets.
+if all(marker in text for marker in ALREADY_APPLIED_MARKERS.values()):
+    print('NO_CHANGES_ALREADY_APPLIED')
+    raise SystemExit(0)
 
 
 def replace_once(old: str, new: str, label: str):
