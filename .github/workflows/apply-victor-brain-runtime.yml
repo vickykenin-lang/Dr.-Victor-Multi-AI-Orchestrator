@@ -23,6 +23,7 @@ on:
       - 'scripts/apply_outcome_state.py'
       - 'scripts/apply_execution_plan.py'
       - 'scripts/apply_model_truth_runtime.py'
+      - 'scripts/apply_model_truth_runtime_converged.py'
       - 'scripts/apply_natural_reply_guard.py'
       - 'scripts/apply_cognee_auth_circuit_breaker.py'
       - 'brain/runtime.mjs'
@@ -102,7 +103,7 @@ jobs:
           python scripts/apply_truth_resolver.py
           python scripts/apply_outcome_state.py
           python scripts/apply_execution_plan.py
-          python scripts/apply_model_truth_runtime.py
+          python scripts/apply_model_truth_runtime_converged.py
           python scripts/apply_natural_reply_guard.py
           python scripts/apply_cognee_auth_circuit_breaker.py
       - name: Run core tests
