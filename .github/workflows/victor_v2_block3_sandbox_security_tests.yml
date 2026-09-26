@@ -6,7 +6,11 @@ on:
       - 'brain/sandbox_manager.mjs'
       - 'brain/capability_broker.mjs'
       - 'brain/safety_watchdog.mjs'
+      - 'brain/security_kernel.mjs'
+      - 'brain/action_contract.mjs'
+      - 'brain/shadow_autonomy_runtime.mjs'
       - 'brain/block3_sandbox_security.test.mjs'
+      - 'brain/founder_unavailable_safety_acceptance.test.mjs'
       - '.github/workflows/victor_v2_block3_sandbox_security_tests.yml'
   workflow_dispatch:
 
@@ -29,5 +33,8 @@ jobs:
           node --check brain/sandbox_manager.mjs
           node --check brain/capability_broker.mjs
           node --check brain/safety_watchdog.mjs
-      - name: Run Block 3 regression pack
-        run: node --test brain/block3_sandbox_security.test.mjs
+          node --check brain/security_kernel.mjs
+          node --check brain/action_contract.mjs
+          node --check brain/shadow_autonomy_runtime.mjs
+      - name: Run Block 3 + Founder-unavailable acceptance pack
+        run: node --test brain/block3_sandbox_security.test.mjs brain/founder_unavailable_safety_acceptance.test.mjs
