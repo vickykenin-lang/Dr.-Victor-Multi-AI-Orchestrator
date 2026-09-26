@@ -28,7 +28,7 @@ jobs:
       VICTOR_FOUNDER_CHAT_ID: ${{ secrets.VICTOR_FOUNDER_CHAT_ID }}
       TELEGRAM_CHAT_ID_VICTOR: ${{ secrets.TELEGRAM_CHAT_ID_VICTOR }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Probe deployed Victor and run live acceptance
         run: |
@@ -160,8 +160,6 @@ jobs:
                               body = {
                                   'update_id': now * 100 + idx,
                                   'message': {
-                                      # Synthetic updates do not correspond to a real Telegram message.
-                                      # Use 0 so Worker reply logic does not attach an invalid reply_parameters.message_id.
                                       'message_id': 0,
                                       'date': now,
                                       'chat': {'id': int(founder_chat), 'type': 'private'},
