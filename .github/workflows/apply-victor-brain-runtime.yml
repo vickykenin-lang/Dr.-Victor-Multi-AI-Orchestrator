@@ -66,7 +66,6 @@ on:
       - 'victor-telegram-worker/reply_integrity.test.mjs'
       - 'docs/VICTOR_FINAL_CORRECTION_PLAN.md'
       - 'data/victor_correction_backlog.json'
-      - '.github/workflows/apply-victor-brain-runtime.yml'
   workflow_dispatch:
 
 permissions:
