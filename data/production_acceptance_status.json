@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "checked_at_utc": "2026-09-26T08:08:16.717819+00:00",
-  "repository_sha_under_test": "c8c128d21ecbf9aab04d9e0dd588e83e3169b06a",
+  "checked_at_utc": "2026-09-26T08:11:24.060828+00:00",
+  "repository_sha_under_test": "5b47fbe64675c1d9e7d95771b7c80b43226cf535",
   "production_verification": {
     "telegram_webhook": {
       "api_http_status": 200,
