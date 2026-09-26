@@ -1,4 +1,5 @@
 import { attachResolvedTruth } from './fact_evidence_resolver.mjs';
+import { callVictorModel } from '../victor-telegram-worker/model_router.mjs';
 
 const REPOS = {
   rio: 'vickykenin-lang/rio-affiliate-engine',
@@ -10,18 +11,20 @@ export function classifyFactRequest(text = '') {
   const value = String(text || '').toLowerCase();
   const asksExact = /\b(exact|timestamp|time stamp|kitne|count|number|commit|activity date|last commit|heartbeat|cached|default response|template|real[- ]?time|sach batao|pause|paused|auto[- ]?publish|alerts?|log|ground truth|data\/|\.json)\b/i.test(value);
   const asksEvidence = /\b(evidence|proof|verify|verified|source|github|repo|repository|fresh|actual|concrete|specific)\b/i.test(value);
+  const asksLlmConnectivity = /\b(?:llm|ai|model)\b.{0,40}\b(?:connected|connection|connectivity|available|working|live|reachable)\b|\b(?:connected|connection|connectivity|available|working|live|reachable)\b.{0,40}\b(?:llm|ai|model)\b/i.test(value);
   const targets = [];
   if (/\brio\b|instagram|heartbeat|rio alerts?/i.test(value)) targets.push('rio');
   if (/\baura\s*3\b|\baura3\b|vickykenin-lang\/aura-3\.0/i.test(value)) targets.push('aura3');
   if (/\btony(?:\s+stark)?\b/i.test(value)) targets.push('tony_stark');
   return {
-    matched: asksExact || asksEvidence,
+    matched: asksExact || asksEvidence || asksLlmConnectivity,
     targets: [...new Set(targets)],
     asksHeartbeat: /heartbeat/i.test(value),
     asksPause: /(pause|paused|auto[- ]?publish|instagram.*(on|off|enabled|disabled))/i.test(value),
     asksCommit: /(last commit|commit date|activity date|github.*activity|repo.*activity)/i.test(value),
     asksCounts: /(kitne|count|number|how many|total).*(heartbeat|run|cycle|fail|complete)|(heartbeat|run|cycle).*(kitne|count|number|how many|total)/i.test(value),
     asksCachedTruth: /(cached|default response|template|real[- ]?time|sach batao)/i.test(value),
+    asksLlmConnectivity,
   };
 }
 
@@ -91,8 +94,56 @@ async function rioWorkflowCounts(env, text) {
   };
 }
 
+async function collectLlmRuntimeEvidence(env = {}) {
+  const base = {
+    checked_at_utc: new Date().toISOString(),
+    inference_enabled: env.ENABLE_AI_INFERENCE === 'true',
+    credential_configured: Boolean(env.API_VICTOR),
+    live_request_verified: false,
+    real_output_verified: false,
+    status: 'NOT_LIVE_VERIFIED',
+  };
+
+  if (!base.inference_enabled) return { ...base, status: 'INFERENCE_DISABLED' };
+  if (!base.credential_configured) return { ...base, status: 'CREDENTIAL_MISSING' };
+
+  try {
+    const result = await callVictorModel(
+      env,
+      'Victor runtime connectivity probe. Return one short harmless confirmation sentence. Never expose credentials or secrets.',
+      'Confirm this is a fresh live inference response.',
+      { maxTokens: 80, temperature: 0 },
+    );
+    return {
+      ...base,
+      status: 'LIVE_VERIFIED',
+      live_request_verified: true,
+      real_output_verified: Boolean(String(result?.content || '').trim()),
+      selected_model: result?.model || null,
+      task_type: result?.task || null,
+      discovery_status: result?.discovery_status || null,
+      fallback_failures: Array.isArray(result?.failures) ? result.failures.length : 0,
+      output_excerpt: String(result?.content || '').trim().slice(0, 180) || null,
+      secrets_exposed: false,
+    };
+  } catch (error) {
+    return {
+      ...base,
+      status: 'LIVE_CHECK_FAILED',
+      error_code: error?.code || error?.name || 'AI_RUNTIME_CHECK_FAILED',
+      discovery_status: error?.discoveryStatus || null,
+      failure_count: Array.isArray(error?.modelFailures) ? error.modelFailures.length : 0,
+      secrets_exposed: false,
+    };
+  }
+}
+
 export async function collectFactEvidence(env, text, classification = classifyFactRequest(text)) {
-  const evidence = { fetched_at_utc: new Date().toISOString(), targets: classification.targets, rio: null, aura3: null, tony_stark: null };
+  const evidence = { fetched_at_utc: new Date().toISOString(), targets: classification.targets, rio: null, aura3: null, tony_stark: null, llm_runtime: null };
+
+  if (classification.asksLlmConnectivity) {
+    evidence.llm_runtime = await collectLlmRuntimeEvidence(env);
+  }
 
   if (classification.targets.includes('rio') || classification.asksHeartbeat || classification.asksPause) {
     const [runner, control, production, work, igRun] = await Promise.all([
@@ -137,13 +188,14 @@ export function buildFactAnswerPrompt(founderText, evidence) {
     'You are Victor answering the Founder from the verified evidence provided below. GitHub is canonical when it contains an explicit fact; Cognee long-term memory may supply a noncanonical remembered fact when GitHub is silent. Absence from a registry, file, or department list is not a conflict with a remembered fact unless the canonical source explicitly states a contradictory value or rule.',
     'Answer every part of the Founder question. Do not ignore a second department or second sub-question.',
     'Give exact numbers/timestamps/commit dates when present. If a requested number is not supported by the fetched scope, say exactly what was counted and what remains unknown.',
+    'For LLM/AI/model connectivity questions, use llm_runtime from this fresh request. Keep these states distinct: inference enabled, credential configured, live request verified, real output verified. Never call a credential alone a verified live connection. LIVE_VERIFIED requires the fresh probe to have returned real output.',
     'Use resolved_truth as the authoritative reconciliation output. If it reports a conflict, explain which receipt won and why using truth precedence/freshness. If status is RESOLVED_STALE_ONLY, label the fact stale instead of presenting it as current.',
-    'Never invent or mentally recalculate freshness ages or thresholds. If you mention staleness math, copy age_ms and stale_after_ms exactly from the selected receipt; otherwise simply say stale/current per the receipt. Do not write approximate ages that are not explicitly supported.',
+    'Never invent or mentally recalculate freshness ages or thresholds. If you mention staleness math, copy age_ms and stale_after_ms exactly from the selected receipt; otherwise simply say stale/current per the receipt.',
     'For freshly fetched configuration receipts whose metadata.semantics is CURRENT_CONFIGURATION_FROM_FRESH_GITHUB_READ, report the configured value as current at fetched_at_utc; last_change_at is historical metadata, not proof that the current value is stale.',
     'Do not replace facts with reassurance, status templates, or phrases like “trace kar raha hoon”.',
     'If current canonical data conflicts with an older alert/message, explicitly distinguish OLD ALERT from CURRENT STATE and cite the current field/value in plain language.',
     'For heartbeat counts, preserve the runtime note: workflow-run conclusion is not necessarily identical to heartbeat-job conclusion.',
-    'If asked whether the reply is cached/default/template, say this answer used fresh GitHub reads at fetched_at_utc. Do not claim real-time beyond those reads.',
+    'If asked whether the reply is cached/default/template, say this answer used fresh reads at fetched_at_utc. Do not claim real-time beyond those reads.',
     'Use natural concise Hinglish. No markdown table. Internal source paths may be named because the Founder explicitly asked for evidence.',
     `Founder question: ${String(founderText || '').trim()}`,
     `Fresh evidence JSON: ${JSON.stringify(evidence)}`,
