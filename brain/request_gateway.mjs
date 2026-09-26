@@ -86,7 +86,16 @@ export function buildFactRequestFromFounderRequest(request = {}, rawText = '') {
   };
 }
 
+export function isExplicitDepartmentExecutionRequest(request = {}) {
+  const targets = unique(request?.entities || []).filter(x => ['rio', 'aura3', 'tony_stark'].includes(x));
+  const actions = new Set(request?.requested_actions || []);
+  return targets.length === 1 && (actions.has('execute') || actions.has('repair') || actions.has('publish'));
+}
+
 export function shouldUseFactGateway(request = {}, factRequest = {}) {
+  // Founder explicitly assigning executable work to one department must not be swallowed
+  // by fact/evidence words that describe the requested deliverable.
+  if (isExplicitDepartmentExecutionRequest(request)) return false;
   return request?.evidence_required === true || (request?.requested_facts || []).length > 0 || factRequest?.matched === true;
 }
 
