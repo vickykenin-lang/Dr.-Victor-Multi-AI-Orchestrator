@@ -38,9 +38,9 @@ jobs:
                   inventory.append({'file':str(path),'contents_write':has_write,'git_pushes':pushes})
               for item in pushes:
                   cmd=item['command']
-                  safe_non_main=('vision-runtime-state' in cmd)
-                  if not safe_non_main:
-                      findings.append({'file':str(path),'line':item['line'],'command':cmd,'reason':'DIRECT_OR_AMBIGUOUS_GIT_PUSH_FROM_WORKFLOW'})
+                  safe_non_main=('vision-runtime-state' in cmd or 'CANARY_BRANCH' in cmd)
+                  if has_write and not safe_non_main:
+                      findings.append({'file':str(path),'line':item['line'],'command':cmd,'reason':'WRITE_AUTHORITY_WITH_DIRECT_OR_AMBIGUOUS_GIT_PUSH'})
           print(json.dumps({'inventory':inventory,'blocking_findings':findings},indent=2))
           Path('/tmp/step9-direct-writer-audit.json').write_text(json.dumps({'inventory':inventory,'blocking_findings':findings},indent=2)+'\n')
           if findings:

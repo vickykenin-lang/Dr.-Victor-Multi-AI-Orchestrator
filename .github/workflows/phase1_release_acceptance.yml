@@ -7,7 +7,7 @@ on:
       - '.github/workflows/phase1_release_acceptance.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   accept-release-control:
@@ -17,6 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Expose deployment metadata in health endpoint
