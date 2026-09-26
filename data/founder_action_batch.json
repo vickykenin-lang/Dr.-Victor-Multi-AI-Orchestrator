@@ -1,7 +1,8 @@
 {
-  "schema_version": 1,
-  "status": "CONSOLIDATED_NOT_YET_REQUESTED",
+  "schema_version": 2,
+  "status": "REQUESTED_AWAITING_FOUNDER_ACTION",
   "generated_at_utc": "2026-09-25T21:36:30Z",
+  "requested_in_chat": true,
   "principle": "Founder dependencies are batched only after all safely executable non-Founder work is exhausted.",
   "actions": [
     {
@@ -9,14 +10,14 @@
       "category": "GITHUB_ADMIN",
       "action": "Enable main-branch protection or an equivalent ruleset with required status checks.",
       "why_founder_required": "Current connected GitHub capability does not expose repository administration required for branch protection; main is presently unprotected.",
-      "current_state": "PENDING"
+      "current_state": "PENDING_FOUNDER_ACTION"
     },
     {
       "id": "FOUNDER-GH-WORKFLOWS-002",
       "category": "GITHUB_PERMISSION",
-      "action": "Grant a controlled token/App permission capable of updating workflow files so the remaining 69 legacy mutable GitHub Action refs can be pinned in one reviewed batch.",
+      "action": "Grant a controlled token/App permission capable of updating workflow files so the remaining legacy mutable GitHub Action refs can be pinned in one reviewed batch.",
       "why_founder_required": "A controlled batch push was refused by GitHub because the acting App lacked workflows permission. Critical END GAME and production workflows are already pinned.",
-      "current_state": "PENDING"
+      "current_state": "PENDING_FOUNDER_ACTION"
     },
     {
       "id": "FOUNDER-BUSINESS-003",
@@ -34,6 +35,6 @@
     }
   ],
   "time_dependency_not_founder_action": {
-    "package6": "Seven-day reliability certification must mature and be audited; initial fail-closed and GREEN-only recovery acceptance already passed."
+    "package6": "Prequalified for forward execution; seven-day reliability certification remains scheduled and must later mature and be audited for final PASS."
   }
 }
