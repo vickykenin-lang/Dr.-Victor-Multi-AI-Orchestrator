@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/apply_victor_brain_runtime.py'
+      - 'scripts/apply_victor_brain_runtime_converged.py'
       - 'scripts/apply_victor_rio_bridge_fixes.py'
       - 'scripts/fix_autonomy_state_concurrency.py'
       - 'scripts/apply_founder_manual_trigger_fix.py'
@@ -84,7 +85,7 @@ jobs:
           node-version: '22'
       - name: Apply runtime integration
         run: |
-          python scripts/apply_victor_brain_runtime.py
+          python scripts/apply_victor_brain_runtime_converged.py
           python scripts/apply_victor_rio_bridge_fixes.py
           python scripts/fix_autonomy_state_concurrency.py
           python scripts/apply_founder_manual_trigger_fix.py
