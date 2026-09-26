@@ -34,9 +34,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Checkout canonical main code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout isolated Vision runtime state
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: vision-runtime-state
+          path: .vision-state
+          fetch-depth: 1
+      - name: Restore Vision runtime state
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d .vision-state/vision/engine/jobs ]; then
+            mkdir -p vision/engine/jobs
+            rsync -a --delete .vision-state/vision/engine/jobs/ vision/engine/jobs/
+          fi
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "20"
@@ -61,17 +77,35 @@ jobs:
           NVIDIA_VICTOR_VISION_KEY: ${{ secrets.NVIDIA_VICTOR_VISION_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: python3 vision/scripts/production_engine.py
-      - name: Commit job state
+      - name: Persist Vision job state outside main
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
+          mkdir -p .vision-state/vision/engine/jobs
+          rsync -a --delete vision/engine/jobs/ .vision-state/vision/engine/jobs/
+          cd .vision-state
           git config user.name vision-engine
           git config user.email vision-engine@users.noreply.github.com
           git add vision/engine/jobs/ || true
-          if git diff --staged --quiet; then echo nothing; else
-            git commit -m "engine: ${{ inputs.action || 'scan_auto' }} ${{ inputs.job_id }}"
-            git pull --rebase origin main || git pull --rebase --autostash origin main || true
-            git push
+          if git diff --staged --quiet; then
+            echo 'VISION_STATE_UNCHANGED'
+          else
+            git commit -m "engine-state: ${{ inputs.action || 'scan_auto' }} ${{ inputs.job_id }}"
+            git pull --rebase origin vision-runtime-state
+            git push origin HEAD:vision-runtime-state
           fi
+      - name: Assert canonical main was not mutated
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          remote_main="$(git rev-parse FETCH_HEAD)"
+          if [ "$remote_main" != "${GITHUB_SHA}" ]; then
+            echo "MAIN_MOVED_DURING_RUN:$remote_main:${GITHUB_SHA}" >&2
+            exit 1
+          fi
+          echo 'CANONICAL_MAIN_NOT_MUTATED_BY_VISION_RUN'
       - name: Auto trigger next after gap
         if: success()
         env:
