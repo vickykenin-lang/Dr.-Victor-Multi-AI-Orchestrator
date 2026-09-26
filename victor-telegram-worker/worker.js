@@ -332,7 +332,7 @@ export default {
       const sandboxValidation = validateSandboxSpec(sandbox);
       const lease = issueCapabilityLease({ capability_id: 'sandbox.execute', objective_id: 'V2-LIVE-SELFTEST', action_id: 'LEASE', ttl_seconds: 60 });
       const leaseValidation = validateCapabilityLease(lease, { objective_id: 'V2-LIVE-SELFTEST', action_id: 'LEASE', capability_id: 'sandbox.execute' });
-      const watchdog = evaluateWatchdog({ heartbeat_age_seconds: 0 });
+      const watchdog = evaluateWatchdog({ watchdog_available: true, watchdog_healthy: true, heartbeat_age_seconds: 0 });
       const endgame = endgameRuntimeHealth(env);
       const ready = stopTest.intent === V2_FOUNDER_INTENT.STOP_PAUSE
         && greenTest.decision === 'ALLOW'
@@ -396,7 +396,7 @@ export default {
     }
 
     const v2Intent = classifyV2FounderIntent(text);
-    const v2Watchdog = evaluateWatchdog({ heartbeat_age_seconds: 0 });
+    const v2Watchdog = evaluateWatchdog({ watchdog_available: true, watchdog_healthy: true, heartbeat_age_seconds: 0 });
     if (v2Watchdog.decision === 'SAFE_HOLD') {
       await sendTelegramMessage(env, chatId, 'Victor V2 watchdog SAFE_HOLD active hai; new execution dispatch blocked hai.', message.message_id);
       return json({ ok: true, mode: 'V2_SAFE_HOLD', dispatch: 'BLOCKED', watchdog: v2Watchdog.triggers });
