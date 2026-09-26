@@ -6,6 +6,18 @@ function secureOpaqueId(prefix, length) {
   return `${prefix}${randomUUID.call(globalThis.crypto).replace(/-/g, '').slice(0, length)}`;
 }
 
+export function sanitizeEvidenceValue(value) {
+  let text = String(value ?? '');
+  text = text.replace(/(Bearer\s+)[A-Za-z0-9._~+\/-=]+/gi, '$1[REDACTED]');
+  text = text.replace(/((?:api[_-]?key|access[_-]?key|secret(?:[_-]?key)?|token|password|passwd|pwd)\s*[:=]\s*)([^\s,;]+)/gi, '$1[REDACTED]');
+  text = text.replace(/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16})\b/g, '[REDACTED]');
+  return text;
+}
+
+function sanitizeEvidenceList(values = []) {
+  return [...new Set(values.map(sanitizeEvidenceValue))].filter(Boolean);
+}
+
 export function createSandboxSpec({ objective_id, action_id, requested_tools = [], network_allowlist = [], budgets = {} } = {}) {
   if (!objective_id || !action_id) throw new Error('objective_id and action_id are required');
   const sandbox_id = secureOpaqueId('sbx_', 16);
@@ -72,9 +84,10 @@ export function buildSandboxEvidenceReceipt({ spec, status, evidence_refs = [], 
     sandbox_id: spec.sandbox_id,
     objective_id: spec.objective_id,
     action_id: spec.action_id,
-    status: String(status || 'UNKNOWN'),
-    evidence_refs: [...new Set(evidence_refs.map(String))].filter(Boolean),
-    notes: [...new Set(notes.map(String))].filter(Boolean),
+    status: sanitizeEvidenceValue(status || 'UNKNOWN'),
+    evidence_refs: sanitizeEvidenceList(evidence_refs),
+    notes: sanitizeEvidenceList(notes),
+    secret_material_exposed: false,
     production_applied: false,
     promotion_required: true,
     teardown_required: true,
