@@ -5,6 +5,7 @@ import { buildActiveContext, appendRecentTurn, formatActiveContextForPrompt } fr
 import { classifyFounderIntent, FOUNDER_INTENT, mayCreateExecutionContract } from './founder_intent_gateway.mjs';
 import { runShadowAutonomy } from './shadow_autonomy_runtime.mjs';
 
+// Locked Step 1 regression retest: cases 2, 7 and 8.
 // Case 2: a natural follow-up must keep the immediately preceding conversational origin
 // available to the response layer rather than resetting the thread.
 test('CASE 2: joke origin follow-up retains the preceding joke turn in active context', () => {
