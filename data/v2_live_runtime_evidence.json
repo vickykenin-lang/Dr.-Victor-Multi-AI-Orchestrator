@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "verified_at_utc": "2026-09-25T14:48:45.844563+00:00",
+  "verified_at_utc": "2026-09-26T05:41:36.414929+00:00",
   "status": "LIVE_V2_RUNTIME_VERIFIED_POST_ROLLBACK_RESTORE",
   "secrets_exposed": false,
   "results": {
@@ -10,7 +10,7 @@
         "service": "victor-telegram-webhook",
         "deployment_git_sha": "d22f433b84f7bbe9e3811e88549e149095943e43",
         "deployment_build_uuid": "5e1c7da4-1bd9-4767-9229-73ff8d824b6d",
-        "cloudflare_version_id": "1831689a-19fa-426d-8077-7678cb4ef184",
+        "cloudflare_version_id": "37441294-a519-4bc2-b601-087ec8f83a83",
         "deployment_identity_gate": "IDENTITY_PRESENT_NOT_LIVE_VERIFIED",
         "deployment_identity_evidence_required": [
           "deployment_git_sha",
@@ -57,6 +57,23 @@
         "ai_credential_configured": true,
         "cognee_inference_credential_configured": true,
         "cognee_inference_runtime": "COGNEE_CLOUD_MEMORY_API_V2",
+        "endgame_runtime_package": "PACKAGE2_LIVE_ACCEPTANCE_V1",
+        "endgame_runtime_health": {
+          "schema_version": 1,
+          "service": "victor-endgame-runtime",
+          "status": "READY",
+          "verified_procedure": "founder-status-check-v1",
+          "degraded_mode": "DEGRADED_VERIFIED_PROCEDURE",
+          "execution_allowed": true,
+          "manual_trigger_only": true,
+          "truthful_telemetry_surface": "LIVE",
+          "experience_ledger_available": true,
+          "experience_ledger_durable": true,
+          "cognee_memory_status": "CONFIGURED",
+          "cognee_dataset": "victor_long_term_memory",
+          "production_autonomy_enabled": false,
+          "secrets_exposed": false
+        },
         "cognee_auth_circuit_breaker": "COGNEE_CLOUD_AUTH_401_403_HOLD_V3",
         "telegram_webhook_ack_policy": "HANDLED_ERRORS_HTTP_200_V1",
         "model_router": "BEDROCK_DISCOVERY_SPECIALIST_V1",
@@ -105,6 +122,12 @@
         "watchdog": "CONTINUE_BOUNDED",
         "security_policy": "victor-security-policy-v1",
         "production_autonomy_enabled": false,
+        "endgame_runtime_status": "READY",
+        "endgame_verified_procedure": "founder-status-check-v1",
+        "endgame_degraded_mode": "DEGRADED_VERIFIED_PROCEDURE",
+        "endgame_truthful_telemetry_surface": "LIVE",
+        "endgame_experience_ledger_durable": true,
+        "endgame_cognee_memory_status": "CONFIGURED",
         "live_sandbox_execution_verified": false,
         "live_rollback_drill_verified": false,
         "secrets_exposed": false
