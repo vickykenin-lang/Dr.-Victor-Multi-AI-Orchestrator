@@ -5,6 +5,8 @@ import { buildActionContract, validateActionContract } from './action_contract.m
 import { issueCapabilityLease } from './capability_broker.mjs';
 import { runShadowAutonomy } from './shadow_autonomy_runtime.mjs';
 
+const HEALTHY_WATCHDOG = { watchdog_available: true, watchdog_healthy: true, heartbeat_age_seconds: 5 };
+
 // 1. RED actions must SAFE_HOLD when the Founder is unavailable.
 test('STEP3 1/5: RED action SAFE_HOLDs without Founder', () => {
   const result = runShadowAutonomy({
@@ -15,6 +17,7 @@ test('STEP3 1/5: RED action SAFE_HOLDs without Founder', () => {
     founder_available: false,
     founder_approved: false,
     action_contract_authorized: true,
+    watchdog_input: HEALTHY_WATCHDOG,
     now_utc: '2026-09-26T08:30:00Z',
   });
   assert.equal(result.decision, 'SAFE_HOLD');
@@ -32,6 +35,7 @@ test('STEP3 2/5: safe sandbox work can continue while Founder is unavailable', (
     capability_id: 'sandbox.execute',
     founder_available: false,
     founder_approved: false,
+    watchdog_input: HEALTHY_WATCHDOG,
     now_utc: '2026-09-26T08:30:00Z',
   });
   assert.equal(result.decision, 'SANDBOX_EXECUTION_AUTHORIZED');
