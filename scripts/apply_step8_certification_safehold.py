@@ -11,11 +11,14 @@ if cert_import not in text:
         raise SystemExit('STEP8_CERT_IMPORT_ANCHOR_MISSING')
     text = text.replace(import_line, import_line + cert_import, 1)
 
-start = "    const v2Intent = classifyV2FounderIntent(text);\n    const v2Watchdog = evaluateWatchdog({ heartbeat_age_seconds: 0 });\n"
+# Anchor only on the stable Founder-intent boundary. The watchdog invocation
+# evolved after the original Step-8 repair was prepared; preserve the explicit
+# current local evaluator availability/health context rather than downgrading it.
+start = "    const v2Intent = classifyV2FounderIntent(text);\n"
 end = "    const emergencyCommand = parseEmergencyCommand(text);\n"
 
 replacement = r'''    const v2Intent = classifyV2FounderIntent(text);
-    const v2Watchdog = evaluateWatchdog({ heartbeat_age_seconds: 0 });
+    const v2Watchdog = evaluateWatchdog({ watchdog_available: true, watchdog_healthy: true, heartbeat_age_seconds: 0 });
     const departmentCertification = parseDepartmentCertificationCommand(text);
 
     if (departmentCertification) {
