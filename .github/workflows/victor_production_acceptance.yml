@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: victor-production-evidence-main
@@ -29,6 +29,8 @@ jobs:
       TELEGRAM_CHAT_ID_VICTOR: ${{ secrets.TELEGRAM_CHAT_ID_VICTOR }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       - name: Probe deployed Victor and run live acceptance
         run: |
