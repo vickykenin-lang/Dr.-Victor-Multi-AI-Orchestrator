@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'scripts/apply_semantic_memory_direct_answer.py'
+      - 'victor-telegram-worker/remembered_fact_gate.mjs'
+      - 'victor-telegram-worker/remembered_fact_gate.test.mjs'
       - '.github/workflows/apply-semantic-memory-direct-answer.yml'
   workflow_dispatch:
 
@@ -27,15 +29,18 @@ jobs:
       - name: Apply semantic direct-answer patch
         run: python scripts/apply_semantic_memory_direct_answer.py
       - name: Syntax check worker
-        run: node --check victor-telegram-worker/worker.js
+        run: |
+          node --check victor-telegram-worker/worker.js
+          node --check victor-telegram-worker/remembered_fact_gate.mjs
       - name: Run memory tests
         run: |
           node --test victor-telegram-worker/cognee_memory_bridge.test.mjs
           node --test victor-telegram-worker/memory_brain.test.mjs
+          node --test victor-telegram-worker/remembered_fact_gate.test.mjs
       - name: Verify deterministic memory answer guard
         run: |
-          grep -q "VICTOR_MEMORY_DIRECT_ANSWER" victor-telegram-worker/worker.js
-          grep -q "canonicalTargetEvidencePresent" victor-telegram-worker/worker.js
+          grep -q "selectDirectRememberedFact" victor-telegram-worker/worker.js
+          grep -q "CANONICAL_CONTRADICTION" victor-telegram-worker/remembered_fact_gate.mjs
       - name: Persist patch if changed
         run: |
           if git diff --quiet; then
@@ -44,6 +49,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add victor-telegram-worker/worker.js
+          git add victor-telegram-worker/worker.js victor-telegram-worker/remembered_fact_gate.mjs victor-telegram-worker/remembered_fact_gate.test.mjs
           git commit -m "runtime: answer semantic-only remembered facts deterministically"
           git push
