@@ -1,0 +1,92 @@
+name: END GAME Step 8 RIO Certification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/endgame_step8_rio_certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rio-live-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      WORKER_BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
+      TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+      VICTOR_FOUNDER_CHAT_ID: ${{ secrets.VICTOR_FOUNDER_CHAT_ID }}
+    steps:
+      - name: Require protected Founder transport credentials
+        shell: bash
+        run: |
+          if [ -z "$TELEGRAM_WEBHOOK_SECRET" ] || [ -z "$VICTOR_FOUNDER_CHAT_ID" ]; then
+            echo 'Protected Founder transport secrets are not configured.' >&2
+            exit 42
+          fi
+      - name: Execute Founder to Victor to RIO to Victor round-trip
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.request
+
+          base=os.environ['WORKER_BASE_URL'].rstrip('/')
+          founder=str(os.environ['VICTOR_FOUNDER_CHAT_ID'])
+          payload={
+              'update_id': int(time.time()*1000) % 2147483647,
+              'message': {
+                  'message_id': 0,
+                  'from': {'id': int(founder)},
+                  'chat': {'id': int(founder), 'type': 'private'},
+                  'text': 'ENDGAME DEPARTMENT CERTIFY RIO',
+              },
+          }
+          req=urllib.request.Request(
+              base+'/telegram', data=json.dumps(payload).encode(), method='POST',
+              headers={'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],'User-Agent':'Victor-ENDGAME-Step8-RIO/1.0'},
+          )
+          with urllib.request.urlopen(req, timeout=45) as response:
+              body=json.loads(response.read().decode()); code=response.status
+          safe={'http_status':code,'ok':body.get('ok'),'mode':body.get('mode'),'target':body.get('target'),'task_id':body.get('task_id')}
+          print('DISPATCH='+json.dumps(safe,sort_keys=True))
+          assert code == 200 and body.get('ok') is True, safe
+          assert body.get('mode') == 'ENDGAME_DEPARTMENT_CERTIFICATION', safe
+          assert body.get('target') == 'rio', safe
+          task_id=body.get('task_id'); assert task_id, safe
+
+          safe_id=''.join(c if (c.isalnum() or c in '._-') else '-' for c in str(task_id)).strip('-')[:120]
+          url=f'https://raw.githubusercontent.com/vickykenin-lang/rio-affiliate-engine/main/integration/results/victor_tasks/{safe_id}.json'
+          result=None
+          for _ in range(60):
+              try:
+                  r=urllib.request.Request(url+f'?t={int(time.time()*1000)}',headers={'User-Agent':'Victor-ENDGAME-Step8-RIO-Result/1.0','Cache-Control':'no-cache'})
+                  with urllib.request.urlopen(r,timeout=20) as response:
+                      if response.status == 200:
+                          candidate=json.loads(response.read().decode())
+                          if candidate.get('task_id') == task_id:
+                              result=candidate; break
+              except Exception:
+                  pass
+              time.sleep(4)
+          assert result is not None, {'status':'RIO_RESULT_TIMEOUT','task_id':task_id}
+          strict=result.get('strict_supervision') or {}
+          evidence=strict.get('evidence') or []
+          checks={
+              'task_correlation': result.get('task_id') == task_id,
+              'sender': result.get('sender') == 'rio',
+              'recipient': result.get('recipient') == 'victor',
+              'task_result': result.get('message_type') == 'TASK_RESULT',
+              'no_public_action': result.get('public_action_performed') is False,
+              'revert_to_victor': strict.get('revert_to_victor') is True,
+              'objective_alignment': bool(strict.get('objective_alignment')),
+              'status': bool(strict.get('status')),
+              'solution': bool(strict.get('solution')),
+              'next_action': bool(strict.get('next_action')),
+              'evidence': isinstance(evidence,list) and len(evidence) > 0,
+          }
+          result_safe={'status':'PASS' if all(checks.values()) else 'FAIL','task_id':task_id,'execution_status':result.get('execution_status'),'strict_status':strict.get('status'),'verification':checks,'evidence_count':len(evidence),'secrets_exposed':False}
+          print('RIO_CERTIFICATION='+json.dumps(result_safe,indent=2))
+          assert all(checks.values()), result_safe
+          PY
