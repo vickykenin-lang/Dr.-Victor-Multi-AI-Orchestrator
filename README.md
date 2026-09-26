@@ -1,5 +1,9 @@
 # Dr. Victor Multi-AI Orchestrator
 
+<p align="center">
+  <img src="assets/victor-mindmap.svg" alt="Dr. Victor Multi-AI Orchestrator Mind Map" width="100%" />
+</p>
+
 **Central manager** · Founder: Vicky · Leader: Dr. Victor
 **Backcheck:** 22 Aug 2026 → see [BACKCHECK_REPORT.md](BACKCHECK_REPORT.md)
 
