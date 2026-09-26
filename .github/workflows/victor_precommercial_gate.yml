@@ -81,9 +81,11 @@ jobs:
           import fs from 'node:fs';
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
-          if (pkg?.devDependencies?.wrangler !== '4.128.0') throw new Error('WRANGLER_VERSION_NOT_EXACTLY_PINNED');
-          if (lock?.packages?.['']?.devDependencies?.wrangler !== '4.128.0') throw new Error('ROOT_LOCK_WRANGLER_MISMATCH');
-          if (lock?.packages?.['node_modules/wrangler']?.version !== '4.128.0') throw new Error('LOCKED_WRANGLER_VERSION_MISMATCH');
+          const expectedWranglerRange = '^4.141.0';
+          const expectedWranglerLocked = '4.141.0';
+          if (pkg?.devDependencies?.wrangler !== expectedWranglerRange) throw new Error('WRANGLER_SECURITY_RANGE_MISMATCH');
+          if (lock?.packages?.['']?.devDependencies?.wrangler !== expectedWranglerRange) throw new Error('ROOT_LOCK_WRANGLER_MISMATCH');
+          if (lock?.packages?.['node_modules/wrangler']?.version !== expectedWranglerLocked) throw new Error('LOCKED_WRANGLER_VERSION_MISMATCH');
           const deploy = String(pkg?.scripts?.deploy || '');
           if (!deploy.includes('wrangler deploy --strict')) throw new Error('STRICT_REMOTE_CONFIG_GUARD_MISSING');
           if (!deploy.includes('VICTOR_DEPLOY_GIT_SHA:$WORKERS_CI_COMMIT_SHA')) throw new Error('DEPLOY_SHA_NOT_INJECTED');
@@ -98,7 +100,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --ignore-scripts --no-audit --no-fund
-          npx --no-install wrangler --version | grep -F '4.128.0'
+          npx --no-install wrangler --version | grep -F '4.141.0'
 
       - name: Guard against emergency source-repair workflows
         run: |
