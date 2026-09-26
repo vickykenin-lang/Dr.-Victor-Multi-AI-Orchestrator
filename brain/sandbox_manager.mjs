@@ -39,8 +39,13 @@ export function createSandboxSpec({ objective_id, action_id, requested_tools = [
     budgets: {
       runtime_seconds: Math.max(1, Math.min(Number(budgets.runtime_seconds || 900), 3600)),
       retry_count: Math.max(0, Math.min(Number(budgets.retry_count ?? 3), 10)),
-      external_calls: Math.max(0, Math.min(Number(budgets.external_calls ?? 25), 200)),
+      cpu_seconds: Math.max(1, Math.min(Number(budgets.cpu_seconds || 300), 1800)),
+      memory_mb: Math.max(64, Math.min(Number(budgets.memory_mb || 512), 4096)),
+      pid_count: Math.max(1, Math.min(Number(budgets.pid_count || 64), 512)),
       storage_mb: Math.max(16, Math.min(Number(budgets.storage_mb || 512), 4096)),
+      network_egress_mb: Math.max(0, Math.min(Number(budgets.network_egress_mb ?? 0), 1024)),
+      external_calls: Math.max(0, Math.min(Number(budgets.external_calls ?? 25), 200)),
+      api_calls: Math.max(0, Math.min(Number(budgets.api_calls ?? 25), 200)),
       spend_units: Math.max(0, Math.min(Number(budgets.spend_units || 0), 1000)),
     },
     evidence_export_required: true,
@@ -67,12 +72,17 @@ export function evaluateSandboxBudget({ spec, usage = {} } = {}) {
   const exceeded = [];
   if (Number(usage.runtime_seconds || 0) > Number(limits.runtime_seconds || 0)) exceeded.push('RUNTIME');
   if (Number(usage.retry_count || 0) > Number(limits.retry_count || 0)) exceeded.push('RETRIES');
-  if (Number(usage.external_calls || 0) > Number(limits.external_calls || 0)) exceeded.push('EXTERNAL_CALLS');
+  if (Number(usage.cpu_seconds || 0) > Number(limits.cpu_seconds || 0)) exceeded.push('CPU');
+  if (Number(usage.memory_mb || 0) > Number(limits.memory_mb || 0)) exceeded.push('MEMORY');
+  if (Number(usage.pid_count || 0) > Number(limits.pid_count || 0)) exceeded.push('PIDS');
   if (Number(usage.storage_mb || 0) > Number(limits.storage_mb || 0)) exceeded.push('STORAGE');
+  if (Number(usage.network_egress_mb || 0) > Number(limits.network_egress_mb || 0)) exceeded.push('NETWORK_EGRESS');
+  if (Number(usage.external_calls || 0) > Number(limits.external_calls || 0)) exceeded.push('EXTERNAL_CALLS');
+  if (Number(usage.api_calls || 0) > Number(limits.api_calls || 0)) exceeded.push('API_CALLS');
   if (Number(usage.spend_units || 0) > Number(limits.spend_units || 0)) exceeded.push('SPEND');
   return exceeded.length
-    ? { allowed: false, safe_hold: true, reason: `SANDBOX_BUDGET_EXCEEDED:${exceeded.join(',')}`, exceeded }
-    : { allowed: true, safe_hold: false, reason: 'WITHIN_SANDBOX_BUDGET', exceeded: [] };
+    ? { allowed: false, safe_hold: true, continuation_allowed: false, reason: `SANDBOX_BUDGET_EXCEEDED:${exceeded.join(',')}`, exceeded }
+    : { allowed: true, safe_hold: false, continuation_allowed: true, reason: 'WITHIN_SANDBOX_BUDGET', exceeded: [] };
 }
 
 export function buildSandboxEvidenceReceipt({ spec, status, evidence_refs = [], notes = [] } = {}) {
