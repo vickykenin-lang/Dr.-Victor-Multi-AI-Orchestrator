@@ -4,8 +4,18 @@ PATH = Path('victor-telegram-worker/autonomy_runtime.mjs')
 text = PATH.read_text(encoding='utf-8')
 original = text
 
+# These markers describe the current/evolved runtime state.  Apply scripts are
+# migrations, so rerunning them against a runtime that has already moved beyond
+# the original replacement text must be a safe no-op rather than a deployment
+# failure.
 ALREADY_APPLIED_MARKERS = {
-    'initial_phase': "const initialPhase = (",
+    'brain_import': "import { shouldRunFiveWhys, reviewOutcome, departmentCapabilityFit } from '../brain/runtime.mjs';",
+    'assessment_root_cause': "rootCause: strict.root_cause || result?.root_cause || null,",
+    'goal_prompt': "export function buildGoalTaskPrompt(goal, phase = 'EXECUTE', runtimeGoal = {})",
+    'department_recommendation': "departmentCapabilityFit('tony_stark', text)",
+    'brain_review_calculation': "const brainReview = reviewOutcome({",
+    'brain_runtime_state': "brain_required_mode: fiveWhysRequired ? 'FIVE_WHYS_BEFORE_NEXT_DISPATCH' : 'NORMAL_EXECUTION'",
+    'initial_phase': "const initialPhase = selection.runtimeGoal?.brain_required_mode",
     'followup_phase': "const followUpPhase = nextRuntimeGoal.brain_required_mode",
     'supervise_prompt': "buildGoalTaskPrompt(selection.goal, phase, selection.runtimeGoal || {})",
 }
