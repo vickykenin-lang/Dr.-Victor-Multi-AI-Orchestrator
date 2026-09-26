@@ -8,6 +8,9 @@ on:
       - 'brain/v2_step1_regression_contract.test.mjs'
       - 'brain/active_context.mjs'
       - 'brain/shadow_autonomy_runtime.mjs'
+      - 'brain/fact_runtime.mjs'
+      - 'brain/fact_runtime.test.mjs'
+      - 'victor-telegram-worker/model_router.mjs'
       - 'brain/security_kernel.mjs'
       - 'brain/security_kernel.test.mjs'
       - '.github/workflows/victor_v2_block2_security_tests.yml'
@@ -32,6 +35,7 @@ jobs:
           node --check brain/founder_intent_gateway.mjs
           node --check brain/active_context.mjs
           node --check brain/shadow_autonomy_runtime.mjs
+          node --check brain/fact_runtime.mjs
           node --check brain/security_kernel.mjs
       - name: Run Block 2 regression pack
-        run: node --test brain/founder_intent_gateway.test.mjs brain/v2_step1_regression_contract.test.mjs brain/security_kernel.test.mjs
+        run: node --test brain/founder_intent_gateway.test.mjs brain/v2_step1_regression_contract.test.mjs brain/fact_runtime.test.mjs brain/security_kernel.test.mjs
