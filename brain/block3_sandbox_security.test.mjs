@@ -4,6 +4,8 @@ import { createSandboxSpec, validateSandboxSpec, evaluateSandboxBudget, buildSan
 import { issueCapabilityLease, validateCapabilityLease, revokeCapabilityLease } from './capability_broker.mjs';
 import { evaluateWatchdog, watchdogOverridesVictor } from './safety_watchdog.mjs';
 
+const HEALTHY_WATCHDOG = { watchdog_available: true, watchdog_healthy: true, heartbeat_age_seconds: 5 };
+
 test('sandbox defaults to disposable, isolated, deny-network and no production credentials', () => {
   const spec = createSandboxSpec({ objective_id: 'OBJ-1', action_id: 'ACT-1' });
   assert.equal(spec.lifecycle, 'DISPOSABLE');
@@ -66,9 +68,10 @@ test('expired, wrong-scope and revoked leases fail closed', () => {
 });
 
 test('watchdog independently forces SAFE_HOLD and overrides Victor continue', () => {
-  const wd = evaluateWatchdog({ credential_or_security_anomaly: true });
+  const wd = evaluateWatchdog({ ...HEALTHY_WATCHDOG, credential_or_security_anomaly: true });
   assert.equal(wd.decision, 'SAFE_HOLD');
   assert.equal(wd.allow_new_execution, false);
+  assert.ok(wd.triggers.includes('CREDENTIAL_SECURITY_ANOMALY'));
   const effective = watchdogOverridesVictor('CONTINUE', wd);
   assert.equal(effective.effective_decision, 'SAFE_HOLD');
   assert.equal(effective.overridden, true);
@@ -76,7 +79,7 @@ test('watchdog independently forces SAFE_HOLD and overrides Victor continue', ()
 });
 
 test('healthy watchdog permits bounded continuation', () => {
-  const wd = evaluateWatchdog({ heartbeat_age_seconds: 5, semantic_no_progress_count: 0, transient_retry_count: 0 });
+  const wd = evaluateWatchdog({ ...HEALTHY_WATCHDOG, semantic_no_progress_count: 0, transient_retry_count: 0 });
   assert.equal(wd.decision, 'CONTINUE_BOUNDED');
   assert.equal(wd.allow_new_execution, true);
 });
