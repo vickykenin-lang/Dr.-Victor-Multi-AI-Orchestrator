@@ -6,7 +6,11 @@ on:
       - 'brain/rollback_contract.mjs'
       - 'brain/promotion_gate.mjs'
       - 'brain/shadow_autonomy_runtime.mjs'
+      - 'brain/safety_watchdog.mjs'
+      - 'brain/action_contract.mjs'
+      - 'brain/conversation_runtime.mjs'
       - 'brain/block4_promotion_shadow.test.mjs'
+      - 'brain/phase_c_shadow_acceptance.test.mjs'
       - '.github/workflows/victor_v2_block4_shadow_promotion_tests.yml'
   workflow_dispatch:
 
@@ -29,5 +33,8 @@ jobs:
           node --check brain/rollback_contract.mjs
           node --check brain/promotion_gate.mjs
           node --check brain/shadow_autonomy_runtime.mjs
-      - name: Run Block 4 regression pack
-        run: node --test brain/block4_promotion_shadow.test.mjs
+          node --check brain/safety_watchdog.mjs
+          node --check brain/action_contract.mjs
+          node --check brain/conversation_runtime.mjs
+      - name: Run Block 4 + Phase-C regression pack
+        run: node --test brain/block4_promotion_shadow.test.mjs brain/phase_c_shadow_acceptance.test.mjs
