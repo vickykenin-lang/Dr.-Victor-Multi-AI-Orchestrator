@@ -1,4 +1,5 @@
 name: Step 9 Branch Protection Readiness
+# Step-9 final closure verification trigger.
 
 on:
   push:
