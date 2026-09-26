@@ -3,6 +3,7 @@ import runpy
 
 RUNTIME = Path('victor-telegram-worker/autonomy_runtime.mjs')
 LEGACY_PATCH = Path('scripts/apply_victor_brain_runtime.py')
+STEP8_CERT_PATCH = Path('scripts/apply_step8_certification_safehold.py')
 
 text = RUNTIME.read_text(encoding='utf-8')
 
@@ -35,3 +36,10 @@ if not missing:
 else:
     print('CONVERGENCE_GUARD_MISSING=' + ','.join(missing))
     runpy.run_path(str(LEGACY_PATCH), run_name='__main__')
+
+# Step 8 department certification is intentionally chained from this canonical
+# convergence entrypoint so the existing Apply Victor Brain Runtime workflow
+# applies the evidence-only SAFE_HOLD exception deterministically.
+if not STEP8_CERT_PATCH.exists():
+    raise SystemExit('STEP8_CERTIFICATION_PATCH_MISSING')
+runpy.run_path(str(STEP8_CERT_PATCH), run_name='__main__')
