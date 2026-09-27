@@ -18,8 +18,10 @@ class ControlRoomLiveEvidenceTests(unittest.TestCase):
 
     def test_live_receipt_has_explicit_boundaries(self):
         boundary = self.live['evidence_boundary']
-        self.assertFalse(boundary['action_contract_instance_verified'])
-        self.assertFalse(boundary['procedure_use_verified'])
+        self.assertTrue(boundary['action_contract_instance_verified'])
+        self.assertTrue(boundary['procedure_use_verified'])
+        self.assertTrue(boundary['memory_engine_read_verified'])
+        self.assertFalse(boundary['memory_engine_write_verified'])
         self.assertFalse(boundary['memory_engine_read_write_verified'])
         self.assertTrue(boundary['department_result_verified'])
         self.assertFalse(boundary['commercial_outcome_upgraded'])
@@ -55,10 +57,30 @@ class ControlRoomLiveEvidenceTests(unittest.TestCase):
             self.assertEqual(authority['allowed_trigger'], 'founder-command')
             self.assertTrue(authority['live_boundary_verified'])
 
-    def test_missing_action_contract_procedure_and_memory_stay_unverified(self):
-        self.assertEqual(self.record['action_contract']['current_instance_status'], 'NOT_VERIFIED')
-        self.assertEqual(self.record['procedure_use']['current_procedure_status'], 'NOT_VERIFIED')
-        self.assertEqual(self.record['memory_state']['current_runtime_read_or_write'], 'NOT_VERIFIED')
+    def test_fresh_runtime_probe_promotes_only_bounded_action_contract_and_procedure(self):
+        f = self.record['live_evidence']['runtime_truth_freshness']
+        if f['state'] == 'FRESH':
+            contract = self.record['action_contract']
+            self.assertEqual(contract['current_instance_status'], 'CURRENT_VERIFIED_DIAGNOSTIC')
+            self.assertEqual(contract['current_instance']['target'], 'internal')
+            self.assertEqual(contract['current_instance']['phase'], 'PLAN')
+            self.assertFalse(contract['current_instance']['mutation_allowed'])
+            self.assertFalse(contract['current_instance']['production_allowed'])
+            self.assertFalse(contract['current_instance']['public_action_allowed'])
+            self.assertNotIn('CURRENT_ACTION_CONTRACT_INSTANCE_NOT_PERSISTED', self.record['truthfulness']['unresolved_surfaces'])
+            procedure = self.record['procedure_use']
+            self.assertEqual(procedure['current_procedure_status'], 'CURRENT_VERIFIED_DIAGNOSTIC')
+            self.assertEqual(procedure['current_procedure_id'], 'founder-status-check-v1')
+            self.assertNotIn('CURRENT_PROCEDURE_USE_NOT_PERSISTED', self.record['truthfulness']['unresolved_surfaces'])
+
+    def test_live_memory_read_is_verified_without_upgrading_write(self):
+        f = self.record['live_evidence']['memory_freshness']
+        if f['state'] == 'FRESH':
+            memory = self.record['memory_state']
+            self.assertEqual(memory['current_runtime_read_or_write'], 'READ_VERIFIED_WRITE_NOT_VERIFIED')
+            self.assertTrue(memory['durable_binding_verified'])
+            self.assertTrue(memory['memory_read_verified'])
+            self.assertFalse(memory['memory_write_verified'])
 
     def test_step14_still_cannot_close(self):
         self.assertFalse(self.record['acceptance']['closure_claimed'])
