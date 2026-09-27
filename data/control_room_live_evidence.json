@@ -1,20 +1,35 @@
 {
   "schema_version": 1,
-  "captured_at_utc": "2026-09-27T04:15:40.259Z",
-  "source": "CLOUDFLARE_RUNTIME_AND_KV_DIRECT_READ",
+  "captured_at_utc": "2026-09-27T04:30:10.968Z",
+  "source": "CLOUDFLARE_RUNTIME_KV_AND_VERIFIED_DEPARTMENT_RESULT_DIRECT_READ",
   "conversation_state": {
     "updated_at_utc": "2026-09-27T04:15:40.259Z",
     "active_topic": "RIO_STATUS_OR_BLOCKER",
     "active_target": "rio",
     "last_task_id": "victor-rio-1790482538790-1467",
     "last_task_type": "STATUS_CHECK",
-    "task_state": "PENDING",
+    "task_state": "RESULT_VERIFIED_EXTERNAL_RECEIPT",
     "active_issue": "uska exact latest status batao; naya duplicate task mat banana.",
-    "current_result_verified": false,
-    "current_result": null
+    "current_result_verified": true,
+    "current_result": {
+      "sender": "rio",
+      "task_id": "victor-rio-1790482538790-1467",
+      "task_type": "STATUS_CHECK",
+      "observed_at_utc": "2026-09-27T04:15:45.920078+00:00",
+      "execution_status": "COMPLETED_READ_ONLY_DIAGNOSTIC",
+      "strict_supervision_status": "REPORTING_CONNECTED_PENDING_VICTOR_CERTIFICATION",
+      "error_or_blocker": null,
+      "requires_follow_up": false,
+      "public_action_performed": false,
+      "credential_transfer_performed": false,
+      "governed_business_cycle_performed": false,
+      "result_repository": "vickykenin-lang/rio-affiliate-engine",
+      "result_commit_sha": "a698e49be57238e3fe5ef1a87de187f58a538009",
+      "result_path": "integration/results/victor_tasks/victor-rio-1790482538790-1467.json"
+    }
   },
   "heartbeat": {
-    "observed_at_utc": "2026-09-27T04:15:11.106Z",
+    "observed_at_utc": "2026-09-27T04:30:10.968Z",
     "status": "PASS",
     "production_action_allowed": false,
     "production_autonomy_enabled": false,
@@ -35,7 +50,7 @@
     "action_contract_instance_verified": false,
     "procedure_use_verified": false,
     "memory_engine_read_write_verified": false,
-    "department_result_verified": false,
+    "department_result_verified": true,
     "commercial_outcome_upgraded": false
   }
 }
