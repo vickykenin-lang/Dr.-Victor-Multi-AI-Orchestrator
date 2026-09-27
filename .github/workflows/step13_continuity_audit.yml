@@ -1,0 +1,83 @@
+name: Step 13 Continuity Audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/step13_continuity_audit.mjs'
+      - 'scripts/step13_continuity_audit.test.mjs'
+      - '.github/workflows/step13_continuity_audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/step13_continuity_audit.mjs'
+      - 'scripts/step13_continuity_audit.test.mjs'
+      - '.github/workflows/step13_continuity_audit.yml'
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  continuity-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+      - name: Verify fail-closed continuity auditor
+        run: node scripts/step13_continuity_audit.test.mjs
+      - name: Collect real Package 6 schedule history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow_id='367303175'
+          page=1
+          printf '{"workflow_runs":[' > /tmp/package6-runs.json
+          first=1
+          while [ "$page" -le 10 ]; do
+            response=$(curl -fsS \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H 'Accept: application/vnd.github+json' \
+              "https://api.github.com/repos/${REPO}/actions/workflows/${workflow_id}/runs?event=schedule&per_page=100&page=${page}")
+            count=$(printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log((JSON.parse(s).workflow_runs||[]).length))")
+            [ "$count" -gt 0 ] || break
+            printf '%s' "$response" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{for(const r of (JSON.parse(s).workflow_runs||[])) console.log(JSON.stringify({id:r.id,event:r.event,created_at:r.created_at,status:r.status,conclusion:r.conclusion,head_sha:r.head_sha}))})" > /tmp/page.ndjson
+            while IFS= read -r line; do
+              if [ "$first" -eq 0 ]; then printf ',' >> /tmp/package6-runs.json; fi
+              printf '%s' "$line" >> /tmp/package6-runs.json
+              first=0
+            done < /tmp/page.ndjson
+            [ "$count" -lt 100 ] && break
+            page=$((page+1))
+          done
+          printf ']}' >> /tmp/package6-runs.json
+          node scripts/step13_continuity_audit.mjs < /tmp/package6-runs.json > /tmp/step13-continuity-report.json
+          cat /tmp/step13-continuity-report.json
+      - name: Enforce no synthetic final PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const r=JSON.parse(fs.readFileSync('/tmp/step13-continuity-report.json','utf8'));
+          if (r.final_step13_pass !== false) throw new Error('STEP13_AUDITOR_MUST_NEVER_AUTO_PASS');
+          if (!['PENDING_WINDOW_MATURITY','MATURITY_REACHED_RECONCILIATION_REQUIRED'].includes(r.decision)) throw new Error(`INVALID_DECISION:${r.decision}`);
+          console.log(JSON.stringify({status:'STEP13_CONTINUITY_EVIDENCE_CAPTURED',decision:r.decision,window_mature:r.window_mature,observed:r.observed_schedule_runs,gaps:r.detected_gaps_over_30_minutes.length,non_success:r.non_success_runs.length,final_step13_pass:r.final_step13_pass}));
+          NODE
+      - name: Upload continuity evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: step13-continuity-${{ github.run_id }}
+          path: /tmp/step13-continuity-report.json
+          retention-days: 30
