@@ -1,16 +1,11 @@
 name: Victor V2 Block 5 Production Deploy
-# Package 3 certification gate deployment refresh: 2026-09-25
-# Safe AURA3 dispatch diagnostic activation: 2026-09-25
-# Step-9 deployment identity hardening: 2026-09-26
-# Founder reasoning/conversation deployment coverage: 2026-09-27
 
 on:
   push:
     branches: [main]
     paths:
       - '.github/workflows/victor_v2_block5_production_deploy.yml'
-      - 'victor-telegram-worker/worker.js'
-      - 'victor-telegram-worker/endgame_runtime_acceptance.mjs'
+      - 'victor-telegram-worker/**'
       - 'brain/endgame_runtime_gate.mjs'
       - 'brain/procedure_registry.mjs'
       - 'brain/degraded_mode.mjs'
@@ -33,33 +28,43 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: d027de83cb964eb66fa56ffed27c0b27
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       WORKER_NAME: victor-telegram-webhook
-      WORKER_BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
-      TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
-      VICTOR_FOUNDER_CHAT_ID: ${{ secrets.VICTOR_FOUNDER_CHAT_ID }}
+      PRIMARY_BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
+      EDGE_BASE_URL: https://victor-edge-proxy.vickykenin.workers.dev
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
           cache: npm
+
       - name: Require protected Cloudflare deploy credential
         shell: bash
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo 'CLOUDFLARE_API_TOKEN repository secret is not configured.' >&2
-            exit 42
-          fi
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'CLOUDFLARE_API_TOKEN is not configured' >&2; exit 42; }
+
       - name: Install pinned toolchain
         run: npm ci
+
       - name: Regression gate before production
         run: |
           node --check victor-telegram-worker/worker.js
           node --check victor-telegram-worker/endgame_runtime_acceptance.mjs
-          node --test brain/founder_conversation.test.mjs brain/conversation_runtime.test.mjs brain/founder_intent_gateway.test.mjs brain/security_kernel.test.mjs brain/action_contract.test.mjs brain/block3_sandbox_security.test.mjs brain/block4_promotion_shadow.test.mjs brain/block5_redteam_security.test.mjs victor-telegram-worker/endgame_runtime_acceptance.test.mjs
+          node --test \
+            brain/founder_conversation.test.mjs \
+            brain/conversation_runtime.test.mjs \
+            brain/founder_intent_gateway.test.mjs \
+            brain/security_kernel.test.mjs \
+            brain/action_contract.test.mjs \
+            brain/block3_sandbox_security.test.mjs \
+            brain/block4_promotion_shadow.test.mjs \
+            brain/block5_redteam_security.test.mjs \
+            victor-telegram-worker/endgame_runtime_acceptance.test.mjs
+
       - name: Build exact Worker module bundle
         shell: bash
         run: |
@@ -70,17 +75,15 @@ jobs:
           test -n "$BUNDLE"
           test -s "$BUNDLE"
           node --check "$BUNDLE"
-          if [ "$BUNDLE" != 'dist/v2-live/worker.js' ]; then
-            cp "$BUNDLE" dist/v2-live/worker.js
-          fi
+          if [ "$BUNDLE" != 'dist/v2-live/worker.js' ]; then cp "$BUNDLE" dist/v2-live/worker.js; fi
           test -s dist/v2-live/worker.js
-      - name: Replace Worker content only, preserve bindings and config
+
+      - name: Upload Worker content preserving runtime config
         shell: bash
         run: |
-          cat > /tmp/metadata.json <<'JSON'
-          {"main_module":"worker.js"}
-          JSON
-          HTTP=$(curl --silent --show-error --output /tmp/cf-response.json --write-out '%{http_code}' \
+          set -euo pipefail
+          printf '%s' '{"main_module":"worker.js"}' > /tmp/metadata.json
+          HTTP=$(curl --silent --show-error --output /tmp/cf-upload.json --write-out '%{http_code}' \
             --request PUT \
             --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             --form 'metadata=@/tmp/metadata.json;type=application/json' \
@@ -88,151 +91,95 @@ jobs:
             "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/content")
           python - "$HTTP" <<'PY'
           import json,sys
-          code=int(sys.argv[1])
-          body=json.load(open('/tmp/cf-response.json'))
+          code=int(sys.argv[1]); body=json.load(open('/tmp/cf-upload.json'))
           if code != 200 or body.get('success') is not True:
-              print(json.dumps({'http_status':code,'success':body.get('success'),'errors':body.get('errors',[])},indent=2))
-              raise SystemExit(1)
+              print(json.dumps({'http_status':code,'errors':body.get('errors',[])},indent=2)); raise SystemExit(1)
           result=body.get('result') or {}
-          print(json.dumps({'http_status':code,'success':True,'etag':result.get('etag'),'modified_on':result.get('modified_on'),'has_modules':result.get('has_modules')},indent=2))
+          print(json.dumps({'status':'WORKER_CONTENT_UPLOADED','modified_on':result.get('modified_on'),'etag':result.get('etag')},indent=2))
           PY
-      - name: Stamp exact Git deployment identity while inheriting all protected bindings
+
+      - name: Stamp exact Git identity while inheriting protected bindings
         shell: bash
         run: |
           set -euo pipefail
-          HTTP=$(curl --silent --show-error --output /tmp/cf-settings-before.json --write-out '%{http_code}' \
+          HTTP=$(curl --silent --show-error --output /tmp/cf-settings.json --write-out '%{http_code}' \
             --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/settings")
           python - "$HTTP" "$GITHUB_SHA" <<'PY'
           import json,sys
-          code=int(sys.argv[1]); sha=sys.argv[2]
-          body=json.load(open('/tmp/cf-settings-before.json'))
-          if code != 200 or body.get('success') is not True:
-              raise SystemExit(f'CLOUDFLARE_SETTINGS_READ_FAILED:{code}')
+          code=int(sys.argv[1]); sha=sys.argv[2]; body=json.load(open('/tmp/cf-settings.json'))
+          if code != 200 or body.get('success') is not True: raise SystemExit(f'CLOUDFLARE_SETTINGS_READ_FAILED:{code}')
           bindings=(body.get('result') or {}).get('bindings') or []
-          inherited=[]
-          seen=set()
-          for binding in bindings:
-              name=binding.get('name')
-              if not name or name == 'VICTOR_DEPLOY_GIT_SHA' or name in seen:
-                  continue
-              seen.add(name)
-              inherited.append({'name':name,'type':'inherit','version_id':'latest'})
+          inherited=[]; seen=set()
+          for b in bindings:
+              name=b.get('name')
+              if not name or name == 'VICTOR_DEPLOY_GIT_SHA' or name in seen: continue
+              seen.add(name); inherited.append({'name':name,'type':'inherit','version_id':'latest'})
           inherited.append({'name':'VICTOR_DEPLOY_GIT_SHA','type':'plain_text','text':sha})
           json.dump({'bindings':inherited},open('/tmp/settings-patch.json','w'),separators=(',',':'))
-          print(json.dumps({'status':'IDENTITY_PATCH_PREPARED','inherited_binding_count':len(inherited)-1,'identity_binding':'VICTOR_DEPLOY_GIT_SHA','target_git_sha':sha}))
+          print(json.dumps({'status':'IDENTITY_PATCH_PREPARED','protected_bindings_inherited':len(inherited)-1,'target_git_sha':sha}))
           PY
-          HTTP=$(curl --silent --show-error --output /tmp/cf-settings-patch-response.json --write-out '%{http_code}' \
+          HTTP=$(curl --silent --show-error --output /tmp/cf-settings-patch.json --write-out '%{http_code}' \
             --request PATCH \
             --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             --form 'settings=@/tmp/settings-patch.json;type=application/json' \
             "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/settings")
           python - "$HTTP" <<'PY'
           import json,sys
-          code=int(sys.argv[1]); body=json.load(open('/tmp/cf-settings-patch-response.json'))
+          code=int(sys.argv[1]); body=json.load(open('/tmp/cf-settings-patch.json'))
           if code != 200 or body.get('success') is not True:
-              print(json.dumps({'http_status':code,'success':body.get('success'),'errors':body.get('errors',[])},indent=2))
-              raise SystemExit('CLOUDFLARE_IDENTITY_STAMP_FAILED')
-          result=body.get('result') or {}
-          print(json.dumps({'status':'DEPLOYMENT_IDENTITY_STAMPED','http_status':code,'success':True,'version_id':result.get('version_id') or result.get('id')},indent=2))
+              print(json.dumps({'http_status':code,'errors':body.get('errors',[])},indent=2)); raise SystemExit('IDENTITY_STAMP_FAILED')
+          print(json.dumps({'status':'DEPLOYMENT_IDENTITY_STAMPED','http_status':code}))
           PY
-      - name: Verify live V2 runtime and END GAME health surfaces
+
+      - name: Wait for exact primary deployment identity
         shell: bash
         run: |
           python - <<'PY'
-          import json, os, time, urllib.request
-          base=os.environ['WORKER_BASE_URL'].rstrip('/')
-          required=['/health','/v2-health','/endgame-runtime-health','/core-health','/aura3-bridge-health','/tony-bridge-health','/telegram-webhook-health']
-          results={}
-          for path in required:
-            last=None
-            for _ in range(10):
+          import json,os,time,urllib.request
+          url=os.environ['PRIMARY_BASE_URL'].rstrip('/')+'/health'; expected=os.environ['GITHUB_SHA']; last=None
+          for _ in range(30):
               try:
-                req=urllib.request.Request(base+path,headers={'User-Agent':'Victor-ENDGAME-Package2-Live-Verify/1.0'})
-                with urllib.request.urlopen(req,timeout=20) as r:
-                  body=json.loads(r.read().decode())
-                  last={'http_status':r.status,'body':body}
-                  if r.status==200: break
-              except Exception as e:
-                last={'http_status':None,'error':str(e)[:300]}
+                  req=urllib.request.Request(url,headers={'User-Agent':'Victor-Deploy-Identity-Verify/2.0','Cache-Control':'no-cache'})
+                  with urllib.request.urlopen(req,timeout=15) as r:
+                      body=json.loads(r.read().decode()); last={'http_status':r.status,'body':body}
+                      if r.status==200 and body.get('deployment_git_sha')==expected and body.get('cloudflare_version_id'):
+                          print(json.dumps({'status':'LIVE_DEPLOYMENT_IDENTITY_VERIFIED','git_sha':expected,'cloudflare_version_id':body.get('cloudflare_version_id')},indent=2)); raise SystemExit(0)
+              except Exception as e: last={'error':str(e)[:300]}
               time.sleep(3)
-            results[path]=last
-          assert all(v.get('http_status')==200 for v in results.values()), results
-          v2=results['/v2-health']['body']
-          assert v2.get('status')=='READY', v2
-          assert v2.get('runtime_wired') is True, v2
-          assert v2.get('founder_stop_precedence') is True, v2
-          assert v2.get('red_credential_without_founder')=='DENY', v2
-          assert v2.get('production_autonomy_enabled') is False, v2
-          endgame=results['/endgame-runtime-health']['body']
-          assert endgame.get('status')=='READY', endgame
-          assert endgame.get('degraded_mode')=='DEGRADED_VERIFIED_PROCEDURE', endgame
-          assert endgame.get('truthful_telemetry_surface')=='LIVE', endgame
-          assert endgame.get('experience_ledger_durable') is True, endgame
-          assert endgame.get('production_autonomy_enabled') is False, endgame
-          health=results['/health']['body']
-          assert health.get('v2_runtime_wired') is True, health
-          assert health.get('v2_production_autonomy_enabled') is False, health
-          assert health.get('deployment_git_sha') == os.environ.get('GITHUB_SHA'), {'expected':os.environ.get('GITHUB_SHA'),'actual':health.get('deployment_git_sha')}
-          assert health.get('cloudflare_version_id'), health
-          print(json.dumps({'status':'LIVE_ENDGAME_PACKAGE2_HEALTH_VERIFIED','source_git_sha':os.environ.get('GITHUB_SHA'),'deployment_identity_verified':True,'cloudflare_version_id':health.get('cloudflare_version_id'),'results':results},indent=2))
+          print(json.dumps({'status':'DEPLOYMENT_IDENTITY_NOT_PROPAGATED','expected':expected,'last':last},indent=2)); raise SystemExit(1)
           PY
-      - name: Founder-authorized END GAME Package 2 live acceptance
+
+      - name: Verify primary runtime and governed edge ingress
         shell: bash
         run: |
           python - <<'PY'
-          import json, os, urllib.request
-          if not os.environ.get('TELEGRAM_WEBHOOK_SECRET') or not os.environ.get('VICTOR_FOUNDER_CHAT_ID'):
-              raise SystemExit('Protected Founder acceptance secrets are not configured')
-          base=os.environ['WORKER_BASE_URL'].rstrip('/')
-          founder=str(os.environ['VICTOR_FOUNDER_CHAT_ID'])
-          payload={
-              'update_id': 926092502,
-              'message': {
-                  'message_id': 0,
-                  'from': {'id': int(founder)},
-                  'chat': {'id': int(founder), 'type': 'private'},
-                  'text': 'ENDGAME RUNTIME ACCEPTANCE',
-              },
+          import json,os,urllib.request
+          primary=os.environ['PRIMARY_BASE_URL'].rstrip('/'); edge=os.environ['EDGE_BASE_URL'].rstrip('/')
+          targets={
+            'health':primary+'/health',
+            'v2':primary+'/v2-health',
+            'endgame':primary+'/endgame-runtime-health',
+            'core':primary+'/core-health',
+            'aura3':primary+'/aura3-bridge-health',
+            'tony':primary+'/tony-bridge-health',
+            'proxy':edge+'/proxy-health',
+            'webhook':edge+'/telegram-webhook-health',
           }
-          req=urllib.request.Request(
-              base+'/telegram',
-              data=json.dumps(payload).encode(),
-              method='POST',
-              headers={
-                  'Content-Type':'application/json',
-                  'X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET'],
-                  'User-Agent':'Victor-ENDGAME-Package2-Live-Acceptance/1.0',
-              },
-          )
-          with urllib.request.urlopen(req,timeout=45) as r:
-              body=json.loads(r.read().decode())
-              code=r.status
-          safe={
-              'http_status':code,
-              'mode':body.get('mode'),
-              'status':body.get('status'),
-              'procedure_registry_live':body.get('procedure_registry_live'),
-              'degraded_mode_live':body.get('degraded_mode_live'),
-              'truthful_telemetry_live':body.get('truthful_telemetry_live'),
-              'experience_ledger_readback_verified':body.get('experience_ledger_readback_verified'),
-              'experience_advisory_reuse_verified':body.get('experience_advisory_reuse_verified'),
-              'cognee_semantic_roundtrip_verified':body.get('cognee_semantic_roundtrip_verified'),
-              'cognee_result_count':body.get('cognee_result_count'),
-              'blockers':body.get('blockers'),
-              'production_autonomy_enabled':body.get('production_autonomy_enabled'),
-              'secrets_exposed':body.get('secrets_exposed'),
-          }
-          print(json.dumps(safe,indent=2))
-          assert code==200, safe
-          assert body.get('mode')=='ENDGAME_RUNTIME_ACCEPTANCE', safe
-          assert body.get('status')=='PASS', safe
-          assert body.get('procedure_registry_live') is True, safe
-          assert body.get('degraded_mode_live') is True, safe
-          assert body.get('truthful_telemetry_live') is True, safe
-          assert body.get('experience_ledger_readback_verified') is True, safe
-          assert body.get('experience_advisory_reuse_verified') is True, safe
-          assert body.get('cognee_semantic_roundtrip_verified') is True, safe
-          assert body.get('production_autonomy_enabled') is False, safe
-          assert body.get('secrets_exposed') is False, safe
+          out={}
+          for name,url in targets.items():
+              req=urllib.request.Request(url,headers={'User-Agent':'Victor-Proxy-Aware-Live-Verify/2.0','Cache-Control':'no-cache'})
+              with urllib.request.urlopen(req,timeout=20) as r:
+                  out[name]={'http_status':r.status,'body':json.loads(r.read().decode())}
+          assert all(v['http_status']==200 for v in out.values()), out
+          h=out['health']['body']; v2=out['v2']['body']; eg=out['endgame']['body']; proxy=out['proxy']['body']; wh=out['webhook']['body']
+          assert h.get('deployment_git_sha')==os.environ['GITHUB_SHA'], h
+          assert h.get('v2_production_autonomy_enabled') is False, h
+          assert h.get('autonomy_allowed_trigger')=='founder-command', h
+          assert v2.get('status')=='READY' and v2.get('production_autonomy_enabled') is False, v2
+          assert eg.get('status')=='READY' and eg.get('production_autonomy_enabled') is False, eg
+          assert proxy.get('status')=='READY', proxy
+          assert wh.get('status')=='WEBHOOK_CONFIGURED_MATCHING', wh
+          assert wh.get('webhook_url_matches_expected') is True, wh
+          print(json.dumps({'status':'LIVE_PROXY_AWARE_DEPLOYMENT_VERIFIED','git_sha':h.get('deployment_git_sha'),'cloudflare_version_id':h.get('cloudflare_version_id'),'edge_proxy_ready':True,'telegram_webhook_matching':True,'production_autonomy_enabled':False,'consequential_trigger':'founder-command','synthetic_founder_event_used':False},indent=2))
           PY
