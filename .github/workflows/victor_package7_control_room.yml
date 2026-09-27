@@ -7,6 +7,19 @@ on:
       - 'scripts/build_control_room_snapshot.py'
       - 'tests/test_control_room_snapshot.py'
       - 'data/*.json'
+      - 'memory/**'
+      - 'brain/action_contract.mjs'
+      - 'brain/procedure_registry.mjs'
+      - '.github/workflows/victor_package7_control_room.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/build_control_room_snapshot.py'
+      - 'tests/test_control_room_snapshot.py'
+      - 'data/*.json'
+      - 'memory/**'
+      - 'brain/action_contract.mjs'
+      - 'brain/procedure_registry.mjs'
       - '.github/workflows/victor_package7_control_room.yml'
   workflow_dispatch:
 
