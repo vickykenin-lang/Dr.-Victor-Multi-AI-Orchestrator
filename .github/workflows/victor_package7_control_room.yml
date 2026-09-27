@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - 'scripts/build_control_room_snapshot.py'
+      - 'scripts/apply_control_room_live_evidence.py'
       - 'tests/test_control_room_snapshot.py'
+      - 'tests/test_control_room_live_evidence.py'
       - 'data/*.json'
       - 'memory/**'
       - 'brain/action_contract.mjs'
@@ -15,7 +17,9 @@ on:
     branches: [main]
     paths:
       - 'scripts/build_control_room_snapshot.py'
+      - 'scripts/apply_control_room_live_evidence.py'
       - 'tests/test_control_room_snapshot.py'
+      - 'tests/test_control_room_live_evidence.py'
       - 'data/*.json'
       - 'memory/**'
       - 'brain/action_contract.mjs'
@@ -36,13 +40,19 @@ jobs:
           persist-credentials: false
       - name: Build canonical control room snapshot
         run: python3 scripts/build_control_room_snapshot.py
-      - name: Verify truth boundaries
+      - name: Verify canonical truth boundaries before live overlay
         run: python3 -m unittest tests/test_control_room_snapshot.py
+      - name: Apply bounded live observability evidence
+        run: python3 scripts/apply_control_room_live_evidence.py
+      - name: Verify live evidence truth boundaries
+        run: python3 -m unittest tests/test_control_room_live_evidence.py
       - name: Verify Founder dashboard contract
         run: python3 -m unittest tests/test_founder_dashboard.py
-      - name: Upload snapshot evidence
+      - name: Upload snapshot and live evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: victor-control-room-${{ github.run_id }}
-          path: data/control_room_snapshot.json
+          path: |
+            data/control_room_snapshot.json
+            data/control_room_live_evidence.json
           retention-days: 30
