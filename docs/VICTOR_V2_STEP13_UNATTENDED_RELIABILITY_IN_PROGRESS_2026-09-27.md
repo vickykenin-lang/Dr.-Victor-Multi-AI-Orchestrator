@@ -38,6 +38,23 @@ The current Package 6 workflow:
 
 The Package 6 state and certification records explicitly keep final certification pending until the seven-day history is audited.
 
+### Step 13 bounded failure/recovery mechanism acceptance
+
+PR `#102` added the fail-closed mechanism layer and was merged to main at commit `1232f9e8ba92609a5ebd73f3fe1168e9e2affe03`.
+
+Acceptance workflow `Step 13 Unattended Reliability Mechanisms`, run `36283699356`, completed successfully. The passing checks verify:
+
+- transient failure enters bounded retry with finite retry budget and backoff;
+- retry-budget exhaustion produces a dead-letter record rather than automatic production replay;
+- dead-letter records are frozen evidence objects requiring governed review;
+- an unexpired lease keeps its owner, an expired lease can only perform bounded reassignment to a distinct candidate, and an expired lease without a candidate fails to `SAFE_HOLD`;
+- restart recovery only restores a valid recent checkpoint; missing, invalid, or stale checkpoints fail to `SAFE_HOLD`;
+- production incident signals enter `SAFE_HOLD` and do not permit automatic production recovery;
+- the consequential execution trigger remains `founder-command`;
+- the mechanism layer contains no `production_action_allowed: true`, automatic production replay, or automatic production recovery path.
+
+This is **mechanism acceptance evidence**, not proof that such events occurred naturally during every part of the 168-hour unattended window.
+
 ### Existing earlier mechanism acceptances that remain relevant but do not replace the 168h window
 
 - Resource/budget ceiling exhaustion acceptance: closed earlier under Step 5.
@@ -67,13 +84,13 @@ This proves unattended schedule-triggered execution exists, but the sampled evid
 | Watchdog / stale-signal SAFE_HOLD | EVIDENCED MECHANISM | Scheduled drill + earlier Step 6 |
 | GREEN-only bounded recovery | EVIDENCED MECHANISM | Package 6 workflow |
 | Production autonomy stays disabled | EVIDENCED CURRENT CONTROL | Package 6 assertions |
-| Founder-command consequential boundary | EVIDENCED CURRENT CONTROL | Package 6 assertions |
+| Founder-command consequential boundary | EVIDENCED CURRENT CONTROL | Package 6 assertions + Step 13 mechanism acceptance |
 | Budget ceilings hold | SUPPORTING MECHANISM EVIDENCE | Earlier Step 5; window-wide audit still required |
-| Retry recovers transient failure | PENDING WINDOW EVIDENCE | Must be evidenced by fault/recovery event or bounded acceptance evidence retained for Step 13 |
-| Dead-letter recovery event captured | NOT YET EVIDENCED FOR STEP 13 | Repository search at Step 13 entry found no direct `dead_letter` match; do not infer coverage |
-| Lease expiry/reassignment | NOT YET EVIDENCED FOR STEP 13 | Repository search at Step 13 entry found no direct `lease` match; do not infer coverage |
-| State survives restart | SUPPORTING MECHANISM EVIDENCE / WINDOW PROOF PENDING | Must retain restart/persistence evidence relevant to this certification |
-| Production incident response works | PENDING WINDOW EVIDENCE | Must be demonstrated without expanding unattended authority |
+| Retry recovers transient failure | EVIDENCED MECHANISM | Step 13 mechanism workflow run `36283699356`; natural window event still not required to be inferred |
+| Dead-letter recovery event captured | EVIDENCED MECHANISM | Dead-letter record creation and no automatic production replay verified in run `36283699356` |
+| Lease expiry/reassignment | EVIDENCED MECHANISM | Active lease, expired bounded reassignment, and no-candidate SAFE_HOLD verified in run `36283699356` |
+| State survives restart | EVIDENCED MECHANISM / WINDOW CONTINUITY PENDING | Valid recent checkpoint restore + stale/missing fail-closed verified; full window continuity still pending |
+| Production incident response works | EVIDENCED MECHANISM | Incident enters SAFE_HOLD with automatic production recovery disabled |
 | No manual babysitting required | PENDING | Requires complete schedule history over full window |
 | Evidence retained across window | PENDING | Must be audited at maturity |
 
