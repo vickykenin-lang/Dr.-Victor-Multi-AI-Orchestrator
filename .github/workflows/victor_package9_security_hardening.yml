@@ -4,6 +4,7 @@ name: Victor Package 9 Security Hardening
 # Step-11 closure re-verification trigger.
 # Step-12 closure re-verification trigger.
 # Step-13 in-progress governance verification trigger.
+# Step-13 mechanism evidence receipt verification trigger.
 
 on:
   push:
