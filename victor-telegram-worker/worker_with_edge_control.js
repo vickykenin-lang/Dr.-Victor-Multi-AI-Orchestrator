@@ -2,6 +2,7 @@ import primaryWorker, { isAuthorizedFounderMessage } from './worker.js';
 import { applyEdgeProxyControl, parseEdgeProxyControlCommand } from './edge_proxy_control.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
+const TELEGRAM_PRIMARY_DEADLINE_MS = 40_000;
 
 function constantTimeEqual(a, b) {
   const left = new TextEncoder().encode(String(a || ''));
@@ -37,6 +38,48 @@ function json(body, status = 200) {
   });
 }
 
+async function runPrimaryWithTelegramDeadline(request, env, ctx, message = null) {
+  let timer;
+  const deadline = new Promise(resolve => {
+    timer = setTimeout(async () => {
+      const chatId = String(message?.chat?.id ?? '');
+      const senderId = String(message?.from?.id ?? '');
+      if (message && isAuthorizedFounderMessage(env, chatId, senderId)) {
+        await acknowledge(
+          env,
+          chatId,
+          message?.message_id,
+          'Victor ne request receive kar li, lekin processing Telegram response window ke andar complete nahi hui. Koi action completed claim nahi kiya gaya. Main silent retry loop me nahi jaunga.',
+        );
+      }
+      console.warn(JSON.stringify({
+        event: 'VICTOR_TELEGRAM_PRIMARY_DEADLINE',
+        deadline_ms: TELEGRAM_PRIMARY_DEADLINE_MS,
+        message_id: message?.message_id || null,
+        founder_authorized: Boolean(message && isAuthorizedFounderMessage(env, chatId, senderId)),
+        secrets_exposed: false,
+      }));
+      resolve(json({
+        ok: true,
+        mode: 'TELEGRAM_PROCESSING_DEADLINE',
+        status: 'PROCESSING_NOT_COMPLETED_WITHIN_RESPONSE_WINDOW',
+        action_completed_claimed: false,
+        telegram_retry_suppressed: true,
+        secrets_exposed: false,
+      }, 200));
+    }, TELEGRAM_PRIMARY_DEADLINE_MS);
+  });
+
+  try {
+    return await Promise.race([
+      primaryWorker.fetch(request, env, ctx),
+      deadline,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default {
   scheduled(controller, env, ctx) {
     return primaryWorker.scheduled(controller, env, ctx);
@@ -44,6 +87,7 @@ export default {
 
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    let parsedTelegramMessage = null;
 
     if (request.method === 'POST' && url.pathname === '/telegram' && env?.TELEGRAM_WEBHOOK_SECRET) {
       const supplied = request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
@@ -51,6 +95,7 @@ export default {
         try {
           const update = await request.clone().json();
           const message = update?.message;
+          parsedTelegramMessage = message || null;
           const command = parseEdgeProxyControlCommand(message?.text || '');
           const chatId = String(message?.chat?.id ?? '');
           const senderId = String(message?.from?.id ?? '');
@@ -84,8 +129,12 @@ export default {
       }
     }
 
+    if (request.method === 'POST' && url.pathname === '/telegram') {
+      return runPrimaryWithTelegramDeadline(request, env, ctx, parsedTelegramMessage);
+    }
+
     return primaryWorker.fetch(request, env, ctx);
   },
 };
 
-export { constantTimeEqual };
+export { constantTimeEqual, runPrimaryWithTelegramDeadline, TELEGRAM_PRIMARY_DEADLINE_MS };
