@@ -3,6 +3,7 @@ name: Step 9 Branch Protection Readiness
 # Step-10 closure re-verification trigger.
 # Step-11 closure re-verification trigger.
 # Step-12 closure re-verification trigger.
+# Step-13 in-progress governance verification trigger.
 
 on:
   push:
