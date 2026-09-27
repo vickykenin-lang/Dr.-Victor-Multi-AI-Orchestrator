@@ -1,0 +1,36 @@
+name: Victor Edge Reverse Proxy
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'workers/victor-edge-proxy/**'
+      - '.github/workflows/victor_edge_proxy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  edge-proxy-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Run edge proxy tests
+        run: node --test workers/victor-edge-proxy/worker.test.mjs
+      - name: Verify fail-closed boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'CLOUDFLARE_SERVICE_BINDING' workers/victor-edge-proxy/worker.js
+          grep -q 'WEBHOOK_SECRET_HEADER_REQUIRED' workers/victor-edge-proxy/worker.js
+          grep -q 'UPSTREAM_UNAVAILABLE' workers/victor-edge-proxy/worker.js
+          grep -q 'production_autonomy_changed: false' workers/victor-edge-proxy/worker.js
+          ! grep -RInE 'TELEGRAM_(BOT_TOKEN|WEBHOOK_SECRET)[[:space:]]*=' workers/victor-edge-proxy
+          echo EDGE_PROXY_SECURITY_BOUNDARY_PASS
