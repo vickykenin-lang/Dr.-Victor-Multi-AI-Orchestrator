@@ -1,42 +1,42 @@
 {
-  "schema_version": 1,
-  "updated_at_utc": "2026-09-25T16:13:34Z",
-  "purpose": "Define current operational status sources and prevent stale historical receipts from overriding later verified evidence.",
+  "schema_version": 2,
+  "updated_at_utc": "2026-09-27T11:01:00Z",
+  "purpose": "Define current operational status sources and prevent stale historical receipts or superseded summaries from overriding later verified evidence.",
   "precedence": [
     {
       "rank": 1,
-      "domain": "V2_CURRENT_RUNTIME_CUTOVER",
-      "source": "data/v2_block5_final_status.json",
-      "status": "CURRENT_VERIFIED",
-      "rule": "Controls current V2 runtime cutover, autonomy posture, sandbox and rollback verification state."
+      "domain": "POST_ENDGAME_CURRENT_CANONICAL_STATE",
+      "source": "data/post_endgame_current_status.json",
+      "status": "CURRENT_CANONICAL",
+      "rule": "Controls current Victor technical baseline, authority posture, closed capability state, and explicit non-blocking carry-forwards after post-END-GAME reconciliation."
     },
     {
       "rank": 2,
-      "domain": "V2_LIVE_RUNTIME_EVIDENCE",
-      "source": "data/v2_live_runtime_evidence.json",
-      "status": "CURRENT_VERIFIED",
-      "rule": "Fresh live endpoint evidence controls observed runtime facts."
+      "domain": "FRESH_LIVE_RUNTIME_EVIDENCE",
+      "source": "production runtime evidence and current Cloudflare deployment metadata",
+      "status": "CURRENT_VERIFIED_WHEN_FRESH",
+      "rule": "Fresh independently verified runtime evidence controls observed live facts and may supersede stale repository summaries without rewriting historical receipts."
     },
     {
       "rank": 3,
-      "domain": "V2_EXECUTION_SUMMARY",
-      "source": "data/victor_v2_execution_status.json",
-      "status": "RECONCILED_CURRENT",
-      "rule": "Summary must agree with later Block 5 closure evidence and may not resurrect earlier blockers."
-    },
-    {
-      "rank": 4,
       "domain": "AUTONOMY_AUTHORITY",
       "source": "data/autonomy_state.json",
       "status": "RECONCILED_CURRENT",
-      "rule": "Current authority is production autonomy OFF, scheduler unbound, Founder-command-only. Historical scheduler evidence is history only."
+      "rule": "Current authority remains production autonomy OFF, scheduler unbound, Founder-command-only for consequential execution; bounded GREEN read/sandbox autonomy is separately verified."
     },
     {
-      "rank": 5,
+      "rank": 4,
       "domain": "BUSINESS_OUTCOME",
       "source": "data/revenue_outcomes.json",
       "status": "CANONICAL_CURRENT",
-      "rule": "Only independently verified revenue/payment events count as business outcome."
+      "rule": "Only independently verified revenue/payment events count as business outcome; absence of revenue does not invalidate technical completion."
+    },
+    {
+      "rank": 5,
+      "domain": "V2_HISTORICAL_CUTOVER_EVIDENCE",
+      "source": "data/v2_block5_final_status.json",
+      "status": "HISTORICAL_VERIFIED_AT_OBSERVATION_TIME",
+      "rule": "Preserves the 2026-09-25 V2 cutover observation only. Its carry-forward list is not current authority or current security status after later closures."
     }
   ],
   "historical_only_sources": [
@@ -46,14 +46,20 @@
     },
     {
       "source": "docs/VICTOR_V2_BLOCK5_REDTEAM_CUTOVER_AUDIT_2026-09-25.md",
-      "reason": "Historical pre-closure audit; later final closure audit supersedes its cutover-blocked observation for current-state reporting."
+      "reason": "Historical pre-closure audit; later final closure evidence supersedes its blocked observations for current-state reporting."
+    },
+    {
+      "source": "data/v2_block5_final_status.json carry_forward",
+      "reason": "Historical cutover-time carry-forwards including branch protection and supply-chain findings were superseded by later verified security hardening."
     }
   ],
   "hard_rules": [
     "NO_EARLIER_STAGE_IMPLIES_A_LATER_STAGE",
     "FRESH_VERIFIED_RUNTIME_EVIDENCE_OVERRIDES_STALE_STATUS_SUMMARIES",
+    "POST_ENDGAME_CURRENT_CANONICAL_STATE_OVERRIDES_PRE_CLOSURE_SUMMARIES_FOR_CURRENT_REPORTING",
     "HISTORICAL_RECEIPTS_REMAIN_IMMUTABLE_HISTORY",
     "HISTORICAL_AUTONOMY_EVIDENCE_DOES_NOT_GRANT_CURRENT_AUTHORITY",
-    "MISSING_EVIDENCE_IS_UNKNOWN_NOT_SUCCESS"
+    "MISSING_EVIDENCE_IS_UNKNOWN_NOT_SUCCESS",
+    "BUSINESS_OUTCOME_DOES_NOT_DEFINE_TECHNICAL_COMPLETENESS"
   ]
 }
