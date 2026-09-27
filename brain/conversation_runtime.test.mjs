@@ -15,6 +15,13 @@ test('task status follow-up does not create a new task intent', () => {
   assert.equal(result.task_id, 'victor-rio-123');
 });
 
+test('Founder task-detail question binds to persisted task instead of generic pending response', () => {
+  const result = classifyConversationFollowUp('Detail me batao kya shuru kiya hai', { last_target: 'aura3', last_task_id: 'victor-aura3-123' });
+  assert.equal(result.mode, 'TASK_DETAIL_FOLLOWUP');
+  assert.equal(result.target, 'aura3');
+  assert.equal(result.task_id, 'victor-aura3-123');
+});
+
 test('contextual next step binds to active RIO task', () => {
   const result = classifyConversationFollowUp('to ab kya karna chahiye?', { last_target: 'rio', last_task_id: 'victor-rio-123' });
   assert.equal(result.mode, 'CONTEXTUAL_NEXT_STEP');
@@ -66,6 +73,18 @@ test('follow-up without recent context remains unresolved', () => {
   assert.equal(result.mode, null);
 });
 
-test('pending task message explicitly prevents duplicate dispatch', () => {
-  assert.match(formatPendingTaskStatus({ last_target: 'rio', last_task_id: 'task-1' }), /naya duplicate task dispatch nahi karega/i);
+test('pending task message exposes persisted truth and forbids false completion/background tracking', () => {
+  const reply = formatPendingTaskStatus({
+    last_target: 'aura3',
+    last_task_id: 'task-1',
+    last_task_type: 'STATUS_CHECK',
+    task_state: 'PENDING',
+    last_founder_text: 'Aura 3 ko bhi check karo',
+  });
+  assert.match(reply, /PENDING/);
+  assert.match(reply, /STATUS_CHECK/);
+  assert.match(reply, /task-1/);
+  assert.match(reply, /Aura 3 ko bhi check karo/);
+  assert.match(reply, /RESULT_RECEIVED\/COMPLETED claim nahi hoga/i);
+  assert.match(reply, /background tracking promise/i);
 });
