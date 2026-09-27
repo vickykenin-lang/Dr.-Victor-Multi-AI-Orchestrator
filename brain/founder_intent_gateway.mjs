@@ -8,6 +8,15 @@ export const FOUNDER_INTENT = Object.freeze({
   SYSTEM_TEST: 'SYSTEM_TEST',
 });
 
+export const TEMPORARY_LLM_AUTHORITY = Object.freeze({
+  version: 'VICTOR_BEDROCK_INTENT_AUTHORITY_V1',
+  starts_at_utc: '2026-09-27T16:09:00.000Z',
+  ends_at_utc: '2026-10-27T16:09:00.000Z',
+  extension_requires_explicit_founder_approval: true,
+  authority_scope: 'FOUNDER_NATURAL_IMPERATIVE_INTENT_ROUTING',
+  never_expands_red_or_security_authority: true,
+});
+
 export function normalizeFounderText(value) {
   return String(value || '')
     .toLowerCase()
@@ -23,6 +32,24 @@ function targetFromText(text = '') {
   if (/\baura3\b/i.test(text)) return 'aura3';
   if (/\bvictor\b/i.test(text)) return 'victor';
   return null;
+}
+
+export function temporaryLlmAuthorityStatus(nowValue = Date.now()) {
+  const now = Number.isFinite(Number(nowValue)) ? Number(nowValue) : Date.now();
+  const start = Date.parse(TEMPORARY_LLM_AUTHORITY.starts_at_utc);
+  const end = Date.parse(TEMPORARY_LLM_AUTHORITY.ends_at_utc);
+  return {
+    ...TEMPORARY_LLM_AUTHORITY,
+    active: now >= start && now < end,
+    expired: now >= end,
+    starts_at_epoch_ms: start,
+    ends_at_epoch_ms: end,
+  };
+}
+
+function isNaturalFounderImperative(value = '') {
+  return /(?:^|\s)(?:remind|reminder|schedule|set|send|bhejo|bhej\s+do|bhej\s+dena|kar\s+do|kar\s+dena|karva\s+do|karva\s+dena|karo|check|check\s+karo|dekho|dekh\s+lo|dekh\s+lena|batao|search|find|read|note|save|continue|resume|chalu\s+karo|shuru\s+karo)(?:\s|$)/i.test(value)
+    || /(?:kar|karva|bhej|dekh)\s+(?:do|dena|lena)$/i.test(value);
 }
 
 export function classifyFounderIntent(text, context = {}) {
@@ -100,12 +127,32 @@ export function classifyFounderIntent(text, context = {}) {
     };
   }
 
+  // Temporary Founder-authorized Bedrock learning window.
+  // The existing Bedrock planner remains responsible for semantic mode/target selection.
+  // This gate only stops rejecting natural Founder imperatives because they omit a narrow
+  // hard-coded execution verb. It does not expand RED/security/credential authority.
+  const authority = temporaryLlmAuthorityStatus(context?.now_utc ?? Date.now());
+  if (authority.active && isNaturalFounderImperative(value)) {
+    return {
+      intent: FOUNDER_INTENT.EXECUTION_COMMAND,
+      target,
+      execution_allowed: true,
+      requires_deterministic_stop: false,
+      reason: 'TEMPORARY_BEDROCK_AUTHORITY_NATURAL_IMPERATIVE',
+      temporary_llm_authority: true,
+      temporary_llm_authority_ends_at_utc: authority.ends_at_utc,
+      extension_requires_explicit_founder_approval: true,
+    };
+  }
+
   return {
     intent: FOUNDER_INTENT.CHAT,
     target,
     execution_allowed: false,
     requires_deterministic_stop: false,
-    reason: 'DEFAULT_CONVERSATIONAL_FAIL_CLOSED',
+    reason: authority.expired
+      ? 'TEMPORARY_BEDROCK_AUTHORITY_EXPIRED_EXTENSION_REQUIRES_FOUNDER_APPROVAL'
+      : 'DEFAULT_CONVERSATIONAL_FAIL_CLOSED',
   };
 }
 
