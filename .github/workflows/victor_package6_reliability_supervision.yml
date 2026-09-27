@@ -6,6 +6,7 @@ on:
     paths:
       - 'brain/reliability_supervisor.mjs'
       - 'brain/reliability_supervisor.test.mjs'
+      - 'workers/victor-reliability-heartbeat/**'
       - '.github/workflows/victor_package6_reliability_supervision.yml'
   schedule:
     - cron: '*/15 * * * *'
@@ -30,14 +31,21 @@ jobs:
         with:
           node-version: '20'
       - name: Validate supervisor fail-closed behavior
-        run: node brain/reliability_supervisor.test.mjs
-      - name: Probe live Victor surfaces
+        run: |
+          node brain/reliability_supervisor.test.mjs
+          node workers/victor-reliability-heartbeat/worker.test.mjs
+      - name: Probe live Victor runtime and governed edge ingress
         shell: bash
         run: |
           set -euo pipefail
-          BASE='https://victor-telegram-webhook.vickykenin.workers.dev'
-          for p in health v2-health endgame-runtime-health core-health aura3-bridge-health tony-bridge-health telegram-webhook-health; do
-            code=$(curl -sS -o "/tmp/${p}.json" -w '%{http_code}' -A 'Victor-Package6-Reliability/1.0' "${BASE}/${p}")
+          PRIMARY='https://victor-telegram-webhook.vickykenin.workers.dev'
+          EDGE='https://victor-edge-proxy.vickykenin.workers.dev'
+          for p in health v2-health endgame-runtime-health core-health aura3-bridge-health tony-bridge-health; do
+            code=$(curl -sS -o "/tmp/${p}.json" -w '%{http_code}' -A 'Victor-Package6-Reliability/2.0' "${PRIMARY}/${p}")
+            test "$code" = '200'
+          done
+          for p in proxy-health telegram-webhook-health; do
+            code=$(curl -sS -o "/tmp/${p}.json" -w '%{http_code}' -A 'Victor-Package6-Reliability/2.0' "${EDGE}/${p}")
             test "$code" = '200'
           done
           node - <<'NODE'
@@ -45,14 +53,19 @@ jobs:
           const health = JSON.parse(fs.readFileSync('/tmp/health.json','utf8'));
           const v2 = JSON.parse(fs.readFileSync('/tmp/v2-health.json','utf8'));
           const endgame = JSON.parse(fs.readFileSync('/tmp/endgame-runtime-health.json','utf8'));
-          const ready = health.status === 'READY' && v2.status === 'READY' && endgame.status === 'READY';
-          if (!ready) throw new Error('LIVE_RUNTIME_NOT_READY');
+          const proxy = JSON.parse(fs.readFileSync('/tmp/proxy-health.json','utf8'));
+          const webhook = JSON.parse(fs.readFileSync('/tmp/telegram-webhook-health.json','utf8'));
+          const ready = health.status === 'READY' && v2.status === 'READY' && endgame.status === 'READY' && proxy.status === 'READY';
+          if (!ready) throw new Error('LIVE_RUNTIME_OR_EDGE_NOT_READY');
+          if (webhook.status !== 'WEBHOOK_CONFIGURED_MATCHING' || webhook.webhook_url_matches_expected !== true) {
+            throw new Error('GOVERNED_EDGE_WEBHOOK_NOT_MATCHING');
+          }
           if (health.v2_production_autonomy_enabled === true || v2.production_autonomy_enabled === true || endgame.production_autonomy_enabled === true) {
             throw new Error('PRODUCTION_AUTONOMY_BOUNDARY_CHANGED');
           }
           const trigger = health.autonomy_allowed_trigger || 'founder-command';
           if (trigger !== 'founder-command') throw new Error(`TRIGGER_BOUNDARY_CHANGED:${trigger}`);
-          console.log(JSON.stringify({status:'LIVE_SUPERVISION_SIGNAL_PASS',production_autonomy_enabled:false,consequential_execution_trigger:'founder-command',secrets_exposed:false}));
+          console.log(JSON.stringify({status:'LIVE_SUPERVISION_SIGNAL_PASS',edge_proxy_ready:true,webhook_ingress_matching:true,production_autonomy_enabled:false,consequential_execution_trigger:'founder-command',historical_168h_certification:'FOUNDER_SKIPPED_NOT_CERTIFIED',secrets_exposed:false}));
           NODE
       - name: Exercise stale signal SAFE_HOLD drill
         run: |
