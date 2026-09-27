@@ -21,7 +21,7 @@ class ControlRoomLiveEvidenceTests(unittest.TestCase):
         self.assertFalse(boundary['action_contract_instance_verified'])
         self.assertFalse(boundary['procedure_use_verified'])
         self.assertFalse(boundary['memory_engine_read_write_verified'])
-        self.assertFalse(boundary['department_result_verified'])
+        self.assertTrue(boundary['department_result_verified'])
         self.assertFalse(boundary['commercial_outcome_upgraded'])
 
     def test_fresh_live_dispatch_overlays_historical_repository_state(self):
@@ -33,13 +33,16 @@ class ControlRoomLiveEvidenceTests(unittest.TestCase):
             self.assertEqual(dispatch['task_id'], 'victor-rio-1790482538790-1467')
             self.assertNotIn('CURRENT_DEPARTMENT_DISPATCH_NOT_VERIFIED', self.record['truthfulness']['unresolved_surfaces'])
 
-    def test_pending_dispatch_does_not_become_verified_result(self):
+    def test_verified_external_result_is_promoted_only_when_explicitly_verified(self):
         result = self.record['department_execution']['result']
         if self.record['live_evidence']['conversation_state_freshness']['state'] == 'FRESH':
-            self.assertEqual(result['status'], 'NOT_VERIFIED')
-            self.assertFalse(result['verified'])
-            self.assertIsNone(result['result'])
-            self.assertIn('CURRENT_DEPARTMENT_RESULT_NOT_VERIFIED', self.record['truthfulness']['unresolved_surfaces'])
+            self.assertEqual(result['status'], 'CURRENT')
+            self.assertTrue(result['verified'])
+            self.assertEqual(result['result']['task_id'], 'victor-rio-1790482538790-1467')
+            self.assertEqual(result['result']['execution_status'], 'COMPLETED_READ_ONLY_DIAGNOSTIC')
+            self.assertFalse(result['result']['public_action_performed'])
+            self.assertFalse(result['result']['credential_transfer_performed'])
+            self.assertNotIn('CURRENT_DEPARTMENT_RESULT_NOT_VERIFIED', self.record['truthfulness']['unresolved_surfaces'])
 
     def test_fresh_heartbeat_surfaces_watchdog_and_authority_without_expansion(self):
         f = self.record['live_evidence']['heartbeat_freshness']
