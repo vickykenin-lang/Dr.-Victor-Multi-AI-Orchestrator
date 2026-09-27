@@ -6,6 +6,14 @@ on:
     paths:
       - 'brain/green_autonomy_runtime.mjs'
       - 'brain/green_autonomy_runtime.test.mjs'
+      - 'brain/step10_green_autonomy_acceptance.test.mjs'
+      - '.github/workflows/victor_package4_green_autonomy.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'brain/green_autonomy_runtime.mjs'
+      - 'brain/green_autonomy_runtime.test.mjs'
+      - 'brain/step10_green_autonomy_acceptance.test.mjs'
       - '.github/workflows/victor_package4_green_autonomy.yml'
   workflow_dispatch:
   schedule:
@@ -30,11 +38,11 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Verify GREEN-only policy
+      - name: Verify GREEN-only policy and Step-10 acceptance
         run: |
           node --check brain/green_autonomy_runtime.mjs
-          node --test brain/green_autonomy_runtime.test.mjs brain/security_kernel.test.mjs brain/block3_sandbox_security.test.mjs brain/block4_promotion_shadow.test.mjs brain/block5_redteam_security.test.mjs
-      - name: Execute bounded GREEN evidence cycle
+          node --test brain/green_autonomy_runtime.test.mjs brain/step10_green_autonomy_acceptance.test.mjs brain/security_kernel.test.mjs brain/block3_sandbox_security.test.mjs brain/block4_promotion_shadow.test.mjs brain/block5_redteam_security.test.mjs
+      - name: Execute bounded GREEN live evidence cycle
         shell: bash
         run: |
           python - <<'PY'
@@ -43,18 +51,21 @@ jobs:
           paths=['/health','/v2-health','/endgame-runtime-health','/core-health','/aura3-bridge-health','/tony-bridge-health']
           evidence={}
           for path in paths:
-            req=urllib.request.Request(base+path,headers={'User-Agent':'Victor-Package4-GREEN-Autonomy/1.0','Cache-Control':'no-cache'})
+            req=urllib.request.Request(base+path,headers={'User-Agent':'Victor-Package4-GREEN-Autonomy/2.0','Cache-Control':'no-cache'})
             with urllib.request.urlopen(req,timeout=20) as r:
               body=json.loads(r.read().decode())
               evidence[path]={'http_status':r.status,'status':body.get('status'),'service':body.get('service')}
           assert all(v['http_status']==200 for v in evidence.values()), evidence
           print(json.dumps({
-            'status':'GREEN_AUTONOMY_CYCLE_VERIFIED',
+            'status':'STEP10_GREEN_AUTONOMY_LIVE_VERIFIED',
+            'flow':['INVESTIGATE','SANDBOX','TEST','RETRY','EVIDENCE','GOVERNED_COMPLETION'],
             'capabilities':['repo.read','evidence.read','sandbox.execute'],
             'production_mutation_performed':False,
             'public_action_performed':False,
             'credential_action_performed':False,
             'authority_expansion_performed':False,
+            'amber_enabled':False,
+            'red_enabled':False,
             'evidence':evidence,
             'secrets_exposed':False,
           },indent=2))
