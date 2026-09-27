@@ -32,5 +32,5 @@ jobs:
           grep -q 'WEBHOOK_SECRET_HEADER_REQUIRED' workers/victor-edge-proxy/worker.js
           grep -q 'UPSTREAM_UNAVAILABLE' workers/victor-edge-proxy/worker.js
           grep -q 'production_autonomy_changed: false' workers/victor-edge-proxy/worker.js
-          ! grep -RInE '(TELEGRAM_BOT_TOKEN|TELEGRAM_WEBHOOK_SECRET)\s*=\s*["'"'][^"'"']+' workers/victor-edge-proxy
+          ! grep -RInE 'TELEGRAM_(BOT_TOKEN|WEBHOOK_SECRET)[[:space:]]*=' workers/victor-edge-proxy
           echo EDGE_PROXY_SECURITY_BOUNDARY_PASS
