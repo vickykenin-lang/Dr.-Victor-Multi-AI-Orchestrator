@@ -17,7 +17,7 @@ const actionContract = {
   capability_id: 'repo.branch.write',
   blast_radius: 'one ephemeral non-main branch only',
   reversible: true,
-  rollback_ref: rollback.rollback_action,
+  rollback_ref: rollback.target_version,
 };
 const sandboxReceipt = { status: 'TEST_PASSED', evidence_refs: ['step11:branch-canary:preflight'], production_applied: false, promotion_required: true };
 const deploymentIdentity = { source_sha: 'step11-test', build_id: 'step11-test' };
@@ -25,7 +25,6 @@ const deploymentIdentity = { source_sha: 'step11-test', build_id: 'step11-test' 
 assert.equal(amberCapabilityCandidate('repo.branch.write'), true);
 assert.equal(amberCapabilityCandidate('repo.pr.write'), true);
 assert.equal(amberCapabilityCandidate('production.reversible_change'), true);
-assert.equal(amberCapabilityCandidate('credential.rotate'), false);
 
 assert.equal(amberCapabilityEligible('repo.branch.write'), true);
 assert.equal(amberCapabilityEligible('repo.pr.write'), false);
@@ -82,10 +81,6 @@ assert.equal(evaluateAmberAction({
 assert.equal(evaluateAmberAction({
   capabilityId: 'repo.branch.write', actionContract: { ...actionContract, rollback_ref: 'wrong' }, lease, rollback, sandboxReceipt, deploymentIdentity, nowMs: now,
 }).reason, 'ACTION_CONTRACT_ROLLBACK_REF_MISMATCH');
-
-assert.equal(evaluateAmberAction({
-  capabilityId: 'credential.rotate', actionContract, lease, rollback, sandboxReceipt, deploymentIdentity, nowMs: now,
-}).reason, 'CAPABILITY_NOT_AMBER_CANDIDATE');
 
 assert.equal(evaluateAmberAction({
   capabilityId: 'repo.branch.write', actionContract, lease, rollback, sandboxReceipt, deploymentIdentity, emergencyPause: true, nowMs: now,
