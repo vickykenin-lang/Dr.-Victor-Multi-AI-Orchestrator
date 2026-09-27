@@ -2,6 +2,7 @@ name: Victor V2 Block 5 Production Deploy
 # Package 3 certification gate deployment refresh: 2026-09-25
 # Safe AURA3 dispatch diagnostic activation: 2026-09-25
 # Step-9 deployment identity hardening: 2026-09-26
+# Founder reasoning/conversation deployment coverage: 2026-09-27
 
 on:
   push:
@@ -15,6 +16,10 @@ on:
       - 'brain/degraded_mode.mjs'
       - 'brain/truthful_telemetry.mjs'
       - 'brain/experience_ledger.mjs'
+      - 'brain/founder_conversation.mjs'
+      - 'brain/founder_conversation.test.mjs'
+      - 'brain/conversation_runtime.mjs'
+      - 'brain/conversation_runtime.test.mjs'
   workflow_dispatch:
 
 permissions:
@@ -54,7 +59,7 @@ jobs:
         run: |
           node --check victor-telegram-worker/worker.js
           node --check victor-telegram-worker/endgame_runtime_acceptance.mjs
-          node --test brain/founder_intent_gateway.test.mjs brain/security_kernel.test.mjs brain/action_contract.test.mjs brain/block3_sandbox_security.test.mjs brain/block4_promotion_shadow.test.mjs brain/block5_redteam_security.test.mjs victor-telegram-worker/endgame_runtime_acceptance.test.mjs
+          node --test brain/founder_conversation.test.mjs brain/conversation_runtime.test.mjs brain/founder_intent_gateway.test.mjs brain/security_kernel.test.mjs brain/action_contract.test.mjs brain/block3_sandbox_security.test.mjs brain/block4_promotion_shadow.test.mjs brain/block5_redteam_security.test.mjs victor-telegram-worker/endgame_runtime_acceptance.test.mjs
       - name: Build exact Worker module bundle
         run: |
           rm -rf dist/v2-live
