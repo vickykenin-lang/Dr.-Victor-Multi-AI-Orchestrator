@@ -1,5 +1,5 @@
 name = "victor-telegram-webhook"
-main = "victor-telegram-worker/worker.js"
+main = "victor-telegram-worker/worker_with_edge_control.js"
 compatibility_date = "2026-08-27"
 keep_vars = true
 
