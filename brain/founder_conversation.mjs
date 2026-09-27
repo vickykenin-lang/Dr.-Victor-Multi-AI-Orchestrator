@@ -1,28 +1,40 @@
-export function naturalDispatchAcknowledgement(target, request = '') {
+export function naturalDispatchAcknowledgement(target, request = '', dispatch = null) {
   const name = displayTarget(target);
   const text = String(request || '').trim();
   const lower = text.toLowerCase();
+  const taskType = dispatch?.taskType || null;
+  const taskId = dispatch?.taskId || null;
+  const accepted = dispatch?.status === 'DISPATCHED';
+
+  if (accepted) {
+    const detail = [
+      `${name} request dispatch accepted hai`,
+      taskType ? `task type: ${taskType}` : null,
+      taskId ? `task ID: ${taskId}` : null,
+    ].filter(Boolean).join(' | ');
+    return `${detail}. Iska matlab sirf dispatch successful hai—result abhi verified/completed nahi maana gaya. Main isi request ke current verification window me fresh result check karunga.`;
+  }
 
   if (/(instagram|insta).*(latest|new|post)|(?:latest|new).*(instagram|insta)/i.test(lower)) {
-    return `${name} ka latest actually published Instagram post fresh evidence se verify kar raha hoon. Draft ya ready-to-post item ko published nahi maanunga. Result milte hi seedha yahin bataunga.`;
+    return `${name} ka latest actually published Instagram post fresh evidence se verify karne ke liye request prepare hui hai. Draft ya ready-to-post item ko published nahi maanunga, aur verified result ke bina completion claim nahi hoga.`;
   }
   if (/(status|progress|kaha|kahaan|atka|pareshani|problem|issue|blocker)/i.test(lower)) {
-    return `${name} ka fresh status check kar raha hoon. Jo actual blocker ya next step evidence se confirm hoga, wahi bataunga.`;
+    return `${name} ka fresh status check request prepare hui hai. Dispatch/result evidence confirm hone ke baad hi actual status bataunga.`;
   }
-  return `${name} par ye kaam start karwa diya hai. Internal tracking main handle kar raha hoon; useful result milte hi seedha update dunga.`;
+  return `${name} ke liye request prepare hui hai. Dispatch evidence ke bina main “kaam start ho gaya” ya future update ka claim nahi karunga.`;
 }
 
 export function naturalInvestigationAcknowledgement(target, query = '') {
   const name = displayTarget(target);
   const subject = String(query || '').trim();
   return subject
-    ? `Haan, isi point ko specifically verify kar raha hoon: “${clip(subject, 180)}”. Purani report repeat nahi karunga; fresh evidence ya exact evidence-gap ka reason bataunga.`
-    : `${name} ke isi unresolved point ko specifically verify kar raha hoon. Purani report repeat nahi karunga; fresh evidence ya exact evidence-gap ka reason bataunga.`;
+    ? `Isi point ka fresh evidence check kar raha hoon: “${clip(subject, 180)}”. Purani report repeat nahi karunga; jo verify hoga wahi bataunga.`
+    : `${name} ke unresolved point ka fresh evidence check kar raha hoon. Purani report repeat nahi karunga; jo verify hoga wahi bataunga.`;
 }
 
 export function naturalPendingReply(target) {
   const name = displayTarget(target);
-  return `${name} ka fresh result abhi pending hai. Main isi check ko track kar raha hoon—duplicate task create nahi kar raha. Result aate hi yahin bataunga.`;
+  return `${name} ka dispatched task mila hai, lekin verified result file abhi available nahi hai. Current state: RESULT_PENDING. Is reply ke baad continuous/background tracking ka claim nahi hai; completion tabhi bolunga jab fresh result evidence mile.`;
 }
 
 export function buildNaturalResultPrompt(target, founderQuestion, rawReport) {
@@ -32,8 +44,9 @@ export function buildNaturalResultPrompt(target, founderQuestion, rawReport) {
     'Use concise natural Hinglish unless the Founder used English.',
     'Lead with the actual answer. Then mention only the useful evidence, implication, blocker, or next step.',
     'Do not expose internal task IDs, schema names, transport states, file paths, certification boilerplate, or machine labels unless the Founder explicitly asked for technical details.',
-    'Do not invent facts. Preserve uncertainty exactly. READY_TO_POST is not PUBLISHED. Internal progress is not business outcome.',
-    'If the raw report does not answer the question, say what is still unknown and what Victor is doing to verify it.',
+    'Do not invent facts. Preserve uncertainty exactly. READY_TO_POST is not PUBLISHED. DISPATCHED is not RUNNING. RUNNING is not RESULT_RECEIVED. RESULT_RECEIVED is not COMPLETED unless verified. Internal progress is not business outcome.',
+    'Never promise a later/background update unless a real persistent watcher/notification mechanism is attached and evidenced.',
+    'If the raw report does not answer the question, state exactly what is verified, what is still unknown, and what evidence is missing.',
     `Department: ${displayTarget(target)}`,
     `Founder question/context: ${String(founderQuestion || '').trim() || 'Not supplied'}`,
     `Verified raw report:\n${String(rawReport || '').trim()}`,
@@ -48,7 +61,7 @@ export function naturalResultFallback(target, rawReport) {
     .replace(/\b(?:REPORTING_CONNECTED_PENDING_VICTOR_CERTIFICATION|CHECKED_AGAINST_[A-Z0-9_]+)\b/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  return cleaned ? `${name} ka fresh verified update:\n\n${cleaned}` : `${name} ka fresh result mila hai, lekin useful Founder-facing summary abhi generate nahi ho paayi.`;
+  return cleaned ? `${name} ka fresh verified update:\n\n${cleaned}` : `${name} ka verified result evidence mila, lekin useful Founder-facing summary generate nahi ho paayi. Completion ka extra claim nahi kar raha.`;
 }
 
 export function displayTarget(target) {

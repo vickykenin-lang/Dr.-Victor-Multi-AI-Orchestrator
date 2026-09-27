@@ -17,6 +17,7 @@ export function classifyConversationFollowUp(text, session = {}) {
 
   const continuation = /^(pata karke batao|check karke batao|dekh ke batao|dekho aur batao|find out|check and tell me|kya hua|kya status hai|status\??)$/i.test(value);
   const taskStatus = /(iska|uska|task ka|task).*status|status.*(iska|uska|task)|kab pata chalega|kab result milega|result kab|revert kab/i.test(value);
+  const taskDetail = /(detail|details|exact|proper|clearly|specifically).*(kya|what).*(shuru|start|dispatch|task|kaam|work)|(kya|what).*(shuru|start|dispatch|task|kaam|work).*(detail|details|exact|proper|clearly|specifically)|kya shuru kiya|kya start kiya|what did you start|what was dispatched/i.test(value);
   const problemFollowUp = /^(kya pareshani hai abhi|kaha atka hua hai|kahaan atka hua hai|kahan atka hai|what is the issue now|what is blocking it)$/i.test(value);
   const nextStepFollowUp = /^(to |toh |ab |then |so )?(ab )?(kya karna chahiye|kya kare|kya karen|next kya|aage kya|what should we do|what next|what should i do|what should victor do)\??$/i.test(value);
   const explanationFollowUp = /^(kyu|kyun|kyon|why|aisa kyu|aisa kyun|aisa kyon|why so|why is that|kaise|how so)\??$/i.test(value);
@@ -32,6 +33,10 @@ export function classifyConversationFollowUp(text, session = {}) {
       query: String(text || '').trim(),
       reason: 'WHY_OR_HOW_BOUND_TO_PREVIOUS_VERIFIED_REPLY',
     };
+  }
+
+  if (taskDetail && hasTask) {
+    return { mode: 'TASK_DETAIL_FOLLOWUP', target, task_id: taskId, reason: 'FOUNDER_REQUESTS_PERSISTED_TASK_DETAILS' };
   }
 
   // A request to investigate a specific unknown/unverified point is new evidence work,
@@ -75,7 +80,17 @@ export function buildInvestigationTaskText(followUp = {}, session = {}) {
 }
 
 export function formatPendingTaskStatus(session = {}) {
-  const target = String(session.last_target || 'department').toUpperCase();
-  const taskId = session.last_task_id || 'unknown';
-  return `${target} task ${taskId} ka result abhi pending hai. Victor isi task ka fresh revert wait/verify karega; naya duplicate task dispatch nahi karega.`;
+  const target = String(session.last_target || session.active_target || 'department').toUpperCase();
+  const taskId = session.last_task_id || session.active_task_id || 'unknown';
+  const taskType = session.last_task_type || 'UNKNOWN';
+  const taskState = session.task_state || 'PENDING';
+  const founderText = String(session.last_founder_text || '').trim();
+  const parts = [
+    `${target} task ka persisted current state: ${taskState}.`,
+    `Task type: ${taskType}.`,
+    `Task ID: ${taskId}.`,
+  ];
+  if (founderText) parts.push(`Original request: ${founderText.slice(0, 300)}.`);
+  parts.push('Verified result evidence abhi available nahi hai; isliye RESULT_RECEIVED/COMPLETED claim nahi hoga. Koi continuous/background tracking promise bhi active nahi maana jayega jab tak separate watcher evidence na ho.');
+  return parts.join(' ');
 }
