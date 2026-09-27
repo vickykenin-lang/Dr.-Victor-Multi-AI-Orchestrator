@@ -1,0 +1,62 @@
+name: Victor V2 Step 12 Continuous Learning Acceptance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'brain/experience_ledger.mjs'
+      - 'brain/experience_ledger.test.mjs'
+      - 'brain/procedure_registry.mjs'
+      - 'brain/procedure_registry.test.mjs'
+      - 'brain/cognee_advisory.mjs'
+      - 'brain/cognee_advisory.test.mjs'
+      - 'brain/truth_resolver.mjs'
+      - 'brain/truth_resolver.test.mjs'
+      - 'brain/step12_continuous_learning_acceptance.test.mjs'
+      - '.github/workflows/victor_v2_step12_continuous_learning_tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'brain/experience_ledger.mjs'
+      - 'brain/experience_ledger.test.mjs'
+      - 'brain/procedure_registry.mjs'
+      - 'brain/procedure_registry.test.mjs'
+      - 'brain/cognee_advisory.mjs'
+      - 'brain/cognee_advisory.test.mjs'
+      - 'brain/truth_resolver.mjs'
+      - 'brain/truth_resolver.test.mjs'
+      - 'brain/step12_continuous_learning_acceptance.test.mjs'
+      - '.github/workflows/victor_v2_step12_continuous_learning_tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  continuous-learning-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Syntax check learning modules
+        run: |
+          node --check brain/experience_ledger.mjs
+          node --check brain/procedure_registry.mjs
+          node --check brain/cognee_advisory.mjs
+          node --check brain/truth_resolver.mjs
+          node --check brain/step12_continuous_learning_acceptance.test.mjs
+      - name: Run existing learning regression tests
+        run: |
+          node --test brain/experience_ledger.test.mjs
+          node --test brain/procedure_registry.test.mjs
+          node --test brain/cognee_advisory.test.mjs
+          node --test brain/truth_resolver.test.mjs
+      - name: Run Step 12 operational learning acceptance
+        run: node brain/step12_continuous_learning_acceptance.test.mjs

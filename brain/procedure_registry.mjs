@@ -11,6 +11,16 @@ export function procedureLifecycle({procedureId,verifiedFailure=false,environmen
  const streak=verifiedFailure?p.failure_streak+1:0;
  return {ok:true,status:streak>=2?"SUSPENDED":p.status,failure_streak:streak};
 }
+export function evolveProcedureLifecycle({procedureId,currentState=null,verifiedFailure=false,verifiedSuccess=false,environmentMatch=true}={}){
+ const p=PROCEDURES[String(procedureId||"").trim()]; if(!p)return {ok:false,status:"UNKNOWN",execution_allowed:false};
+ if(!environmentMatch)return {ok:true,status:"DEGRADED",failure_streak:Number(currentState?.failure_streak||0),reason:"ENVIRONMENT_MISMATCH",execution_allowed:false};
+ const priorStatus=String(currentState?.status||p.status).toUpperCase();
+ const priorStreak=Math.max(0,Number(currentState?.failure_streak ?? p.failure_streak ?? 0));
+ if(verifiedSuccess===true)return {ok:true,status:"ACTIVE",failure_streak:0,reason:"VERIFIED_SUCCESS",execution_allowed:true};
+ const streak=verifiedFailure===true?priorStreak+1:priorStreak;
+ const status=(priorStatus==="SUSPENDED"||streak>=2)?"SUSPENDED":"ACTIVE";
+ return {ok:true,status,failure_streak:streak,reason:status==="SUSPENDED"?"VERIFIED_FAILURE_THRESHOLD_REACHED":"LIFECYCLE_ACTIVE",execution_allowed:status==="ACTIVE"};
+}
 export function buildProcedureExecutionPlan({procedureId,trigger,environmentFingerprint="victor-endgame-p0-v1"}={}){
  const p=PROCEDURES[String(procedureId||"").trim()];
  if(!p)return {ok:false,execution_allowed:false,reason:"PROCEDURE_NOT_VERIFIED",steps:[]};
