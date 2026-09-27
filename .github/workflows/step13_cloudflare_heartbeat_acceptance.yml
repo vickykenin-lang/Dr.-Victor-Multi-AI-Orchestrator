@@ -1,0 +1,41 @@
+name: Step 13 Cloudflare Heartbeat Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'workers/victor-reliability-heartbeat/**'
+      - '.github/workflows/step13_cloudflare_heartbeat_acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  heartbeat-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Syntax check heartbeat Worker
+        run: node --check workers/victor-reliability-heartbeat/worker.js
+      - name: Test heartbeat fail-closed behavior
+        run: node workers/victor-reliability-heartbeat/worker.test.mjs
+      - name: Verify read-only authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          f='workers/victor-reliability-heartbeat/worker.js'
+          grep -q "production_action_allowed: false" "$f"
+          grep -q "production_autonomy_enabled: false" "$f"
+          grep -q "consequential_execution_trigger: 'founder-command'" "$f"
+          if grep -En "dispatch[A-Za-z]*Task|sendTelegramMessage|git push|POST|PUT|PATCH|DELETE" "$f"; then
+            echo 'STEP13_HEARTBEAT_CONSEQUENTIAL_PATH_DETECTED' >&2
+            exit 1
+          fi
+          echo 'STEP13_HEARTBEAT_READ_ONLY_BOUNDARY_PASS'
