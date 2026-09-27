@@ -40,11 +40,17 @@ export function evaluateHeartbeatEvidence(probes = {}, observedAt = new Date().t
   };
 }
 
-async function probe(path) {
-  const response = await fetch(`${VICTOR_BASE}/${path}`, {
+async function probe(path, env) {
+  const request = new Request(`https://victor.internal/${path}`, {
     method: 'GET',
-    headers: { 'User-Agent': 'Victor-Step13-Cloudflare-Heartbeat/1.0' },
+    headers: { 'User-Agent': 'Victor-Step13-Cloudflare-Heartbeat/1.1' },
   });
+  const response = env?.VICTOR_RUNTIME?.fetch
+    ? await env.VICTOR_RUNTIME.fetch(request)
+    : await fetch(`${VICTOR_BASE}/${path}`, {
+        method: 'GET',
+        headers: { 'User-Agent': 'Victor-Step13-Cloudflare-Heartbeat/1.1' },
+      });
   const body = await response.json().catch(() => null);
   return { http_status: response.status, body };
 }
@@ -53,7 +59,7 @@ async function runHeartbeat(controller, env) {
   if (!env.VICTOR_RELIABILITY_EVIDENCE) {
     throw new Error('VICTOR_RELIABILITY_EVIDENCE_KV_REQUIRED');
   }
-  const entries = await Promise.all(PROBE_PATHS.map(async path => [path, await probe(path)]));
+  const entries = await Promise.all(PROBE_PATHS.map(async path => [path, await probe(path, env)]));
   const probes = Object.fromEntries(entries);
   const observedAt = new Date().toISOString();
   const evidence = evaluateHeartbeatEvidence(probes, observedAt);
@@ -76,6 +82,7 @@ async function runHeartbeat(controller, env) {
   console.log(JSON.stringify({
     event: 'VICTOR_STEP13_CLOUDFLARE_HEARTBEAT',
     cron: controller?.cron || null,
+    transport: env?.VICTOR_RUNTIME?.fetch ? 'SERVICE_BINDING' : 'PUBLIC_FALLBACK',
     ...evidence,
   }));
   if (evidence.status !== 'PASS') throw new Error('STEP13_HEARTBEAT_SAFE_HOLD');
@@ -106,6 +113,7 @@ export default {
         production_autonomy_enabled: false,
         consequential_execution_trigger: 'founder-command',
         evidence_store_configured: Boolean(env.VICTOR_RELIABILITY_EVIDENCE),
+        runtime_service_binding_configured: Boolean(env.VICTOR_RUNTIME),
       });
     }
     if (url.pathname === '/latest') {

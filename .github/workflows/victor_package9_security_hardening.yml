@@ -5,6 +5,7 @@ name: Victor Package 9 Security Hardening
 # Step-12 closure re-verification trigger.
 # Step-13 in-progress governance verification trigger.
 # Step-13 mechanism evidence receipt verification trigger.
+# Required branch-protection context: run on every PR to main.
 
 on:
   push:
@@ -15,10 +16,6 @@ on:
       - 'package-lock.json'
   pull_request:
     branches: [main]
-    paths:
-      - '.github/workflows/**'
-      - 'package.json'
-      - 'package-lock.json'
   workflow_dispatch:
 
 permissions:
