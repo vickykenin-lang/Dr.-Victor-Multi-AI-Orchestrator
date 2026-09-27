@@ -1,5 +1,6 @@
 const INDEX_PREFIX = 'victor:experience:index:v1:';
 const EPISODE_PREFIX = 'victor:experience:episode:v1:';
+const GLOBAL_INDEX_KEY = 'victor:experience:global-index:v1';
 const ALLOWED_PROVENANCE = new Set(['OBSERVED', 'VERIFIED', 'FOUNDER_CONFIRMED', 'INFERRED', 'UNVERIFIED']);
 const SECRET_KEY_PATTERN = /(?:secret|token|password|credential|authorization|api[_-]?key|private[_-]?key)/i;
 const SECRET_TEXT_PATTERNS = [
@@ -188,6 +189,14 @@ export async function appendExperienceEpisode(env = {}, episode = {}) {
     episode_ids: nextIds,
     updated_at_utc: nowIso(),
   });
+
+  const globalIndex = await readJson(binding, GLOBAL_INDEX_KEY) || { schema_version: 1, episode_ids: [] };
+  const globalIds = [...new Set([...(Array.isArray(globalIndex.episode_ids) ? globalIndex.episode_ids : []), episode.episode_id])].slice(-500);
+  await writeJson(binding, GLOBAL_INDEX_KEY, {
+    ...globalIndex,
+    episode_ids: globalIds,
+    updated_at_utc: nowIso(),
+  });
   return { status: 'APPENDED', episode };
 }
 
@@ -209,6 +218,30 @@ export async function retrieveRecentExperience(env = {}, goalId, options = {}) {
     if (episode) episodes.push(episode);
   }
   return episodes;
+}
+
+export async function retrieveRelevantExperience(env = {}, options = {}) {
+  const binding = store(env);
+  if (!binding) return [];
+  const limit = Math.max(1, Math.min(Number(options.limit || 5), 12));
+  const target = norm(options.target).toLowerCase();
+  const phase = norm(options.phase).toUpperCase();
+  const objectiveId = norm(options.objectiveId);
+  const verifiedOnly = options.verifiedOnly !== false;
+  const globalIndex = await readJson(binding, GLOBAL_INDEX_KEY);
+  const ids = Array.isArray(globalIndex?.episode_ids) ? [...globalIndex.episode_ids].reverse() : [];
+  const matches = [];
+  for (const id of ids) {
+    const episode = await readJson(binding, episodeKey(id));
+    if (!episode) continue;
+    if (objectiveId && norm(episode.objective_id) === objectiveId) continue;
+    if (verifiedOnly && (episode.provenance !== 'VERIFIED' || episode.outcome?.verified !== true)) continue;
+    if (target && norm(episode.action_contract?.target).toLowerCase() !== target) continue;
+    if (phase && norm(episode.action_contract?.phase).toUpperCase() !== phase) continue;
+    matches.push(episode);
+    if (matches.length >= limit) break;
+  }
+  return matches;
 }
 
 export function buildExperienceAdvisoryContext(episodes = []) {
