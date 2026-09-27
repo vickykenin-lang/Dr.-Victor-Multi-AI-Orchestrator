@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - 'workers/victor-edge-proxy/**'
+      - 'victor-telegram-worker/edge_proxy_control.mjs'
+      - 'victor-telegram-worker/edge_proxy_control.test.mjs'
+      - 'victor-telegram-worker/worker_with_edge_control.js'
+      - 'wrangler.toml'
       - '.github/workflows/victor_edge_proxy.yml'
   workflow_dispatch:
 
@@ -23,7 +27,9 @@ jobs:
         with:
           node-version: '22'
       - name: Run edge proxy tests
-        run: node --test workers/victor-edge-proxy/worker.test.mjs
+        run: |
+          node --check victor-telegram-worker/worker_with_edge_control.js
+          node --test workers/victor-edge-proxy/worker.test.mjs victor-telegram-worker/edge_proxy_control.test.mjs
       - name: Verify fail-closed boundaries
         shell: bash
         run: |
@@ -32,5 +38,8 @@ jobs:
           grep -q 'WEBHOOK_SECRET_HEADER_REQUIRED' workers/victor-edge-proxy/worker.js
           grep -q 'UPSTREAM_UNAVAILABLE' workers/victor-edge-proxy/worker.js
           grep -q 'production_autonomy_changed: false' workers/victor-edge-proxy/worker.js
+          grep -q 'VICTOR EDGE PROXY CUTOVER' victor-telegram-worker/edge_proxy_control.mjs
+          grep -q 'VICTOR EDGE PROXY ROLLBACK' victor-telegram-worker/edge_proxy_control.mjs
+          grep -q 'isAuthorizedFounderMessage\|founderAuthorized' victor-telegram-worker/worker_with_edge_control.js
           ! grep -RInE 'TELEGRAM_(BOT_TOKEN|WEBHOOK_SECRET)[[:space:]]*=' workers/victor-edge-proxy
           echo EDGE_PROXY_SECURITY_BOUNDARY_PASS
