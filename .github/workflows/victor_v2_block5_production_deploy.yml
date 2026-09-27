@@ -61,11 +61,19 @@ jobs:
           node --check victor-telegram-worker/endgame_runtime_acceptance.mjs
           node --test brain/founder_conversation.test.mjs brain/conversation_runtime.test.mjs brain/founder_intent_gateway.test.mjs brain/security_kernel.test.mjs brain/action_contract.test.mjs brain/block3_sandbox_security.test.mjs brain/block4_promotion_shadow.test.mjs brain/block5_redteam_security.test.mjs victor-telegram-worker/endgame_runtime_acceptance.test.mjs
       - name: Build exact Worker module bundle
+        shell: bash
         run: |
+          set -euo pipefail
           rm -rf dist/v2-live
           npx wrangler deploy --dry-run --outdir dist/v2-live
+          BUNDLE=$(find dist/v2-live -maxdepth 1 -type f \( -name '*.js' -o -name '*.mjs' \) | sort | head -n 1)
+          test -n "$BUNDLE"
+          test -s "$BUNDLE"
+          node --check "$BUNDLE"
+          if [ "$BUNDLE" != 'dist/v2-live/worker.js' ]; then
+            cp "$BUNDLE" dist/v2-live/worker.js
+          fi
           test -s dist/v2-live/worker.js
-          node --check dist/v2-live/worker.js
       - name: Replace Worker content only, preserve bindings and config
         shell: bash
         run: |
