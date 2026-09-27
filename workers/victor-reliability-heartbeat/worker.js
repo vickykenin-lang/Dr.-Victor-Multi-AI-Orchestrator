@@ -41,16 +41,17 @@ export function evaluateHeartbeatEvidence(probes = {}, observedAt = new Date().t
 }
 
 async function probe(path, env) {
-  const request = new Request(`https://victor.internal/${path}`, {
+  // Keep the canonical production URL visible to the target Worker even when
+  // transport is a Cloudflare service binding. Some health checks validate the
+  // configured webhook URL against the request origin; using a synthetic
+  // victor.internal hostname creates a false WEBHOOK_URL_MISMATCH.
+  const request = new Request(`${VICTOR_BASE}/${path}`, {
     method: 'GET',
-    headers: { 'User-Agent': 'Victor-Step13-Cloudflare-Heartbeat/1.1' },
+    headers: { 'User-Agent': 'Victor-Step13-Cloudflare-Heartbeat/1.2' },
   });
   const response = env?.VICTOR_RUNTIME?.fetch
     ? await env.VICTOR_RUNTIME.fetch(request)
-    : await fetch(`${VICTOR_BASE}/${path}`, {
-        method: 'GET',
-        headers: { 'User-Agent': 'Victor-Step13-Cloudflare-Heartbeat/1.1' },
-      });
+    : await fetch(request);
   const body = await response.json().catch(() => null);
   return { http_status: response.status, body };
 }
