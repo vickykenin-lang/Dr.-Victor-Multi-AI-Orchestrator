@@ -35,7 +35,7 @@ test('health proves verified LLM-free procedure without enabling autonomy', () =
   assert.equal(health.production_autonomy_enabled, false);
 });
 
-test('acceptance verifies procedure, telemetry, durable episode round-trip and Cognee recall', async () => {
+test('acceptance separates durable readback from verified cross-objective reuse', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
     assert.match(String(url), /\/api\/v1\/recall$/);
@@ -56,6 +56,15 @@ test('acceptance verifies procedure, telemetry, durable episode round-trip and C
     assert.equal(result.truthful_telemetry_live, true);
     assert.equal(result.experience_ledger_readback_verified, true);
     assert.equal(result.experience_advisory_reuse_verified, true);
+    assert.equal(result.experience_reuse.consumed_in_decision, true);
+    assert.equal(result.experience_reuse.source_episode_id, 'ENDGAME-PACKAGE2-LIVE:unit-1');
+    assert.equal(result.experience_reuse.source_objective_id, 'ENDGAME-PACKAGE2-LIVE');
+    assert.equal(result.experience_reuse.current_objective_id, 'ENDGAME-PACKAGE2-REUSE:unit-1');
+    assert.notEqual(result.experience_reuse.current_objective_id, result.experience_reuse.source_objective_id);
+    assert.equal(result.experience_reuse.source_provenance, 'VERIFIED');
+    assert.equal(result.experience_reuse.advisory_only, true);
+    assert.deepEqual(result.experience_reuse.selected_reasoning_plan, ['REUSE_VERIFIED_PATTERN', 'VERIFY_RESULT']);
+    assert.equal(result.experience_reuse.reasoning_stage_reduction, 1);
     assert.equal(result.cognee_semantic_roundtrip_verified, true);
     assert.equal(result.production_autonomy_enabled, false);
     assert.deepEqual(result.blockers, []);
