@@ -1,0 +1,95 @@
+name: Step 14 Runtime Truth Probe
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/step14_runtime_truth_probe.yml'
+      - 'scripts/step14_runtime_truth_probe.mjs'
+      - 'tests/step14_runtime_truth_probe.test.mjs'
+      - 'brain/action_contract.mjs'
+      - 'brain/procedure_registry.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/step14_runtime_truth_probe.yml'
+      - 'scripts/step14_runtime_truth_probe.mjs'
+      - 'tests/step14_runtime_truth_probe.test.mjs'
+      - 'brain/action_contract.mjs'
+      - 'brain/procedure_registry.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-runtime-truth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify bounded Action Contract and procedure-use runtime
+        run: |
+          node --test tests/step14_runtime_truth_probe.test.mjs
+          node scripts/step14_runtime_truth_probe.mjs | tee /tmp/step14-runtime-truth.json
+          node -e "const r=require('/tmp/step14-runtime-truth.json'); if(r.status!=='PASS'||!r.action_contract.instance_verified||!r.procedure_use.verified) process.exit(1)"
+      - name: Read live Cloudflare conversation memory state without mutation
+        if: github.event_name == 'push'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: d027de83cb964eb66fa56ffed27c0b27
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          VICTOR_FOUNDER_CHAT_ID: ${{ secrets.VICTOR_FOUNDER_CHAT_ID }}
+          WORKER_NAME: victor-telegram-webhook
+        run: |
+          python - <<'PY'
+          import json, os, sys, urllib.parse, urllib.request
+          account=os.environ.get('CLOUDFLARE_ACCOUNT_ID','')
+          token=os.environ.get('CLOUDFLARE_API_TOKEN','')
+          founder=os.environ.get('VICTOR_FOUNDER_CHAT_ID','')
+          worker=os.environ.get('WORKER_NAME','')
+          if not account or not token or not founder or not worker:
+              raise SystemExit('STEP14_LIVE_MEMORY_PROBE_CONFIGURATION_MISSING')
+          headers={'Authorization':f'Bearer {token}','User-Agent':'Victor-Step14-ControlRoom/1.0'}
+          settings_url=f'https://api.cloudflare.com/client/v4/accounts/{account}/workers/scripts/{worker}/settings'
+          with urllib.request.urlopen(urllib.request.Request(settings_url,headers=headers),timeout=20) as r:
+              settings=json.loads(r.read().decode())
+          bindings=(settings.get('result') or {}).get('bindings') or []
+          binding=next((b for b in bindings if b.get('name')=='VICTOR_CONVERSATION_STATE'),None)
+          namespace=(binding or {}).get('namespace_id')
+          if not namespace:
+              raise SystemExit('STEP14_CONVERSATION_KV_NAMESPACE_NOT_FOUND')
+          key=urllib.parse.quote(f'conversation:{founder}',safe='')
+          value_url=f'https://api.cloudflare.com/client/v4/accounts/{account}/storage/kv/namespaces/{namespace}/values/{key}'
+          with urllib.request.urlopen(urllib.request.Request(value_url,headers=headers),timeout=20) as r:
+              raw=r.read().decode()
+              code=r.status
+          state=json.loads(raw)
+          safe={
+            'schema_version':1,
+            'evidence_type':'VICTOR_STEP14_LIVE_MEMORY_READ',
+            'status':'PASS' if code==200 and isinstance(state,dict) else 'FAIL',
+            'http_status':code,
+            'binding':'VICTOR_CONVERSATION_STATE',
+            'durable_binding_verified':True,
+            'memory_read_verified':True,
+            'memory_write_verified':False,
+            'found':bool(state),
+            'updated_at_utc':state.get('updated_at'),
+            'active_topic':state.get('active_topic'),
+            'active_target':state.get('active_target'),
+            'last_task_id':state.get('last_task_id'),
+            'task_state':state.get('task_state'),
+            'mutation_performed':False,
+            'production_action_performed':False,
+            'authority_expanded':False,
+            'secrets_exposed':False,
+          }
+          print(json.dumps(safe,indent=2))
+          if safe['status']!='PASS': sys.exit(1)
+          PY
