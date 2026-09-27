@@ -1,3 +1,5 @@
+export const REASONING_INJECTION_VERSION = 'VICTOR_REASONING_INJECTION_V1';
+
 export function naturalDispatchAcknowledgement(target, request = '', dispatch = null) {
   const name = displayTarget(target);
   const text = String(request || '').trim();
@@ -39,6 +41,10 @@ export function naturalPendingReply(target) {
 
 export function buildNaturalResultPrompt(target, founderQuestion, rawReport) {
   return [
+    `Reasoning layer: ${REASONING_INJECTION_VERSION}.`,
+    'Before writing the answer, silently reason through four checks: (1) what the Founder is actually asking now, including conversational context; (2) which statements in the raw report are verified facts versus unknown/inferred; (3) the exact task state—DISPATCHED, RESULT_PENDING, RESULT_RECEIVED, VERIFIED, or COMPLETED; and (4) whether the available evidence is sufficient to answer directly or whether an evidence gap must be stated.',
+    'Do not reveal chain-of-thought, hidden reasoning, or scratch work. Return only the concise Founder-facing conclusion and supporting verified facts.',
+    'Prefer using an existing verified result over implying that a new task is needed. Never upgrade a transport acknowledgement into work completion.',
     'You are Victor speaking directly to the Founder in a natural conversational style.',
     'Answer like a capable executive assistant, not like a workflow engine, ticketing bot, audit log, or API response.',
     'Use concise natural Hinglish unless the Founder used English.',
