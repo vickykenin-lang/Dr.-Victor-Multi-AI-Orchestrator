@@ -4,6 +4,7 @@ import {
   buildExperienceEpisode,
   appendExperienceEpisode,
   readExperienceEpisode,
+  retrieveRelevantExperience,
   buildExperienceAdvisoryContext,
 } from '../brain/experience_ledger.mjs';
 import { cogneeMemoryStatus, cogneeRecall } from './cognee_memory_bridge.mjs';
@@ -92,8 +93,35 @@ export async function runEndgameRuntimeAcceptance(env = {}, options = {}) {
 
   const ledgerWrite = await appendExperienceEpisode(env, episode);
   const readback = await readExperienceEpisode(env, episode.episode_id);
-  const advisory = buildExperienceAdvisoryContext(readback ? [readback] : []);
-  const ledgerRoundTrip = Boolean(readback?.episode_id === episode.episode_id && advisory?.[0]?.episode_id === episode.episode_id);
+  const ledgerRoundTrip = Boolean(readback?.episode_id === episode.episode_id);
+
+  // Reuse must be proven through the cross-objective retrieval path. A same-episode
+  // read-back is persistence evidence only and must never be reported as learning reuse.
+  const reuseObjectiveId = `ENDGAME-PACKAGE2-REUSE:${traceId}`;
+  const relevantExperience = await retrieveRelevantExperience(env, {
+    objectiveId: reuseObjectiveId,
+    target: 'internal',
+    phase: 'SYSTEM_TEST',
+    verifiedOnly: true,
+    limit: 5,
+  });
+  const advisory = buildExperienceAdvisoryContext(relevantExperience);
+  const consumedAdvisory = advisory.find(item =>
+    item?.episode_id === episode.episode_id
+    && item?.objective_id !== reuseObjectiveId
+    && item?.provenance === 'VERIFIED'
+    && item?.outcome?.verified === true
+    && item?.actual_progress_delta?.material === true
+  ) || null;
+  const baselineReasoningPlan = ['RUN_FULL_DIAGNOSTIC', 'EXECUTE_BOUNDED_TEST', 'VERIFY_RESULT'];
+  const reuseReasoningPlan = consumedAdvisory
+    ? ['REUSE_VERIFIED_PATTERN', 'VERIFY_RESULT']
+    : baselineReasoningPlan;
+  const experienceReuseVerified = Boolean(
+    consumedAdvisory
+    && reuseReasoningPlan[0] === 'REUSE_VERIFIED_PATTERN'
+    && reuseReasoningPlan.length < baselineReasoningPlan.length
+  );
 
   const cogneeStatus = cogneeMemoryStatus(env);
   let cognee = { ...cogneeStatus, results: [] };
@@ -105,7 +133,7 @@ export async function runEndgameRuntimeAcceptance(env = {}, options = {}) {
     && runtime.mode === 'DEGRADED_VERIFIED_PROCEDURE'
     && runtime.manual_trigger_only === true;
   const telemetryOk = runtime.event?.surface === 'LIVE';
-  const pass = procedureOk && telemetryOk && ledgerRoundTrip && semanticRoundTrip;
+  const pass = procedureOk && telemetryOk && ledgerRoundTrip && experienceReuseVerified && semanticRoundTrip;
 
   return {
     schema_version: 1,
@@ -115,7 +143,19 @@ export async function runEndgameRuntimeAcceptance(env = {}, options = {}) {
     truthful_telemetry_live: telemetryOk,
     experience_ledger_write_status: ledgerWrite.status,
     experience_ledger_readback_verified: ledgerRoundTrip,
-    experience_advisory_reuse_verified: ledgerRoundTrip,
+    experience_advisory_reuse_verified: experienceReuseVerified,
+    experience_reuse: {
+      current_objective_id: reuseObjectiveId,
+      source_episode_id: consumedAdvisory?.episode_id || null,
+      source_objective_id: consumedAdvisory?.objective_id || null,
+      source_provenance: consumedAdvisory?.provenance || null,
+      advisory_only: consumedAdvisory?.advisory_only === true,
+      consumed_in_decision: experienceReuseVerified,
+      baseline_reasoning_stages: baselineReasoningPlan.length,
+      reused_reasoning_stages: reuseReasoningPlan.length,
+      reasoning_stage_reduction: baselineReasoningPlan.length - reuseReasoningPlan.length,
+      selected_reasoning_plan: reuseReasoningPlan,
+    },
     cognee_status: cognee.status || 'UNKNOWN',
     cognee_result_count: Array.isArray(cognee.results) ? cognee.results.length : 0,
     cognee_semantic_roundtrip_verified: semanticRoundTrip,
@@ -125,12 +165,15 @@ export async function runEndgameRuntimeAcceptance(env = {}, options = {}) {
       !procedureOk ? 'VERIFIED_PROCEDURE_OR_DEGRADED_MODE_NOT_LIVE' : null,
       !telemetryOk ? 'TRUTHFUL_TELEMETRY_NOT_FRESH' : null,
       !ledgerRoundTrip ? 'EXPERIENCE_LEDGER_ROUNDTRIP_NOT_VERIFIED' : null,
+      !experienceReuseVerified ? 'EXPERIENCE_CROSS_OBJECTIVE_REUSE_NOT_VERIFIED' : null,
       !semanticRoundTrip ? 'COGNEE_SEMANTIC_ROUNDTRIP_NOT_VERIFIED' : null,
     ].filter(Boolean),
     evidence: {
       procedure_id: runtime.procedure?.procedure?.id || PROCEDURE_ID,
       telemetry_event_id: runtime.event?.event_id || null,
       episode_id: episode.episode_id,
+      reuse_objective_id: reuseObjectiveId,
+      reused_episode_id: consumedAdvisory?.episode_id || null,
       cognee_dataset: cognee.dataset || cogneeStatus.dataset || null,
     },
     secrets_exposed: false,
