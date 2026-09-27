@@ -2,32 +2,79 @@ import { evaluateSecurityRequest } from './security_kernel.mjs';
 import { createRollbackContract, validateRollbackContract } from './rollback_contract.mjs';
 import { evaluatePromotion, evaluatePostPromotionVerification } from './promotion_gate.mjs';
 
-export const AMBER_AUTONOMY_VERSION = 'victor-amber-autonomy-v1';
+export const AMBER_AUTONOMY_VERSION = 'victor-amber-autonomy-v2-step11';
 
-const ALLOWED_AMBER = new Set([
+const CANDIDATE_AMBER = new Set([
   'repo.branch.write',
   'repo.pr.write',
   'production.reversible_change',
 ]);
 
-export function amberCapabilityEligible(capabilityId) {
-  return ALLOWED_AMBER.has(String(capabilityId || ''));
+// Step-11 rollout is incremental. A capability is autonomous only after its
+// own live reversible certification. Start with the branch canary capability;
+// later candidates remain fail-closed until separately certified.
+const ENABLED_AMBER = new Set([
+  'repo.branch.write',
+]);
+
+export function amberCapabilityCandidate(capabilityId) {
+  return CANDIDATE_AMBER.has(String(capabilityId || ''));
 }
 
-export function buildAmberExecutionLease({ leaseId, expiresAtUtc } = {}) {
+export function amberCapabilityEligible(capabilityId) {
+  return ENABLED_AMBER.has(String(capabilityId || ''));
+}
+
+export function amberCapabilityRegistry() {
+  return [...CANDIDATE_AMBER].map(capability_id => ({
+    capability_id,
+    zone: 'AMBER',
+    enabled: ENABLED_AMBER.has(capability_id),
+    certification_required: !ENABLED_AMBER.has(capability_id),
+  }));
+}
+
+export function buildAmberExecutionLease({ leaseId, expiresAtUtc, scope = [...ENABLED_AMBER] } = {}) {
   if (!leaseId || !expiresAtUtc) throw new Error('leaseId and expiresAtUtc are required');
+  const normalizedScope = [...new Set((scope || []).map(String))];
+  if (!normalizedScope.length) throw new Error('non-empty scope is required');
+  if (normalizedScope.some(capabilityId => !amberCapabilityEligible(capabilityId))) {
+    throw new Error('lease scope contains uncertified AMBER capability');
+  }
   return {
     lease_id: String(leaseId),
     status: 'ACTIVE',
     expires_at_utc: String(expiresAtUtc),
-    scope: [...ALLOWED_AMBER],
+    scope: normalizedScope,
     non_transferable: true,
   };
 }
 
+function validateExplicitActionContract(actionContract, capabilityId) {
+  if (!actionContract || typeof actionContract !== 'object') {
+    return { ok: false, reason: 'EXPLICIT_ACTION_CONTRACT_REQUIRED' };
+  }
+  if (!String(actionContract.contract_id || '').trim()) {
+    return { ok: false, reason: 'ACTION_CONTRACT_ID_REQUIRED' };
+  }
+  if (String(actionContract.capability_id || '') !== String(capabilityId || '')) {
+    return { ok: false, reason: 'ACTION_CONTRACT_CAPABILITY_MISMATCH' };
+  }
+  if (!String(actionContract.blast_radius || '').trim()) {
+    return { ok: false, reason: 'BOUNDED_BLAST_RADIUS_REQUIRED' };
+  }
+  if (actionContract.reversible !== true) {
+    return { ok: false, reason: 'ACTION_CONTRACT_REVERSIBILITY_REQUIRED' };
+  }
+  if (!String(actionContract.rollback_ref || '').trim()) {
+    return { ok: false, reason: 'ACTION_CONTRACT_ROLLBACK_REF_REQUIRED' };
+  }
+  return { ok: true, reason: 'EXPLICIT_ACTION_CONTRACT_VALID' };
+}
+
 export function evaluateAmberAction({
   capabilityId,
-  actionContractAuthorized = false,
+  actionContract = null,
   lease = null,
   rollback = null,
   sandboxReceipt = null,
@@ -35,15 +82,27 @@ export function evaluateAmberAction({
   emergencyPause = false,
   nowMs = Date.now(),
 } = {}) {
+  if (!amberCapabilityCandidate(capabilityId)) {
+    return { decision: 'DENY', reason: 'CAPABILITY_NOT_AMBER_CANDIDATE', zone: 'AMBER' };
+  }
   if (!amberCapabilityEligible(capabilityId)) {
-    return { decision: 'DENY', reason: 'CAPABILITY_NOT_ELIGIBLE_FOR_AMBER_AUTONOMY', zone: 'AMBER' };
+    return { decision: 'DENY', reason: 'AMBER_CAPABILITY_NOT_INDIVIDUALLY_CERTIFIED', zone: 'AMBER' };
+  }
+
+  const actionContractValidation = validateExplicitActionContract(actionContract, capabilityId);
+  if (!actionContractValidation.ok) {
+    return { decision: 'DENY', reason: actionContractValidation.reason, zone: 'AMBER' };
+  }
+
+  if (!Array.isArray(lease?.scope) || !lease.scope.includes(String(capabilityId))) {
+    return { decision: 'DENY', reason: 'LEASE_SCOPE_MISMATCH', zone: 'AMBER' };
   }
 
   const security = evaluateSecurityRequest({
     actor: 'victor',
     capability_id: capabilityId,
     founder_approved: false,
-    action_contract_authorized: actionContractAuthorized,
+    action_contract_authorized: true,
     lease,
     emergency_pause: emergencyPause,
     now_ms: nowMs,
@@ -58,10 +117,14 @@ export function evaluateAmberAction({
     return { decision: 'DENY', reason: rollbackValidation.reason, zone: 'AMBER', security };
   }
 
+  if (String(actionContract.rollback_ref) !== String(rollback.rollback_id || rollback.target_version || rollback.rollback_action || '')) {
+    return { decision: 'DENY', reason: 'ACTION_CONTRACT_ROLLBACK_REF_MISMATCH', zone: 'AMBER', security };
+  }
+
   const promotion = evaluatePromotion({
     sandbox_receipt: sandboxReceipt,
     security_decision: security,
-    action_contract_authorized: actionContractAuthorized,
+    action_contract_authorized: true,
     rollback_contract: rollback,
     deployment_identity: deploymentIdentity,
     founder_approved: false,
@@ -76,6 +139,7 @@ export function evaluateAmberAction({
     decision: 'ALLOW_REVERSIBLE_AMBER',
     reason: 'AMBER_GOVERNED_REVERSIBLE',
     zone: 'AMBER',
+    action_contract: actionContract,
     security,
     rollback,
     promotion,
