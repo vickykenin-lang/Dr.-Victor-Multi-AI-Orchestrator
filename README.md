@@ -15,7 +15,7 @@ Vicky judges Victor by **verified department final outcomes and collected revenu
 
 ```
 Vicky (Founder)
-  └── Dr. Victor (Grok) — Orchestrator
+  └── Dr. Victor (CHATGPT) — Orchestrator
         ├── AURA3        LIVE_CERTIFIED
         ├── AURA2        HOLD
         ├── RIO          ACTIVE_GOVERNED
