@@ -1,0 +1,42 @@
+name: Step 13 Unattended Reliability Mechanisms
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'brain/unattended_reliability.mjs'
+      - 'brain/unattended_reliability.test.mjs'
+      - '.github/workflows/step13_unattended_reliability_mechanisms.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'brain/unattended_reliability.mjs'
+      - 'brain/unattended_reliability.test.mjs'
+      - '.github/workflows/step13_unattended_reliability_mechanisms.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-mechanism-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+      - name: Verify retry, dead-letter, lease, restart and incident-response boundaries
+        run: node brain/unattended_reliability.test.mjs
+      - name: Verify production authority remains disabled by mechanism layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -En "production_action_allowed:\s*true|automatic_production_replay_allowed:\s*true|automatic_production_recovery_allowed:\s*true" brain/unattended_reliability.mjs; then
+            echo 'STEP13_UNATTENDED_AUTHORITY_EXPANSION_DETECTED' >&2
+            exit 1
+          fi
+          echo 'STEP13_UNATTENDED_AUTHORITY_BOUNDARY_PASS'
