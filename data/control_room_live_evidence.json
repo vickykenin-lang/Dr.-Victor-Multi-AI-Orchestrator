@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-09-27T04:15:40.259Z",
+  "source": "CLOUDFLARE_RUNTIME_AND_KV_DIRECT_READ",
+  "conversation_state": {
+    "updated_at_utc": "2026-09-27T04:15:40.259Z",
+    "active_topic": "RIO_STATUS_OR_BLOCKER",
+    "active_target": "rio",
+    "last_task_id": "victor-rio-1790482538790-1467",
+    "last_task_type": "STATUS_CHECK",
+    "task_state": "PENDING",
+    "active_issue": "uska exact latest status batao; naya duplicate task mat banana.",
+    "current_result_verified": false,
+    "current_result": null
+  },
+  "heartbeat": {
+    "observed_at_utc": "2026-09-27T04:15:11.106Z",
+    "status": "PASS",
+    "production_action_allowed": false,
+    "production_autonomy_enabled": false,
+    "consequential_execution_trigger": "founder-command",
+    "required_http_ok": true,
+    "runtime_ready": true,
+    "founder_command_boundary_intact": true,
+    "probe_summary": {
+      "health": {"http_status": 200, "status": "READY"},
+      "v2-health": {"http_status": 200, "status": "READY"},
+      "endgame-runtime-health": {"http_status": 200, "status": "READY"},
+      "core-health": {"http_status": 200, "status": "READY"},
+      "telegram-webhook-health": {"http_status": 200, "status": "WEBHOOK_CONFIGURED_MATCHING"}
+    },
+    "secrets_exposed": false
+  },
+  "evidence_boundary": {
+    "action_contract_instance_verified": false,
+    "procedure_use_verified": false,
+    "memory_engine_read_write_verified": false,
+    "department_result_verified": false,
+    "commercial_outcome_upgraded": false
+  }
+}
