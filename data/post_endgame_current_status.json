@@ -1,40 +1,77 @@
 {
-  "schema_version": 1,
-  "updated_at_utc": "2026-09-27T11:01:00Z",
-  "classification": "VICTOR_POST_ENDGAME_CURRENT_CANONICAL_STATE",
-  "technical_baseline_status": "CLOSED_COMPLETE_WITH_EXPLICIT_NON_BLOCKING_CARRY_FORWARD",
-  "current_main_sha_at_reconciliation": "c518850e7518b0c8e21752482bab031efdb827de",
-  "production_worker_deploy_git_sha": "d8e40252986747c2d905d9786893f76f9e66bb8c",
-  "production_worker_source_equivalence": "VERIFIED_NO_RUNTIME_SOURCE_DRIFT_AFTER_DEPLOY",
+  "schema_version": 2,
+  "updated_at_utc": "2026-09-27T11:53:30Z",
+  "classification": "VICTOR_FINAL_AUDIT_PASS_WITH_EXPLICIT_NON_BLOCKING_CAVEATS",
+  "technical_baseline_status": "CLOSED_COMPLETE",
+  "audit_repo_base_sha": "6d906a53e34b665dda6e7ca4c6f79ab2efb10b9d",
+  "production_worker_deploy_git_sha": "1379313018e358260b61414111312d7d8faccfbe",
+  "production_worker_source_equivalence": "VERIFIED_PRIMARY_RUNTIME_SOURCE_UNCHANGED_SINCE_DEPLOY",
+  "production_worker_version_id": "3aa4f3ec-eb21-4c9a-a2e4-b7e20ecab4bf",
+  "reverse_proxy": {
+    "status": "LIVE_CUTOVER_PASS",
+    "worker": "victor-edge-proxy",
+    "source_git_sha": "e515f75be1e00946154bff5ffa9d05d8b894b237",
+    "version_id": "1701698b-9198-4d61-8e0b-71ff72b00d05",
+    "telegram_webhook_url": "https://victor-edge-proxy.vickykenin.workers.dev/telegram",
+    "webhook_status": "WEBHOOK_CONFIGURED_MATCHING",
+    "issue_77": "CLOSED_COMPLETED",
+    "primary_public_endpoint_retained_for_governed_rollback": true
+  },
   "production_autonomy_enabled": false,
-  "scheduler_bound": false,
+  "scheduler_bound_for_consequential_execution": false,
   "allowed_consequential_trigger": "founder-command",
   "bounded_green_autonomy": "LIVE_VERIFIED_BOUNDED_READ_SANDBOX_ONLY",
   "experience_ledger_durable_learning": "LIVE_ACCEPTANCE_PASS",
   "procedure_registry_degraded_mode": "LIVE_ACCEPTANCE_PASS",
   "truthful_telemetry_control_room": "LIVE_ACCEPTANCE_PASS",
   "security_hardening_core": "PASS",
-  "cognee_semantic_memory": "SOURCE_IMPLEMENTED_PRODUCTION_CONFIGURED_TESTED_LIVE_SEMANTIC_RECALL_ACCEPTANCE_PENDING_INDEPENDENT_VERIFICATION",
+  "cognee_semantic_memory": {
+    "status": "LIVE_SEMANTIC_ROUNDTRIP_VERIFIED",
+    "current_runtime_breaker_key": "victor:cognee:auth-breaker:v3",
+    "current_v3_breaker_present": false,
+    "historical_v1_breaker_record": "STALE_HISTORICAL_401_NOT_CURRENT_RUNTIME_AUTHORITY",
+    "authority": "ADVISORY_ONLY_FOUNDER_AND_VERIFIED_REPO_MEMORY_REMAIN_AUTHORITATIVE"
+  },
+  "reliability_heartbeat": {
+    "status": "PASS",
+    "version": "STEP13_HEARTBEAT_V2_PROXY_AWARE",
+    "observed_at_utc": "2026-09-27T11:52:33.505Z",
+    "runtime_ready": true,
+    "edge_proxy_ready": true,
+    "webhook_ingress_matching": true,
+    "production_action_allowed": false,
+    "production_autonomy_enabled": false,
+    "consequential_execution_trigger": "founder-command",
+    "worker_version_id": "eedbe271-ee67-4ea3-8be4-707d4ef4afe7",
+    "workers_dev_public_exposure": false
+  },
   "step13_seven_day_reliability": "FOUNDER_SKIPPED_NOT_CERTIFIED_NON_BLOCKING_CAVEAT",
   "business_outcome": {
     "status": "NO_VERIFIED_REVENUE_EVENT",
     "collected_revenue_inr": 0,
     "technical_completion_blocker": false
   },
-  "explicit_non_blocking_carry_forward": [
-    "COGNEE_FRESH_INDEPENDENT_LIVE_SEMANTIC_RECALL_PROOF",
+  "open_items": {
+    "unrelated_issue_2_falcon": "OPEN_UNRELATED",
+    "open_pull_requests_at_final_audit_start": 0
+  },
+  "explicit_non_blocking_caveats": [
     "STEP13_168H_RELIABILITY_NOT_CERTIFIED_BY_FOUNDER_CHOICE",
-    "REVERSE_PROXY_ISSUE_77_FUTURE_ARCHITECTURE_BACKLOG",
-    "REAL_COMMERCIAL_OUTCOME_NOT_YET_VERIFIED"
+    "REAL_COMMERCIAL_OUTCOME_NOT_YET_VERIFIED",
+    "UNIVERSAL_OR_GLOBAL_DEPARTMENT_AUTONOMY_NOT_GRANTED",
+    "PRIMARY_PUBLIC_WORKER_ENDPOINT_RETAINED_AS_GOVERNED_ROLLBACK_DESTINATION",
+    "ISSUE_2_FALCON_REMAINS_OPEN_AND_UNRELATED"
   ],
   "supersedes_for_current_state_reporting": [
     "data/v2_block5_final_status.json",
-    "data/victor_v2_execution_status.json historical carry_forward fields before this reconciliation",
-    "data/final_endgame_status.json pre-reconciliation pending/running claims"
+    "data/victor_v2_execution_status.json historical carry_forward fields",
+    "data/final_endgame_status.json pre-reconciliation pending/running claims",
+    "data/post_endgame_current_status.json schema_version 1"
   ],
   "truth_rules": [
     "FRESH_VERIFIED_RUNTIME_EVIDENCE_OVERRIDES_STALE_STATUS_SUMMARIES",
     "HISTORICAL_AUDIT_RECEIPTS_REMAIN_IMMUTABLE_HISTORY",
+    "HISTORICAL_BREAKER_RECORDS_DO_NOT_OVERRIDE_CURRENT_RUNTIME_KEY_VERSION",
     "HISTORICAL_AUTONOMY_EVIDENCE_DOES_NOT_GRANT_CURRENT_AUTHORITY",
     "NO_EARLIER_STAGE_IMPLIES_A_LATER_STAGE",
     "MISSING_EVIDENCE_IS_UNKNOWN_NOT_SUCCESS",
