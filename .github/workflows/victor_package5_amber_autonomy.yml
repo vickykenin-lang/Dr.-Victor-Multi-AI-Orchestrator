@@ -58,7 +58,7 @@ jobs:
           const rollback=buildDefaultAmberRollback({previousVersion:'branch-absent',targetVersion:'branch-canary',probe:'git-ls-remote'});
           const base={capabilityId:'repo.branch.write',lease,sandboxReceipt:{status:'TEST_PASSED',evidence_refs:['ci'],production_applied:false,promotion_required:true},deploymentIdentity:{source_sha:process.env.GITHUB_SHA,build_id:process.env.GITHUB_RUN_ID},nowMs:now};
           if (evaluateAmberAction({...base,actionContract:null,rollback}).decision!=='DENY') throw new Error('EXPLICIT_ACTION_CONTRACT_NOT_ENFORCED');
-          const actionContract={contract_id:'step11-ci-branch-write',capability_id:'repo.branch.write',blast_radius:'one ephemeral non-main branch only',reversible:true,rollback_ref:rollback.rollback_action};
+          const actionContract={contract_id:'step11-ci-branch-write',capability_id:'repo.branch.write',blast_radius:'one ephemeral non-main branch only',reversible:true,rollback_ref:rollback.target_version};
           if (evaluateAmberAction({...base,actionContract,rollback:null}).decision!=='DENY') throw new Error('ROLLBACK_CONTRACT_NOT_ENFORCED');
           const allowed=evaluateAmberAction({...base,actionContract,rollback});
           if (allowed.decision!=='ALLOW_REVERSIBLE_AMBER') throw new Error(`VALID_AMBER_DENIED:${JSON.stringify(allowed)}`);
