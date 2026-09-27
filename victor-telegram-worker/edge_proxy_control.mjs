@@ -8,6 +8,12 @@ export function parseEdgeProxyControlCommand(text = '') {
   return null;
 }
 
+function safeTelegramDescription(body) {
+  const value = typeof body?.description === 'string' ? body.description.trim() : '';
+  if (!value) return null;
+  return value.slice(0, 240).replace(/bot\d+:[A-Za-z0-9_-]+/g, 'bot[REDACTED]');
+}
+
 export async function applyEdgeProxyControl(env, command, fetchImpl = fetch) {
   if (!command?.target_url) return { ok: false, status: 'INVALID_COMMAND', secrets_exposed: false };
   if (!env?.TELEGRAM_BOT_TOKEN_VICTOR || !env?.TELEGRAM_WEBHOOK_SECRET) {
@@ -42,8 +48,10 @@ export async function applyEdgeProxyControl(env, command, fetchImpl = fetch) {
     target_url: command.target_url,
     telegram_http_status: response.status,
     telegram_ok: body?.ok === true,
+    telegram_error_code: Number.isFinite(Number(body?.error_code)) ? Number(body.error_code) : null,
+    telegram_description: ok ? null : safeTelegramDescription(body),
     secrets_exposed: false,
   };
 }
 
-export { EDGE_PROXY_WEBHOOK_URL, PRIMARY_WEBHOOK_URL };
+export { EDGE_PROXY_WEBHOOK_URL, PRIMARY_WEBHOOK_URL, safeTelegramDescription };

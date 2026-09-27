@@ -57,11 +57,12 @@ export default {
 
           if (command && isAuthorizedFounderMessage(env, chatId, senderId)) {
             const result = await applyEdgeProxyControl(env, command);
+            const failureDetail = result.telegram_description ? ` — ${result.telegram_description}` : '';
             const safeText = result.ok
               ? command.action === 'CUTOVER'
                 ? 'Victor edge proxy cutover applied. Telegram webhook ab governed edge ingress par hai.'
                 : 'Victor edge proxy rollback applied. Telegram webhook direct primary ingress par restore ho gaya.'
-              : `Victor edge proxy ${command.action.toLowerCase()} failed: ${result.status}. No success claimed.`;
+              : `Victor edge proxy ${command.action.toLowerCase()} failed: ${result.status}${failureDetail}. No success claimed.`;
 
             await acknowledge(env, chatId, message?.message_id, safeText);
             return json({
@@ -71,6 +72,8 @@ export default {
               action: command.action,
               target_url: result.target_url || command.target_url,
               telegram_http_status: result.telegram_http_status || null,
+              telegram_error_code: result.telegram_error_code || null,
+              telegram_description: result.telegram_description || null,
               production_autonomy_changed: false,
               secrets_exposed: false,
             }, 200);
