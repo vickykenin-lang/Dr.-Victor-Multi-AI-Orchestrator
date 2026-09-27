@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  REASONING_INJECTION_VERSION,
   naturalDispatchAcknowledgement,
   naturalInvestigationAcknowledgement,
   naturalPendingReply,
@@ -40,10 +41,16 @@ test('pending reply states RESULT_PENDING and rejects background promise', () =>
   assert.doesNotMatch(reply, /result aate hi|update dunga/i);
 });
 
-test('result prompt requires strict state separation and no background promise', () => {
+test('result prompt injects bounded reasoning without exposing chain-of-thought', () => {
   const prompt = buildNaturalResultPrompt('rio', 'latest Instagram post?', 'Actually published posts: 7');
-  assert.match(prompt, /Lead with the actual answer/i);
-  assert.match(prompt, /Do not invent facts/i);
+  assert.equal(REASONING_INJECTION_VERSION, 'VICTOR_REASONING_INJECTION_V1');
+  assert.match(prompt, /VICTOR_REASONING_INJECTION_V1/);
+  assert.match(prompt, /silently reason through four checks/i);
+  assert.match(prompt, /what the Founder is actually asking now/i);
+  assert.match(prompt, /verified facts versus unknown\/inferred/i);
+  assert.match(prompt, /DISPATCHED, RESULT_PENDING, RESULT_RECEIVED, VERIFIED, or COMPLETED/i);
+  assert.match(prompt, /Do not reveal chain-of-thought/i);
+  assert.match(prompt, /Prefer using an existing verified result/i);
   assert.match(prompt, /DISPATCHED is not RUNNING/i);
   assert.match(prompt, /Never promise a later\/background update/i);
 });
