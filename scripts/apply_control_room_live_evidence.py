@@ -185,6 +185,9 @@ def main() -> int:
         })
 
     truth = snapshot.setdefault("truthfulness", {})
+    step13_required = truth.get("step13_final_certification_required_before_step14_closure", True)
+    if step13_required and "STEP13_FINAL_CERTIFICATION_REQUIRED" not in unresolved:
+        unresolved.append("STEP13_FINAL_CERTIFICATION_REQUIRED")
     truth["unresolved_surfaces"] = unresolved
     truth["live_evidence_ingested"] = True
     truth["live_evidence_current"] = any(
@@ -193,7 +196,7 @@ def main() -> int:
     )
 
     acceptance = snapshot.setdefault("acceptance", {})
-    acceptance["step14_ready_for_final_acceptance"] = len(unresolved) == 0
+    acceptance["step14_ready_for_final_acceptance"] = len(unresolved) == 0 and not step13_required
     acceptance["closure_claimed"] = False
 
     SNAPSHOT.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -204,6 +207,7 @@ def main() -> int:
         "runtime_truth_freshness": runtime_truth_freshness,
         "memory_freshness": memory_freshness,
         "unresolved_surfaces": unresolved,
+        "step13_final_certification_required": step13_required,
         "closure_claimed": False,
     }, indent=2))
     return 0
