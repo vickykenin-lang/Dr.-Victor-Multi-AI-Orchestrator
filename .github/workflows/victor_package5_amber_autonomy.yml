@@ -7,6 +7,12 @@ on:
       - 'brain/amber_autonomy.mjs'
       - 'brain/amber_autonomy.test.mjs'
       - '.github/workflows/victor_package5_amber_autonomy.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'brain/amber_autonomy.mjs'
+      - 'brain/amber_autonomy.test.mjs'
+      - '.github/workflows/victor_package5_amber_autonomy.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,31 +29,42 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '20'
-      - name: Validate AMBER controller
-        run: node brain/amber_autonomy.test.mjs
+          node-version: '22'
+      - name: Validate Step-11 AMBER controller
+        run: |
+          node --check brain/amber_autonomy.mjs
+          node brain/amber_autonomy.test.mjs
       - name: Verify AMBER boundaries remain fail-closed
         run: |
           node - <<'NODE'
           import { evaluateSecurityRequest } from './brain/security_kernel.mjs';
+          import { amberCapabilityRegistry } from './brain/amber_autonomy.mjs';
           const red=['credential.rotate','security.policy.change','authority.expand','production.destructive_change','pause.override'];
           for (const capability_id of red) {
             const r=evaluateSecurityRequest({actor:'victor',capability_id,founder_approved:false,action_contract_authorized:true});
             if (r.decision !== 'DENY') throw new Error(`RED_NOT_DENIED:${capability_id}`);
           }
-          console.log('RED_BOUNDARIES_DENIED');
+          const registry=amberCapabilityRegistry();
+          const enabled=registry.filter(x=>x.enabled).map(x=>x.capability_id);
+          if (JSON.stringify(enabled)!==JSON.stringify(['repo.branch.write'])) throw new Error(`UNEXPECTED_AMBER_ENABLED:${JSON.stringify(enabled)}`);
+          console.log(JSON.stringify({status:'STEP11_AMBER_ENABLEMENT_BOUNDARY_VERIFIED',enabled,disabled:registry.filter(x=>!x.enabled).map(x=>x.capability_id)},null,2));
           NODE
-      - name: Verify rollback path is mandatory
+      - name: Verify explicit Action Contract and rollback are mandatory
         run: |
           node - <<'NODE'
-          import { buildAmberExecutionLease, evaluateAmberAction } from './brain/amber_autonomy.mjs';
+          import { buildAmberExecutionLease, buildDefaultAmberRollback, evaluateAmberAction } from './brain/amber_autonomy.mjs';
           const now=Date.now();
-          const lease=buildAmberExecutionLease({leaseId:'ci-amber',expiresAtUtc:new Date(now+3600000).toISOString()});
-          const r=evaluateAmberAction({capabilityId:'production.reversible_change',actionContractAuthorized:true,lease,rollback:null,sandboxReceipt:{status:'TEST_PASSED',evidence_refs:['ci'],production_applied:false,promotion_required:true},deploymentIdentity:{source_sha:process.env.GITHUB_SHA,build_id:process.env.GITHUB_RUN_ID},nowMs:now});
-          if (r.decision !== 'DENY') throw new Error('ROLLBACK_CONTRACT_NOT_ENFORCED');
-          console.log('ROLLBACK_CONTRACT_ENFORCED');
+          const lease=buildAmberExecutionLease({leaseId:'ci-step11',expiresAtUtc:new Date(now+3600000).toISOString()});
+          const rollback=buildDefaultAmberRollback({previousVersion:'branch-absent',targetVersion:'branch-canary',probe:'git-ls-remote'});
+          const base={capabilityId:'repo.branch.write',lease,sandboxReceipt:{status:'TEST_PASSED',evidence_refs:['ci'],production_applied:false,promotion_required:true},deploymentIdentity:{source_sha:process.env.GITHUB_SHA,build_id:process.env.GITHUB_RUN_ID},nowMs:now};
+          if (evaluateAmberAction({...base,actionContract:null,rollback}).decision!=='DENY') throw new Error('EXPLICIT_ACTION_CONTRACT_NOT_ENFORCED');
+          const actionContract={contract_id:'step11-ci-branch-write',capability_id:'repo.branch.write',blast_radius:'one ephemeral non-main branch only',reversible:true,rollback_ref:rollback.rollback_action};
+          if (evaluateAmberAction({...base,actionContract,rollback:null}).decision!=='DENY') throw new Error('ROLLBACK_CONTRACT_NOT_ENFORCED');
+          const allowed=evaluateAmberAction({...base,actionContract,rollback});
+          if (allowed.decision!=='ALLOW_REVERSIBLE_AMBER') throw new Error(`VALID_AMBER_DENIED:${JSON.stringify(allowed)}`);
+          console.log('STEP11_ACTION_CONTRACT_AND_ROLLBACK_ENFORCED');
           NODE
-      - name: Execute reversible AMBER branch canary
+      - name: Execute certified reversible AMBER branch canary
         env:
           CANARY_BRANCH: victor-amber-canary-${{ github.run_id }}
         run: |
@@ -57,15 +74,34 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git checkout -b "$CANARY_BRANCH"
           mkdir -p .victor-canary
-          printf '%s\n' "run_id=${GITHUB_RUN_ID}" "source_sha=${GITHUB_SHA}" "scope=repo.branch.write" > .victor-canary/amber.txt
+          printf '%s\n' \
+            "run_id=${GITHUB_RUN_ID}" \
+            "source_sha=${GITHUB_SHA}" \
+            "capability=repo.branch.write" \
+            "action_contract=step11-ci-branch-write" \
+            "blast_radius=one ephemeral non-main branch only" \
+            "rollback=delete ephemeral branch" > .victor-canary/amber.txt
           git add .victor-canary/amber.txt
-          git commit -m "test: Victor AMBER reversible branch canary"
+          git commit -m "test: Victor Step-11 AMBER reversible branch canary"
           git push origin HEAD:"$CANARY_BRANCH"
           git ls-remote --exit-code --heads origin "$CANARY_BRANCH" >/dev/null
+          echo 'AMBER_CANARY_CREATE_VERIFIED'
           git push origin --delete "$CANARY_BRANCH"
           if git ls-remote --heads origin "$CANARY_BRANCH" | grep -q .; then
             echo 'AMBER_ROLLBACK_FAILED: branch still exists' >&2
             exit 1
           fi
           trap - EXIT
-          echo 'AMBER_BRANCH_CANARY_AND_ROLLBACK_VERIFIED'
+          printf '%s\n' \
+            '{' \
+            '  "status": "STEP11_REPO_BRANCH_WRITE_LIVE_CERTIFIED",' \
+            '  "capability": "repo.branch.write",' \
+            '  "action_contract": "step11-ci-branch-write",' \
+            '  "blast_radius": "one ephemeral non-main branch only",' \
+            '  "live_mutation_verified": true,' \
+            '  "rollback_verified": true,' \
+            '  "residual_branch_present": false,' \
+            '  "repo_pr_write_enabled": false,' \
+            '  "production_reversible_change_enabled": false,' \
+            '  "red_authority_expanded": false' \
+            '}'
