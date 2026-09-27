@@ -35,7 +35,13 @@ function targetFromText(text = '') {
 }
 
 export function temporaryLlmAuthorityStatus(nowValue = Date.now()) {
-  const now = Number.isFinite(Number(nowValue)) ? Number(nowValue) : Date.now();
+  const numericNow = Number(nowValue);
+  const parsedNow = typeof nowValue === 'string' ? Date.parse(nowValue) : NaN;
+  const now = Number.isFinite(numericNow)
+    ? numericNow
+    : Number.isFinite(parsedNow)
+      ? parsedNow
+      : Date.now();
   const start = Date.parse(TEMPORARY_LLM_AUTHORITY.starts_at_utc);
   const end = Date.parse(TEMPORARY_LLM_AUTHORITY.ends_at_utc);
   return {
