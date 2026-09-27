@@ -1,4 +1,4 @@
-import primaryWorker from './worker.js';
+import primaryWorker, { isAuthorizedFounderMessage } from './worker.js';
 import { applyEdgeProxyControl, parseEdgeProxyControlCommand } from './edge_proxy_control.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -10,11 +10,6 @@ function constantTimeEqual(a, b) {
   let diff = 0;
   for (let i = 0; i < left.length; i += 1) diff |= left[i] ^ right[i];
   return diff === 0;
-}
-
-function founderAuthorized(env, chatId, senderId) {
-  const founder = String(env?.VICTOR_FOUNDER_CHAT_ID || '').trim();
-  return Boolean(founder) && String(chatId || '') === founder && String(senderId || '') === founder;
 }
 
 async function acknowledge(env, chatId, messageId, text) {
@@ -60,7 +55,7 @@ export default {
           const chatId = String(message?.chat?.id ?? '');
           const senderId = String(message?.from?.id ?? '');
 
-          if (command && founderAuthorized(env, chatId, senderId)) {
+          if (command && isAuthorizedFounderMessage(env, chatId, senderId)) {
             const result = await applyEdgeProxyControl(env, command);
             const safeText = result.ok
               ? command.action === 'CUTOVER'
@@ -90,4 +85,4 @@ export default {
   },
 };
 
-export { constantTimeEqual, founderAuthorized };
+export { constantTimeEqual };
