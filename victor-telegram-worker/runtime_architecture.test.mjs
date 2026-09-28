@@ -75,10 +75,11 @@ test('mutating department instructions remain actions, not read-only queries', (
   }
 });
 
-test('generic department query evidence packs exist for active content departments', () => {
+test('generic department query evidence packs cover Victor, RIO, AURA3 and Tony', () => {
+  assert.equal(hasExtendedEvidencePack('victor'), true);
   assert.equal(hasExtendedEvidencePack('rio'), true);
   assert.equal(hasExtendedEvidencePack('aura3'), true);
-  assert.equal(hasExtendedEvidencePack('tony_stark'), false);
+  assert.equal(hasExtendedEvidencePack('tony_stark'), true);
 });
 
 test('legacy exact-fact registry remains available as deterministic evidence utility', () => {
