@@ -8,6 +8,7 @@ const PROCEDURES=Object.freeze({
 
 const ROUTING_CATALOG=Object.freeze({
  STATUS:Object.freeze({procedure_id:"founder-status-check-v1",risk:"GREEN",approval_required:false}),
+ FACT_QUERY:Object.freeze({procedure_id:"founder-status-check-v1",risk:"GREEN",approval_required:false}),
  STOP:Object.freeze({procedure_id:"safe-stop-v1",risk:"AMBER",approval_required:false}),
  ACTION:Object.freeze({procedure_id:"department-action-v1",risk:"AMBER",approval_required:false}),
  SENSITIVE_ACTION:Object.freeze({procedure_id:"sensitive-action-v1",risk:"RED",approval_required:true}),
