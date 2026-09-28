@@ -23,10 +23,17 @@ export function extractApprovalId(text) {
   return match ? match[1] : null;
 }
 
-export function routeDeterministically(text) {
+function isLastPostFactQuery(raw) {
+  return /\b(last|latest|pichl(?:a|i|e)|recent)\b.*\b(post|instagram)\b/i.test(raw)
+    || /\b(post|instagram)\b.*\b(kab|when|last|latest|recent|pichl(?:a|i|e))\b/i.test(raw)
+    || /\blast\s+post\b/i.test(raw);
+}
+
+export function routeDeterministically(text, context = {}) {
   const raw = normalize(text);
-  const value = raw.toLowerCase();
-  const department = resolveDepartment(raw);
+  const explicitDepartment = resolveDepartment(raw);
+  const inheritedDepartment = context?.department || null;
+  const department = explicitDepartment || (isLastPostFactQuery(raw) ? inheritedDepartment : null);
 
   const approvalId = extractApprovalId(raw);
   if (approvalId) return { type: 'APPROVAL', department: null, action: 'approve', risk: 'RED', confidence: 1, approval_id: approvalId, source: 'rule' };
@@ -37,6 +44,11 @@ export function routeDeterministically(text) {
 
   if (/\b(remind|reminder|yaad dila|yaad dilana|yaad kara|remind kar|message bhej.*(?:baje|am|pm)|msg bhej.*(?:baje|am|pm))\b/i.test(raw)) {
     return { type: 'REMINDER', department: null, action: 'create_reminder', risk: 'GREEN', confidence: 1, source: 'rule' };
+  }
+
+  // Exact fact reads must win before generic action words such as "post".
+  if (department === 'rio' && isLastPostFactQuery(raw)) {
+    return { type: 'FACT_QUERY', department: 'rio', action: 'instagram_last_post', risk: 'GREEN', confidence: 1, source: explicitDepartment ? 'rule' : 'context-rule' };
   }
 
   const statusCue = /\b(status|check|update|progress|result|report|health|kya chal|kya hua|kaisa|kitne|published|ready|blocker)\b/i;
@@ -65,7 +77,7 @@ export function routeDeterministically(text) {
 
 export function normalizeSemanticRoute(candidate = {}) {
   const type = String(candidate.type || '').toUpperCase();
-  const allowedTypes = new Set(['CHAT', 'STATUS', 'ACTION', 'REMINDER', 'STOP']);
+  const allowedTypes = new Set(['CHAT', 'STATUS', 'FACT_QUERY', 'ACTION', 'REMINDER', 'STOP']);
   const risk = String(candidate.risk || 'GREEN').toUpperCase();
   const allowedRisks = new Set(['GREEN', 'AMBER', 'RED']);
   const confidence = Number(candidate.confidence || 0);
