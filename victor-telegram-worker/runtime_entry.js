@@ -2,6 +2,7 @@ import primaryWorker, { isAuthorizedFounderMessage } from './worker.js';
 import { callVictorModel } from './model_router.mjs';
 import { routeDeterministically, normalizeSemanticRoute } from './single_router.mjs';
 import { executeTask } from './task_runtime.mjs';
+import { answerDepartmentQuestion } from './department_query_runtime.mjs';
 import { applyEdgeProxyControl, parseEdgeProxyControlCommand } from './edge_proxy_control.mjs';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -9,6 +10,8 @@ const UPDATE_TTL_SECONDS = 86400;
 const CHAT_HISTORY_TTL_SECONDS = 30 * 86400;
 const TASK_CONTEXT_TTL_SECONDS = 6 * 3600;
 const RESULT_TTL_SECONDS = 86400;
+const COURTESY_DELAY_MS = 4000;
+const COURTESY_TTL_SECONDS = 3600;
 const FIXED_PERSONA = `You are Dr. Victor, Vicky Gautam's personal AI assistant and executive orchestrator. This is the pure conversation path. Speak naturally, directly and concisely in the Founder's language. Do not call tools, departments, Cognee, evidence systems or status sources. Do not claim that any external action happened. Do not defend your identity mechanically. Handle casual conversation, humour, frustration and normal questions like a capable general AI assistant.`;
 
 function json(body, status = 200) {
@@ -63,6 +66,35 @@ async function deleteKey(env, key) {
   if (kv && typeof kv.delete === 'function') await kv.delete(key);
 }
 
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function runWithCourtesy(env, ctx, { updateId, chatId, messageId }, work) {
+  let finished = false;
+  const courtesyKey = `victor:courtesy:${updateId}`;
+  const courtesyWork = (async () => {
+    await delay(COURTESY_DELAY_MS);
+    if (finished) return;
+    const existing = await getJson(env, courtesyKey);
+    if (existing) return;
+    await putJson(env, courtesyKey, { state: 'RESERVED', at: new Date().toISOString() }, COURTESY_TTL_SECONDS);
+    try {
+      await sendTelegram(env, chatId, 'Iske answer me thoda time lagega, main check kar raha hoon.', messageId);
+      await putJson(env, courtesyKey, { state: 'SENT', at: new Date().toISOString() }, COURTESY_TTL_SECONDS);
+    } catch (error) {
+      console.warn(JSON.stringify({ event: 'VICTOR_COURTESY_SEND_FAILED', update_id: updateId, error: error?.name || 'Error', secrets_exposed: false }));
+    }
+  })();
+  if (ctx?.waitUntil) ctx.waitUntil(courtesyWork);
+  else void courtesyWork;
+  try {
+    return await work();
+  } finally {
+    finished = true;
+  }
+}
+
 async function readChatHistory(env, chatId) {
   const history = await getJson(env, `victor:chat-history:${chatId}`);
   return Array.isArray(history) ? history.slice(-10) : [];
@@ -90,7 +122,7 @@ async function writeTaskContext(env, chatId, route) {
 }
 
 async function semanticFallback(env, text) {
-  const system = `Classify one Founder message for Victor. Return JSON only. Types: CHAT, STATUS, FACT_QUERY, ACTION, REMINDER, STOP. Departments: rio, aura3, aura2, tony_stark, hulk, or null. Risk: GREEN, AMBER, RED. Default to CHAT. FACT_QUERY is for read-only exact facts. Dispatch ACTION only when the message clearly asks for an external/system action. Frustration, jokes and dismissive speech such as 'bhag jao' are CHAT. Schema: {"type":"CHAT|STATUS|FACT_QUERY|ACTION|REMINDER|STOP","department":null,"action":null,"risk":"GREEN|AMBER|RED","confidence":0.0}`;
+  const system = `Classify one Founder message for Victor. Return JSON only. Types: CHAT, STATUS, DEPARTMENT_QUERY, ACTION, REMINDER, STOP. Departments: rio, aura3, aura2, tony_stark, hulk, or null. Risk: GREEN, AMBER, RED. Default to CHAT. DEPARTMENT_QUERY is any read-only question about a department: facts, history, counts, blockers, revenue, posts, results, dates, pending work or explanations. ACTION is only when the Founder clearly asks to change or execute something. Frustration, jokes and dismissive speech such as 'bhag jao' are CHAT. Schema: {"type":"CHAT|STATUS|DEPARTMENT_QUERY|ACTION|REMINDER|STOP","department":null,"action":null,"risk":"GREEN|AMBER|RED","confidence":0.0}`;
   try {
     const result = await callVictorModel(env, system, text, { task: 'fast', maxTokens: 120, temperature: 0 });
     const cleaned = String(result.content || '').replace(/```json|```/gi, '').trim();
@@ -181,7 +213,7 @@ async function processQueuedMessage(env, ctx, envelope) {
       return;
     }
     route = { ...pending.route, risk: 'RED', approved: true, approval_id: route.approval_id };
-    const taskResult = await executeTask(env, route, pending.text, pending.messageId, pending.updateId);
+    const taskResult = await runWithCourtesy(env, ctx, { updateId, chatId, messageId: message.message_id }, () => executeTask(env, route, pending.text, pending.messageId, pending.updateId));
     if (taskResult.delegate_legacy) {
       await delegateLegacy(env, ctx, pending.update || update, envelope.original_url);
       return;
@@ -193,7 +225,7 @@ async function processQueuedMessage(env, ctx, envelope) {
   }
 
   if (route.type === 'CHAT') {
-    const reply = await runChat(env, chatId, text);
+    const reply = await runWithCourtesy(env, ctx, { updateId, chatId, messageId: message.message_id }, () => runChat(env, chatId, text));
     await putJson(env, resultKey, { reply, type: 'CHAT', completed_at: new Date().toISOString() }, RESULT_TTL_SECONDS);
     await sendTelegram(env, chatId, reply, message.message_id);
     return;
@@ -207,7 +239,15 @@ async function processQueuedMessage(env, ctx, envelope) {
     return;
   }
 
-  const taskResult = await executeTask(env, route, text, message.message_id, updateId);
+  if (route.type === 'DEPARTMENT_QUERY') {
+    const queryResult = await runWithCourtesy(env, ctx, { updateId, chatId, messageId: message.message_id }, () => answerDepartmentQuestion(env, route.department, text));
+    await writeTaskContext(env, chatId, route);
+    await putJson(env, resultKey, { reply: queryResult.reply, type: 'DEPARTMENT_QUERY', completed_at: new Date().toISOString(), verified: queryResult.verified === true }, RESULT_TTL_SECONDS);
+    await sendTelegram(env, chatId, queryResult.reply, message.message_id);
+    return;
+  }
+
+  const taskResult = await runWithCourtesy(env, ctx, { updateId, chatId, messageId: message.message_id }, () => executeTask(env, route, text, message.message_id, updateId));
   if (taskResult.delegate_legacy) {
     await delegateLegacy(env, ctx, update, envelope.original_url);
     return;
@@ -280,4 +320,4 @@ export default {
   },
 };
 
-export { constantTimeEqual, routeMessage, runChat, processQueuedMessage };
+export { constantTimeEqual, routeMessage, runChat, processQueuedMessage, runWithCourtesy };
