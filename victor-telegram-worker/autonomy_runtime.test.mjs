@@ -1,29 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  persistCycleExperience,
+  EXECUTION_TRIGGERS,
+  autonomyConfigured,
   buildAutonomyEvidence,
-  safeRouterDiagnostics,
-  chooseGoalDepartment,
-  selectHighestValueGoal,
-  buildGoalTaskPrompt,
-  buildGoalCertification,
-  autonomyBindingReadiness,
-  canBypassGenericApproval,
-  founderAuthorityBoundary,
-  evaluateGoalAchievement,
   buildGoalRuntimeState,
+  buildGoalTaskPrompt,
   buildVictorReportCard,
-  executeAutonomousGoalCycle,
+  chooseGoalDepartment,
   classifyAutonomyResult,
-  applyMaterialProgressPolicy,
+  runAutonomousCycle,
+  safeRouterDiagnostics,
+  persistCycleExperience,
+  scoreGoal,
+  selectAutonomyGoal,
 } from './autonomy_runtime.mjs';
 
 const revenueGoal = {
-  goal_id: 'rio-affiliate-revenue',
-  objective: 'Produce verified paid affiliate revenue',
-  priority: 100,
+  goal_id: 'ORG-REVENUE-001',
+  title: 'Revenue',
   status: 'ACTIVE',
+  priority: 100,
+  objective: 'Generate verified revenue',
   success_conditions: ['Verified paid outcome'],
   required_evidence_level: 'E5_BUSINESS_OUTCOME',
   primary_department: 'rio',
@@ -64,128 +62,267 @@ test('cycle records each dispatched action as an idempotent durable episode', as
 
 test('router evidence is bounded and excludes arbitrary error text and secrets', () => {
   const evidence = safeRouterDiagnostics({
-    discoveryStatus: 'DISCOVERY_HTTP_ERROR',
-    modelFailures: [
-      { model: 'safe-model', http_status: 429, error: 'ghp_should-never-leak' },
-      { model: 'unsafe model with spaces', code: 'FetchError', token: 'secret' },
-    ],
-    message: 'Bearer super-secret-token',
+    discoveryStatus: 'DISCOVERED',
+    modelFailures: Array.from({ length: 9 }, (_, index) => ({
+      model: index === 0 ? 'key=secret value' : `model-${index}`,
+      code: index === 0 ? 'Bearer secret' : 'TimeoutError',
+      http_status: 403,
+      detail: 'sensitive body',
+    })),
   });
-  assert.equal(evidence.discovery_status, 'DISCOVERY_HTTP_ERROR');
-  assert.equal(evidence.model_failures[0].model, 'safe-model');
-  assert.equal(evidence.model_failures[0].http_status, 429);
-  assert.equal(evidence.model_failures[1].model, 'REDACTED');
-  assert.equal(evidence.model_failures[1].code, 'FetchError');
-  assert.equal(JSON.stringify(evidence).includes('secret'), false);
+  assert.equal(evidence.discovery_status, 'DISCOVERED');
+  assert.equal(evidence.model_failures.length, 4);
+  assert.equal(evidence.model_failures[0].model, 'REDACTED');
+  assert.equal(evidence.model_failures[0].code, 'REDACTED');
+  assert.doesNotMatch(JSON.stringify(evidence), /secret|sensitive/);
 });
 
 test('goal routing follows runtime recommendation instead of fixed department rotation', () => {
-  const selected = chooseGoalDepartment(revenueGoal, { recommended_department: 'aura3' }, ['rio', 'aura3']);
-  assert.equal(selected, 'aura3');
+  assert.equal(chooseGoalDepartment(revenueGoal, { recommended_department: 'tony_stark' }, ['rio', 'tony_stark']), 'tony_stark');
+  assert.equal(chooseGoalDepartment(revenueGoal, {}, ['rio', 'tony_stark']), 'rio');
 });
 
 test('highest-value active goal is selected', () => {
-  const selected = selectHighestValueGoal([
-    { ...revenueGoal, goal_id: 'low', priority: 10 },
-    { ...revenueGoal, goal_id: 'high', priority: 50 },
-  ], {});
-  assert.equal(selected.goal_id, 'high');
+  const registry = { goals: [
+    { ...revenueGoal, goal_id: 'g-low', priority: 30 },
+    { ...revenueGoal, goal_id: 'g-high', priority: 90 },
+  ] };
+  const selected = selectAutonomyGoal(registry, { goals: {} }, ['rio'], Date.parse('2026-08-28T18:00:00Z'));
+  assert.equal(selected.goal.goal_id, 'g-high');
+  assert.equal(selected.target, 'rio');
 });
 
 test('completed goal is not selected again', () => {
-  const selected = selectHighestValueGoal([revenueGoal], { [revenueGoal.goal_id]: { state: 'GOAL_ACHIEVED_VERIFIED' } });
+  const selected = selectAutonomyGoal(
+    { goals: [revenueGoal] },
+    { goals: { 'ORG-REVENUE-001': { state: 'GOAL_ACHIEVED_VERIFIED' } } },
+    ['rio'],
+  );
   assert.equal(selected, null);
 });
 
 test('stale unresolved work gains bounded priority', () => {
-  const now = Date.now();
-  const selected = selectHighestValueGoal([
-    { ...revenueGoal, goal_id: 'fresh', priority: 50 },
-    { ...revenueGoal, goal_id: 'stale', priority: 45 },
-  ], {
-    fresh: { state: 'READY', last_attempt_at_utc: new Date(now - 60_000).toISOString() },
-    stale: { state: 'BLOCKED_RETRYABLE', last_attempt_at_utc: new Date(now - 4 * 3600_000).toISOString() },
-  }, now);
-  assert.equal(selected.goal_id, 'stale');
+  const now = Date.parse('2026-08-28T18:00:00Z');
+  const fresh = scoreGoal(revenueGoal, { state: 'WORKING', last_attempt_at_utc: '2026-08-28T17:55:00Z' }, now);
+  const stale = scoreGoal(revenueGoal, { state: 'WORKING', last_attempt_at_utc: '2026-08-28T12:00:00Z' }, now);
+  assert.ok(stale > fresh);
 });
 
 test('goal task prompt delegates HOW but keeps target and boundaries fixed', () => {
-  const prompt = buildGoalTaskPrompt(revenueGoal, { state: 'READY' }, 'rio');
-  assert.match(prompt, /how/i);
+  const prompt = buildGoalTaskPrompt(revenueGoal, 'EXECUTE');
+  assert.match(prompt, /Target: Generate verified revenue/);
+  assert.match(prompt, /HOW is delegated/);
   assert.match(prompt, /NO_RAW_SECRET_DISCLOSURE/);
-  assert.match(prompt, /verified paid affiliate revenue/i);
+  assert.match(prompt, /Do not wait for routine Founder approval/);
 });
 
 test('verified goal cycle creates persistent certification evidence', () => {
-  const certification = buildGoalCertification(revenueGoal, {
-    assessment: { goalAchieved: true, evidence: ['paid-settlement-receipt'] },
-    target: 'rio', verified: true,
-  });
-  assert.equal(certification.status, 'GOAL_ACHIEVED_VERIFIED');
-  assert.ok(certification.evidence.includes('paid-settlement-receipt'));
+  const state = buildAutonomyEvidence(
+    { last_verified_cycle: null },
+    { status: 'GOAL_PROGRESS_VERIFIED', goalId: 'ORG-REVENUE-001', target: 'rio', result: { taskId: 'task-1', evidenceReceived: true } },
+    { cron: 'founder-command' },
+    '2026-08-28T18:00:00.000Z',
+  );
+  assert.equal(state.runtime_status, 'MANUAL_GOAL_CYCLE_VERIFIED');
+  assert.equal(state.decision_mode, 'GOAL_DRIVEN_EXECUTIVE');
+  assert.equal(state.last_verified_cycle.goal_id, 'ORG-REVENUE-001');
+  assert.equal(state.last_verified_cycle.task_id, 'task-1');
 });
 
 test('autonomy requires all existing bindings', () => {
-  const ready = autonomyBindingReadiness({
-    VICTOR_CONVERSATION_STATE: {}, GITHUB_ORCHESTRATION_TOKEN: 'x', TELEGRAM_BOT_TOKEN_VICTOR: 'y', VICTOR_FOUNDER_CHAT_ID: '1',
-  });
-  assert.equal(ready.ready, true);
+  assert.equal(autonomyConfigured({}), false);
+  assert.equal(autonomyConfigured({
+    GITHUB_ORCHESTRATION_TOKEN: 'present',
+    TELEGRAM_BOT_TOKEN_VICTOR: 'present',
+    VICTOR_FOUNDER_CHAT_ID: 'present',
+  }), true);
 });
 
 test('generic approval waits are bypassed in self mode', () => {
-  assert.equal(canBypassGenericApproval({ mode: 'SELF' }, { risk: 'GREEN' }), true);
+  const assessment = classifyAutonomyResult({
+    strict_supervision: {
+      status: 'BLOCKED',
+      error_or_blocker: 'FOUNDER_APPROVAL_REQUIRED',
+      next_action: 'FOUNDER_REVIEW',
+      evidence: ['audit.json'],
+      requires_follow_up: true,
+    },
+  });
+  assert.equal(assessment.founderGate, false);
+  assert.equal(assessment.goalAchieved, false);
+  assert.equal(assessment.hasBlocker, true);
 });
 
 test('credential administration remains Founder-only', () => {
-  assert.equal(founderAuthorityBoundary({ nextAction: 'rotate credential' }).founderRequired, true);
+  const assessment = classifyAutonomyResult({
+    strict_supervision: {
+      status: 'BLOCKED',
+      error_or_blocker: 'MISSING CREDENTIAL',
+      next_action: 'ADD CREDENTIAL',
+      evidence: ['credential_presence_check.json'],
+      requires_follow_up: true,
+    },
+  });
+  assert.equal(assessment.founderGate, true);
+  assert.equal(assessment.credentialGate, true);
 });
 
 test('goal or hard-boundary change remains Founder-owned', () => {
-  assert.equal(founderAuthorityBoundary({ nextAction: 'change objective' }).founderRequired, true);
+  const assessment = classifyAutonomyResult({
+    strict_supervision: {
+      status: 'BLOCKED',
+      error_or_blocker: 'HARD_BOUNDARY_CONFLICT',
+      next_action: 'CHANGE_GOAL',
+      evidence: ['constraint.json'],
+      requires_follow_up: true,
+    },
+  });
+  assert.equal(assessment.founderGate, true);
+  assert.equal(assessment.boundaryGate, true);
 });
 
 test('goal achievement requires evidence', () => {
-  assert.equal(evaluateGoalAchievement(revenueGoal, { assessment: { goalAchieved: true, evidence: [] }, verified: true }).achieved, false);
+  const withoutEvidence = classifyAutonomyResult({
+    strict_supervision: { status: 'OBJECTIVE_MET_VERIFIED', evidence: [] },
+  });
+  const withEvidence = classifyAutonomyResult({
+    strict_supervision: { status: 'OBJECTIVE_MET_VERIFIED', evidence: ['payment.json'] },
+  });
+  assert.equal(withoutEvidence.goalAchieved, false);
+  assert.equal(withEvidence.goalAchieved, true);
 });
 
 test('goal runtime state records progress and recommended replan route', () => {
-  const state = buildGoalRuntimeState(revenueGoal, { assessment: { status: 'BLOCKED' }, target: 'tony_stark', verified: true }, { material: false, reason: 'NO_PROGRESS' });
-  assert.ok(state.state);
+  const next = buildGoalRuntimeState(
+    { goals: { 'ORG-REVENUE-001': { state: 'READY', attempts: 0, evidence: [] } } },
+    { goal: revenueGoal, target: 'rio' },
+    {
+      verified: true,
+      assessment: {
+        status: 'BLOCKED',
+        hasBlocker: true,
+        founderGate: false,
+        goalAchieved: false,
+        nextAction: 'Tony technical workflow repair required',
+        evidence: ['failure.json'],
+      },
+    },
+    '2026-08-28T18:00:00Z',
+  );
+  assert.equal(next.goals['ORG-REVENUE-001'].state, 'BLOCKED_RETRYABLE');
+  assert.equal(next.goals['ORG-REVENUE-001'].recommended_department, 'tony_stark');
+  assert.equal(next.goals['ORG-REVENUE-001'].attempts, 1);
 });
 
 test('verified final goal outcome closes runtime goal', () => {
-  const state = buildGoalRuntimeState(revenueGoal, { assessment: { goalAchieved: true, evidence: ['paid'] }, target: 'rio', verified: true }, { material: true });
-  assert.equal(state.state, 'GOAL_ACHIEVED_VERIFIED');
+  const next = buildGoalRuntimeState(
+    { goals: { 'ORG-REVENUE-001': { state: 'WORKING', attempts: 2, evidence: [] } } },
+    { goal: revenueGoal, target: 'rio' },
+    {
+      verified: true,
+      assessment: {
+        status: 'OBJECTIVE_MET_VERIFIED',
+        hasBlocker: false,
+        founderGate: false,
+        goalAchieved: true,
+        nextAction: 'CLOSE',
+        evidence: ['payment.json'],
+      },
+    },
+    '2026-08-28T18:00:00Z',
+  );
+  assert.equal(next.runtime_status, 'GOAL_ACHIEVED_VERIFIED');
+  assert.equal(next.active_goal_id, null);
+  assert.equal(next.goals['ORG-REVENUE-001'].state, 'GOAL_ACHIEVED_VERIFIED');
 });
 
 test('Victor report card gives marks only for verified department final outcomes', () => {
-  const report = buildVictorReportCard([{ target: 'rio', verified: false, assessment: { finalOutcome: { verified: false, evidence: [], score: 10 } } }]);
-  assert.equal(report.departments[0].score, 1);
+  const card = buildVictorReportCard([
+    { target: 'rio', verified: true, assessment: { finalOutcome: null } },
+    { target: 'aura3', verified: true, assessment: { finalOutcome: {
+      verified: true, objective_met: false, score: 7, evidence: ['lead.json'],
+    } } },
+    { target: 'tony_stark', verified: true, assessment: { finalOutcome: {
+      verified: true, objective_met: true, score: 10, evidence: ['repair.json'],
+    } } },
+  ]);
+  assert.equal(card.score, 6);
+  assert.equal(card.departments[0].score, 1);
+  assert.equal(card.departments[1].score, 7);
+  assert.equal(card.departments[2].score, 10);
+  assert.equal(card.system_health_points, 0);
 });
 
 test('10 out of 10 requires objective met evidence', () => {
-  const report = buildVictorReportCard([{ target: 'rio', verified: true, assessment: { finalOutcome: { verified: true, objective_met: false, evidence: ['x'], score: 10 } } }]);
-  assert.equal(report.departments[0].score, 9);
+  const card = buildVictorReportCard([{ target: 'rio', verified: true, assessment: { finalOutcome: {
+    verified: true, objective_met: false, score: 10, evidence: ['partial.json'],
+  } } }]);
+  assert.equal(card.score, 9);
 });
 
 test('Founder manual executive trigger is the only supported execution trigger', async () => {
-  const result = await executeAutonomousGoalCycle({}, { trigger: 'founder-command', dryRun: true });
-  assert.notEqual(result?.status, 'TRIGGER_NOT_ALLOWED');
+  assert.deepEqual(EXECUTION_TRIGGERS, { MANUAL_FOUNDER_TRIGGER: 'founder-command' });
+  await assert.rejects(
+    () => runAutonomousCycle({ cron: 'founder-command', scheduledTime: Date.now() }, {}),
+    /AUTONOMY_REQUIRED_BINDINGS_NOT_CONFIGURED/,
+  );
 });
 
 test('scheduled and unknown triggers fail closed without executing a goal', async () => {
-  assert.equal((await executeAutonomousGoalCycle({}, { trigger: 'scheduled' })).status, 'TRIGGER_NOT_ALLOWED');
-  assert.equal((await executeAutonomousGoalCycle({}, { trigger: 'unknown' })).status, 'TRIGGER_NOT_ALLOWED');
+  for (const cron of ['*/15 * * * *', '30 16 * * *', 'unknown']) {
+    const result = await runAutonomousCycle({ cron, scheduledTime: Date.now() }, {});
+    assert.equal(result.status, 'SAFE_STOP');
+    assert.equal(result.error_code, 'MANUAL_TRIGGER_REQUIRED');
+    assert.equal(result.target, null);
+  }
 });
 
 test('read-only corrective result is verified activity but not material progress', () => {
-  const assessment = classifyAutonomyResult({ strict_supervision: { status: 'VERIFIED', evidence: ['read-only'], outcome_progress: 'no material change' } });
-  const policy = applyMaterialProgressPolicy({ assessment, target: 'rio' });
-  assert.equal(policy.material, false);
+  const priorProgress = '2026-08-28T17:00:00Z';
+  const next = buildGoalRuntimeState(
+    { goals: { 'ORG-REVENUE-001': { state: 'WORKING', attempts: 10, evidence: ['old.json'], last_verified_progress_at_utc: priorProgress } } },
+    { goal: revenueGoal, target: 'tony_stark' },
+    {
+      verified: true,
+      actionContract: {
+        contract_version: 1,
+        objective_id: 'ORG-REVENUE-001',
+        phase: 'CORRECTIVE_EXECUTE',
+        target: 'tony_stark',
+        requested_actions: ['READ_REPOSITORY', 'ANALYZE', 'PROPOSE_OR_APPLY_CODE_CHANGE_SUBJECT_TO_AUTHORITY', 'RUN_TESTS', 'RETURN_EVIDENCE'],
+        authority_level: 'L2',
+        mutation_allowed: true,
+        production_allowed: false,
+      },
+      rawResult: { repair_executed: false },
+      assessment: {
+        status: 'READ_ONLY_AUDIT_COMPLETED',
+        hasBlocker: false,
+        founderGate: false,
+        goalAchieved: false,
+        nextAction: 'VICTOR_REVIEW_AUDIT_AND_AUTHORIZE_REPAIR_PLAN',
+        evidence: ['fresh-audit-filename.json'],
+      },
+    },
+    '2026-08-28T18:00:00Z',
+  );
+  const goal = next.goals['ORG-REVENUE-001'];
+  assert.equal(goal.state, 'NO_PROGRESS');
+  assert.equal(goal.last_progress_delta.material, false);
+  assert.equal(goal.last_verified_progress_at_utc, priorProgress);
 });
 
 test('NO_PROGRESS cycle does not overwrite last materially verified cycle', () => {
-  const prior = { last_material_progress_at_utc: '2026-09-20T00:00:00Z' };
-  const state = buildGoalRuntimeState(revenueGoal, { assessment: { status: 'BLOCKED' }, target: 'rio', verified: true }, { material: false }, prior);
-  assert.equal(state.last_material_progress_at_utc, prior.last_material_progress_at_utc);
+  const prior = {
+    last_verified_cycle: { status: 'GOAL_PROGRESS_VERIFIED', task_id: 'material-task' },
+  };
+  const next = buildAutonomyEvidence(
+    prior,
+    { status: 'GOAL_NO_PROGRESS_VERIFIED', goalId: 'ORG-REVENUE-001', target: 'tony_stark', result: { taskId: 'audit-task', progressDelta: { material: false } } },
+    { cron: 'founder-command' },
+    '2026-08-28T18:00:00Z',
+  );
+  assert.equal(next.runtime_status, 'MANUAL_GOAL_CYCLE_NO_PROGRESS');
+  assert.equal(next.last_verified_cycle.task_id, 'material-task');
+  assert.equal(next.last_observed_cycle.task_id, 'audit-task');
 });
