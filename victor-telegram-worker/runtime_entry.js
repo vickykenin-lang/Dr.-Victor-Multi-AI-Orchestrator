@@ -104,9 +104,9 @@ function approvalIdFor(updateId) {
   return `ap-${String(updateId || 'msg').replace(/[^a-z0-9-]/gi, '').slice(0, 40)}-${Date.now().toString(36)}`;
 }
 
-async function requestApproval(env, updateId, chatId, messageId, text, route) {
+async function requestApproval(env, updateId, chatId, messageId, text, route, originalUpdate) {
   const approvalId = approvalIdFor(updateId);
-  await putJson(env, `victor:approval:${approvalId}`, { updateId, chatId, messageId, text, route, created_at: new Date().toISOString() }, 3600);
+  await putJson(env, `victor:approval:${approvalId}`, { updateId, chatId, messageId, text, route, update: originalUpdate, created_at: new Date().toISOString() }, 3600);
   return `Sensitive action detected. Execution abhi blocked hai. Approve karne ke liye reply karein: OK ${approvalId}`;
 }
 
@@ -165,7 +165,7 @@ async function processQueuedMessage(env, ctx, envelope) {
       return;
     }
     route = { ...pending.route, risk: 'RED', approved: true, approval_id: route.approval_id };
-    const taskResult = await executeTask(env, route, pending.text, pending.messageId);
+    const taskResult = await executeTask(env, route, pending.text, pending.messageId, pending.updateId);
     if (taskResult.delegate_legacy) {
       await delegateLegacy(env, ctx, pending.update || update, envelope.original_url);
       return;
@@ -183,13 +183,13 @@ async function processQueuedMessage(env, ctx, envelope) {
   }
 
   if (route.type === 'ACTION' && route.risk === 'RED') {
-    const reply = await requestApproval(env, updateId, chatId, message.message_id, text, route);
+    const reply = await requestApproval(env, updateId, chatId, message.message_id, text, route, update);
     await putJson(env, resultKey, { reply, type: 'APPROVAL_REQUIRED', completed_at: new Date().toISOString() }, RESULT_TTL_SECONDS);
     await sendTelegram(env, chatId, reply, message.message_id);
     return;
   }
 
-  const taskResult = await executeTask(env, route, text, message.message_id);
+  const taskResult = await executeTask(env, route, text, message.message_id, updateId);
   if (taskResult.delegate_legacy) {
     await delegateLegacy(env, ctx, update, envelope.original_url);
     return;
