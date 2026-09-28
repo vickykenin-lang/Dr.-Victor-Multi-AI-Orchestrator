@@ -2,7 +2,7 @@ import { callVictorModel } from './model_router.mjs';
 import { capabilitySummary, getCapability } from './capability_registry.mjs';
 import { buildCapabilityGapPlan } from './capability_acquisition.mjs';
 
-export const LLM_FIRST_BRAIN_VERSION = 'VICTOR_LLM_FIRST_BRAIN_V2';
+export const LLM_FIRST_BRAIN_VERSION = 'VICTOR_LLM_FIRST_BRAIN_V3';
 const SAFE_MODES = new Set(['DIRECT_REPLY', 'READ_QUERY', 'ACTION', 'MULTI_AGENT', 'CAPABILITY_GAP']);
 const SAFE_RISKS = new Set(['GREEN', 'AMBER', 'RED']);
 function parseJson(content) { return JSON.parse(String(content || '').replace(/```json|```/gi, '').trim()); }
@@ -29,6 +29,9 @@ Hard rules:
 - Date/time questions use CURRENT_TIME_UTC; never fetch department evidence for them.
 - READ_QUERY is read-only verified department/system information.
 - ACTION is one executable task. Select the narrowest available capability.
+- Context continuity is mandatory. RECENT_TASK_CONTEXT is the active semantic anchor for elliptical follow-ups unless the Founder explicitly switches topic/entity.
+- If RECENT_TASK_CONTEXT.department exists and the Founder asks a short follow-up such as "last post kab", "uska status", "earning kitni", "kyu", "abhi kya pending", or says "last conversation ke context me", inherit that same department instead of asking which entity they mean.
+- Never resurrect an older unrelated topic from RECENT_CONVERSATION when a newer RECENT_TASK_CONTEXT exists.
 - For GitHub tasks use capability_id "github" and operation such as "create_repo", "get_repo", "create_file" or "dispatch_workflow". Put structured values in arguments. Repo deletion, permission/security changes, secrets and destructive operations are RED.
 - MULTI_AGENT only for genuinely complex work; choose only useful specialist roles.
 - CAPABILITY_GAP only when current runtime capabilities cannot do the work.
