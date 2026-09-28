@@ -1,5 +1,5 @@
 name = "victor-telegram-webhook"
-main = "victor-telegram-worker/runtime_entry.js"
+main = "victor-telegram-worker/llm_first_runtime.js"
 compatibility_date = "2026-08-27"
 keep_vars = true
 
