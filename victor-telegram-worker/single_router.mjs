@@ -12,7 +12,6 @@ function normalize(text) {
 
 export function resolveDepartment(text) {
   const value = normalize(text);
-  // Explicit AURA2 must win over the bare AURA->AURA3 alias.
   if (/\b(aura\s*2|aura2)\b/i.test(value)) return 'aura2';
   for (const [id, pattern] of DEPARTMENT_ALIASES) if (pattern.test(value)) return id;
   return null;
@@ -23,17 +22,21 @@ export function extractApprovalId(text) {
   return match ? match[1] : null;
 }
 
-function isLastPostFactQuery(raw) {
-  return /\b(last|latest|pichl(?:a|i|e)|recent)\b.*\b(post|instagram)\b/i.test(raw)
-    || /\b(post|instagram)\b.*\b(kab|when|last|latest|recent|pichl(?:a|i|e))\b/i.test(raw)
-    || /\blast\s+post\b/i.test(raw);
+function hasReadOnlyQuestionCue(raw) {
+  return /\?|\b(kya|kab|kitna|kitne|kitni|kaun|kahan|kyu|kaise|batao|bataiye|dikhao|when|what|why|how|which|who|where|last|latest|recent|current|abhi|pending|blocker|revenue|earning|income|result|report|update|progress|published|post|posts|status|health|ready|count)\b/i.test(raw);
+}
+
+function hasMutatingActionCue(raw) {
+  return /\b(start|shuru|run|execute|fix|repair|build|create|change|modify|assign|task do|bhejo|send|publish|post karo|resume|activate|merge|deploy|delete|remove|destroy|rotate|payment|pay|spend|purchase)\b/i.test(raw)
+    || /\b(karo|kar do|karna)\b/i.test(raw) && /\b(fix|repair|build|create|change|modify|assign|task|send|bhej|publish|post|start|shuru|run|execute|resume|activate|merge|deploy|delete|remove|destroy|rotate|pay|spend|purchase)\b/i.test(raw);
 }
 
 export function routeDeterministically(text, context = {}) {
   const raw = normalize(text);
   const explicitDepartment = resolveDepartment(raw);
   const inheritedDepartment = context?.department || null;
-  const department = explicitDepartment || (isLastPostFactQuery(raw) ? inheritedDepartment : null);
+  const questionLike = hasReadOnlyQuestionCue(raw);
+  const department = explicitDepartment || (questionLike ? inheritedDepartment : null);
 
   const approvalId = extractApprovalId(raw);
   if (approvalId) return { type: 'APPROVAL', department: null, action: 'approve', risk: 'RED', confidence: 1, approval_id: approvalId, source: 'rule' };
@@ -46,15 +49,15 @@ export function routeDeterministically(text, context = {}) {
     return { type: 'REMINDER', department: null, action: 'create_reminder', risk: 'GREEN', confidence: 1, source: 'rule' };
   }
 
-  // Read-only fact queries win before generic action words such as "post".
-  // The task runtime resolves the department-specific evidence provider.
-  if (department && isLastPostFactQuery(raw)) {
-    return { type: 'FACT_QUERY', department, action: 'instagram_last_post', risk: 'GREEN', confidence: 1, source: explicitDepartment ? 'rule' : 'context-rule' };
+  const statusCue = /\b(status|health)\b/i;
+  if (department && statusCue.test(raw) && !hasMutatingActionCue(raw)) {
+    return { type: 'STATUS', department, action: 'status', risk: 'GREEN', confidence: 1, source: explicitDepartment ? 'rule' : 'context-rule' };
   }
 
-  const statusCue = /\b(status|check|update|progress|result|report|health|kya chal|kya hua|kaisa|kitne|published|ready|blocker)\b/i;
-  if (department && statusCue.test(raw)) {
-    return { type: 'STATUS', department, action: 'status', risk: 'GREEN', confidence: 1, source: 'rule' };
+  // Any read-only question about a named/current department uses one generic query path.
+  // It must win before generic action words such as "post" when the sentence is interrogative.
+  if (department && questionLike && !hasMutatingActionCue(raw)) {
+    return { type: 'DEPARTMENT_QUERY', department, action: 'answer_question', risk: 'GREEN', confidence: 1, source: explicitDepartment ? 'rule' : 'context-rule' };
   }
 
   const sensitiveCue = /\b(merge|deploy|delete|remove|destroy|rotate|credential|secret|permission|access|production|payment|pay|spend|purchase|billing|security setting|branch protection)\b/i;
@@ -67,8 +70,6 @@ export function routeDeterministically(text, context = {}) {
     return { type: 'ACTION', department, action: 'department_action', risk: 'AMBER', confidence: 0.98, source: 'rule' };
   }
 
-  // Operational-looking text that did not match a precise rule gets one semantic fallback.
-  // Casual/joke/frustration remains CHAT by default and never dispatches by accident.
   if (/\b(check|status|task|assign|execute|run|deploy|merge|remind|schedule|report|fix|repair|audit|investigate|diagnose|analyse|analyze)\b/i.test(raw)) {
     return { type: 'AMBIGUOUS', department, action: null, risk: 'GREEN', confidence: 0, source: 'rule' };
   }
@@ -78,7 +79,7 @@ export function routeDeterministically(text, context = {}) {
 
 export function normalizeSemanticRoute(candidate = {}) {
   const type = String(candidate.type || '').toUpperCase();
-  const allowedTypes = new Set(['CHAT', 'STATUS', 'FACT_QUERY', 'ACTION', 'REMINDER', 'STOP']);
+  const allowedTypes = new Set(['CHAT', 'STATUS', 'DEPARTMENT_QUERY', 'FACT_QUERY', 'ACTION', 'REMINDER', 'STOP']);
   const risk = String(candidate.risk || 'GREEN').toUpperCase();
   const allowedRisks = new Set(['GREEN', 'AMBER', 'RED']);
   const confidence = Number(candidate.confidence || 0);
@@ -86,7 +87,6 @@ export function normalizeSemanticRoute(candidate = {}) {
   if (!allowedTypes.has(type) || !allowedRisks.has(risk) || !Number.isFinite(confidence)) {
     return { type: 'CHAT', department: null, action: null, risk: 'GREEN', confidence: 0, source: 'semantic-invalid' };
   }
-  // Dispatch requires high confidence; uncertainty degrades to CHAT.
   if (type !== 'CHAT' && confidence < 0.85) {
     return { type: 'CHAT', department: null, action: null, risk: 'GREEN', confidence, source: 'semantic-low-confidence' };
   }
