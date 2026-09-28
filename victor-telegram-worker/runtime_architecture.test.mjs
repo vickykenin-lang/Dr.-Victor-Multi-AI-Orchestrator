@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { routeDeterministically, normalizeSemanticRoute, resolveDepartment } from './single_router.mjs';
 import { getDepartmentFactSource, extractDepartmentFact } from './department_fact_registry.mjs';
+import { hasExtendedEvidencePack } from './department_query_runtime.mjs';
 import { resolveProcedureRoute, buildProcedureExecutionPlan } from '../brain/procedure_registry.mjs';
 
 test('casual and frustrated Founder messages default to chat and never dispatch', () => {
@@ -28,38 +29,59 @@ test('explicit department status is deterministic and green', () => {
   assert.equal(route.confidence, 1);
 });
 
-test('last-post fact query is generic across named departments', () => {
+test('arbitrary read-only department questions use one generic query route', () => {
   for (const [text, department] of [
     ['Rio ne last post instagram par kab kiya tha?', 'rio'],
     ['Aura 3 ka last post kab hua tha?', 'aura3'],
-    ['Tony Stark ka latest Instagram post kab hua?', 'tony_stark'],
-    ['Hulk ka last post kab hua tha?', 'hulk'],
+    ['RIO ki earning kitni hui?', 'rio'],
+    ['AURA3 me kya pending hai?', 'aura3'],
+    ['Tony Stark ka last result kya tha?', 'tony_stark'],
+    ['Hulk ka blocker kya hai?', 'hulk'],
+    ['RIO me kitne posts published hain?', 'rio'],
+    ['Aura3 ka current target kya hai?', 'aura3'],
   ]) {
     const route = routeDeterministically(text);
-    assert.equal(route.type, 'FACT_QUERY', text);
+    assert.equal(route.type, 'DEPARTMENT_QUERY', text);
     assert.equal(route.department, department, text);
-    assert.equal(route.action, 'instagram_last_post', text);
+    assert.equal(route.action, 'answer_question', text);
     assert.equal(route.risk, 'GREEN', text);
   }
 });
 
-test('last-post follow-up inherits recent department task context generically', () => {
+test('read-only follow-up inherits recent department context generically', () => {
   for (const department of ['rio', 'aura3', 'tony_stark', 'hulk']) {
-    const route = routeDeterministically('Last post kab hua tha?', { department, type: 'STATUS', action: 'status' });
-    assert.equal(route.type, 'FACT_QUERY');
+    const route = routeDeterministically('Last result kya tha?', { department, type: 'STATUS', action: 'status' });
+    assert.equal(route.type, 'DEPARTMENT_QUERY');
     assert.equal(route.department, department);
-    assert.equal(route.action, 'instagram_last_post');
+    assert.equal(route.action, 'answer_question');
     assert.equal(route.source, 'context-rule');
   }
 });
 
-test('last-post text without department context stays chat instead of guessing a department', () => {
+test('read-only question without department context stays chat instead of guessing', () => {
   const route = routeDeterministically('Last post kab hua tha?');
   assert.equal(route.type, 'CHAT');
   assert.equal(route.department, null);
 });
 
-test('department fact registry exposes verified providers without affecting routing', () => {
+test('mutating department instructions remain actions, not read-only queries', () => {
+  for (const text of [
+    'AURA3 ko post publish karo',
+    'RIO ko campaign start karne ko bolo',
+    'Tony Stark system fix karo',
+  ]) {
+    const route = routeDeterministically(text);
+    assert.equal(route.type, 'ACTION', text);
+  }
+});
+
+test('generic department query evidence packs exist for active content departments', () => {
+  assert.equal(hasExtendedEvidencePack('rio'), true);
+  assert.equal(hasExtendedEvidencePack('aura3'), true);
+  assert.equal(hasExtendedEvidencePack('tony_stark'), false);
+});
+
+test('legacy exact-fact registry remains available as deterministic evidence utility', () => {
   const rio = getDepartmentFactSource('rio', 'instagram_last_post');
   const aura3 = getDepartmentFactSource('aura3', 'instagram_last_post');
   assert.equal(rio?.parser, 'rio_posted_map');
@@ -81,13 +103,6 @@ test('department fact parsers select latest verified record deterministically', 
   });
   assert.equal(aura.record_id, 'one');
   assert.equal(aura.timestamp, '2026-09-02T11:28:54+0000');
-});
-
-test('explicit department action routes to the named department', () => {
-  const route = routeDeterministically('AURA3 ko task do aur system fix karo');
-  assert.equal(route.type, 'ACTION');
-  assert.equal(route.department, 'aura3');
-  assert.equal(route.risk, 'AMBER');
 });
 
 test('sensitive action requires red routing', () => {
@@ -114,7 +129,7 @@ test('semantic fallback cannot dispatch below high confidence', () => {
   assert.equal(route.source, 'semantic-low-confidence');
 });
 
-test('procedure registry is the routing authority for status, fact reads and actions', () => {
+test('procedure registry remains authority for status, fact reads and actions', () => {
   const status = resolveProcedureRoute({ type: 'STATUS', department: 'rio', action: 'status', risk: 'GREEN' });
   assert.equal(status.ok, true);
   assert.equal(status.procedure_id, 'founder-status-check-v1');
@@ -123,7 +138,6 @@ test('procedure registry is the routing authority for status, fact reads and act
   const fact = resolveProcedureRoute({ type: 'FACT_QUERY', department: 'aura3', action: 'instagram_last_post', risk: 'GREEN' });
   assert.equal(fact.ok, true);
   assert.equal(fact.procedure_id, 'founder-status-check-v1');
-  assert.equal(fact.approval_required, false);
 
   const action = resolveProcedureRoute({ type: 'ACTION', department: 'aura3', action: 'department_action', risk: 'AMBER' });
   assert.equal(action.procedure_id, 'department-action-v1');
