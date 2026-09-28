@@ -3,10 +3,10 @@ import {
   rioBridgeConfigured, dispatchRioTask, waitForRioResult, verifyRioResult, formatRioResultForFounder,
   tonyBridgeConfigured, dispatchTonyTask, waitForTonyResult, verifyTonyResult, formatTonyResultForFounder,
 } from './department_bridge.mjs';
+import { getDepartmentFactSource, extractDepartmentFact, formatDepartmentFact } from './department_fact_registry.mjs';
 import { resolveProcedureRoute } from '../brain/procedure_registry.mjs';
 
 const REGISTRY_URL = 'https://raw.githubusercontent.com/vickykenin-lang/Dr.-Victor-Multi-AI-Orchestrator/main/data/department_registry.json';
-const RIO_IG_PUBLISHED_URL = 'https://raw.githubusercontent.com/vickykenin-lang/rio-affiliate-engine/main/data/ig_published.json';
 const TASK_STATE_TTL_SECONDS = 86400;
 
 function stateStore(env) {
@@ -67,28 +67,23 @@ export async function renderDepartmentStatus(department) {
   return lines.join('\n');
 }
 
-export async function renderRioInstagramLastPost() {
-  const data = await fetchJson(RIO_IG_PUBLISHED_URL, 'Victor-RIO-Fact-Query/1.0');
-  const posted = data?.posted && typeof data.posted === 'object' ? data.posted : {};
-  const entries = Object.entries(posted)
-    .map(([offerId, value]) => ({ offerId, ...(value || {}) }))
-    .filter(item => item.posted_at && Number.isFinite(Date.parse(item.posted_at)))
-    .sort((a, b) => Date.parse(b.posted_at) - Date.parse(a.posted_at));
+export async function renderDepartmentFact(department, factType) {
+  const source = getDepartmentFactSource(department, factType);
   const fetchedAt = new Date().toISOString();
-  if (!entries.length) {
-    return `RIO Instagram fact\nLast verified post: NOT_AVAILABLE\nFetched at: ${fetchedAt}\nSource: rio-affiliate-engine/data/ig_published.json`;
+  if (!source) {
+    return {
+      reply: `${departmentName(department)} fact\nRequested fact: ${factType}\nVerified source: NOT_REGISTERED\nNo department action was dispatched.\nFetched at: ${fetchedAt}`,
+      verified: false,
+      capability_gap: 'DEPARTMENT_FACT_SOURCE_NOT_REGISTERED',
+    };
   }
-  const latest = entries[0];
-  const lines = [
-    'RIO Instagram fact',
-    `Last verified post: ${latest.posted_at}`,
-    `Offer: ${latest.offerId}`,
-  ];
-  if (latest.product_name) lines.push(`Product: ${latest.product_name}`);
-  if (latest.permalink) lines.push(`Permalink: ${latest.permalink}`);
-  lines.push(`Fetched at: ${fetchedAt}`);
-  lines.push('Source: rio-affiliate-engine/data/ig_published.json; no LLM-generated fact.');
-  return lines.join('\n');
+  const payload = await fetchJson(source.url, 'Victor-Department-Fact-Query/1.0');
+  const fact = extractDepartmentFact(source, payload);
+  return {
+    reply: formatDepartmentFact({ departmentName: departmentName(department), fact, sourceLabel: source.source_label, fetchedAt }),
+    verified: Boolean(fact),
+    capability_gap: fact ? null : 'VERIFIED_FACT_NOT_AVAILABLE',
+  };
 }
 
 async function resolveOrDispatch(env, target, text, messageId, operationKey) {
@@ -153,10 +148,8 @@ export async function executeTask(env, route, text, messageId, operationKey = nu
   if (route.type === 'FACT_QUERY') {
     const routePolicy = resolveProcedureRoute({ type: 'FACT_QUERY', department: route.department, action: route.action, risk: 'GREEN' });
     if (!routePolicy.ok) return { reply: `Fact route blocked: ${routePolicy.reason}.`, verified: false, routePolicy };
-    if (route.department === 'rio' && route.action === 'instagram_last_post') {
-      return { reply: await renderRioInstagramLastPost(), verified: true, routePolicy };
-    }
-    return { reply: 'Requested fact ke liye verified read path registered nahi hai. Koi guess nahi kiya gaya.', verified: false, routePolicy };
+    const result = await renderDepartmentFact(route.department, route.action);
+    return { ...result, routePolicy };
   }
   if (route.type === 'ACTION') return executeDepartmentAction(env, route, text, messageId, operationKey);
   if (route.type === 'REMINDER') {

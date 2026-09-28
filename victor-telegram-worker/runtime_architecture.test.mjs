@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { routeDeterministically, normalizeSemanticRoute, resolveDepartment } from './single_router.mjs';
+import { getDepartmentFactSource, extractDepartmentFact } from './department_fact_registry.mjs';
 import { resolveProcedureRoute, buildProcedureExecutionPlan } from '../brain/procedure_registry.mjs';
 
 test('casual and frustrated Founder messages default to chat and never dispatch', () => {
@@ -27,26 +28,59 @@ test('explicit department status is deterministic and green', () => {
   assert.equal(route.confidence, 1);
 });
 
-test('explicit RIO Instagram last-post question is a read-only fact query, not an action', () => {
-  const route = routeDeterministically('Rio ne last post instagram par kab kiya tha?');
-  assert.equal(route.type, 'FACT_QUERY');
-  assert.equal(route.department, 'rio');
-  assert.equal(route.action, 'instagram_last_post');
-  assert.equal(route.risk, 'GREEN');
+test('last-post fact query is generic across named departments', () => {
+  for (const [text, department] of [
+    ['Rio ne last post instagram par kab kiya tha?', 'rio'],
+    ['Aura 3 ka last post kab hua tha?', 'aura3'],
+    ['Tony Stark ka latest Instagram post kab hua?', 'tony_stark'],
+    ['Hulk ka last post kab hua tha?', 'hulk'],
+  ]) {
+    const route = routeDeterministically(text);
+    assert.equal(route.type, 'FACT_QUERY', text);
+    assert.equal(route.department, department, text);
+    assert.equal(route.action, 'instagram_last_post', text);
+    assert.equal(route.risk, 'GREEN', text);
+  }
 });
 
-test('last-post follow-up inherits recent RIO task context', () => {
-  const route = routeDeterministically('Last post kab hua tha?', { department: 'rio', type: 'STATUS', action: 'status' });
-  assert.equal(route.type, 'FACT_QUERY');
-  assert.equal(route.department, 'rio');
-  assert.equal(route.action, 'instagram_last_post');
-  assert.equal(route.source, 'context-rule');
+test('last-post follow-up inherits recent department task context generically', () => {
+  for (const department of ['rio', 'aura3', 'tony_stark', 'hulk']) {
+    const route = routeDeterministically('Last post kab hua tha?', { department, type: 'STATUS', action: 'status' });
+    assert.equal(route.type, 'FACT_QUERY');
+    assert.equal(route.department, department);
+    assert.equal(route.action, 'instagram_last_post');
+    assert.equal(route.source, 'context-rule');
+  }
 });
 
 test('last-post text without department context stays chat instead of guessing a department', () => {
   const route = routeDeterministically('Last post kab hua tha?');
   assert.equal(route.type, 'CHAT');
   assert.equal(route.department, null);
+});
+
+test('department fact registry exposes verified providers without affecting routing', () => {
+  const rio = getDepartmentFactSource('rio', 'instagram_last_post');
+  const aura3 = getDepartmentFactSource('aura3', 'instagram_last_post');
+  assert.equal(rio?.parser, 'rio_posted_map');
+  assert.equal(aura3?.parser, 'aura_published_map');
+  assert.equal(getDepartmentFactSource('tony_stark', 'instagram_last_post'), null);
+});
+
+test('department fact parsers select latest verified record deterministically', () => {
+  const rioSource = getDepartmentFactSource('rio', 'instagram_last_post');
+  const rio = extractDepartmentFact(rioSource, { posted: {
+    OLD: { posted_at: '2026-09-01T10:00:00+05:30' },
+    NEW: { posted_at: '2026-09-27T18:47:00+05:30', permalink: 'https://example.test/new' },
+  } });
+  assert.equal(rio.record_id, 'NEW');
+
+  const auraSource = getDepartmentFactSource('aura3', 'instagram_last_post');
+  const aura = extractDepartmentFact(auraSource, {
+    one: { instagram: { at: '2026-09-02T11:28:54+0000', url: 'https://example.test/aura' }, source: 'published' },
+  });
+  assert.equal(aura.record_id, 'one');
+  assert.equal(aura.timestamp, '2026-09-02T11:28:54+0000');
 });
 
 test('explicit department action routes to the named department', () => {
@@ -86,7 +120,7 @@ test('procedure registry is the routing authority for status, fact reads and act
   assert.equal(status.procedure_id, 'founder-status-check-v1');
   assert.equal(status.approval_required, false);
 
-  const fact = resolveProcedureRoute({ type: 'FACT_QUERY', department: 'rio', action: 'instagram_last_post', risk: 'GREEN' });
+  const fact = resolveProcedureRoute({ type: 'FACT_QUERY', department: 'aura3', action: 'instagram_last_post', risk: 'GREEN' });
   assert.equal(fact.ok, true);
   assert.equal(fact.procedure_id, 'founder-status-check-v1');
   assert.equal(fact.approval_required, false);
