@@ -46,9 +46,10 @@ export function routeDeterministically(text, context = {}) {
     return { type: 'REMINDER', department: null, action: 'create_reminder', risk: 'GREEN', confidence: 1, source: 'rule' };
   }
 
-  // Exact fact reads must win before generic action words such as "post".
-  if (department === 'rio' && isLastPostFactQuery(raw)) {
-    return { type: 'FACT_QUERY', department: 'rio', action: 'instagram_last_post', risk: 'GREEN', confidence: 1, source: explicitDepartment ? 'rule' : 'context-rule' };
+  // Read-only fact queries win before generic action words such as "post".
+  // The task runtime resolves the department-specific evidence provider.
+  if (department && isLastPostFactQuery(raw)) {
+    return { type: 'FACT_QUERY', department, action: 'instagram_last_post', risk: 'GREEN', confidence: 1, source: explicitDepartment ? 'rule' : 'context-rule' };
   }
 
   const statusCue = /\b(status|check|update|progress|result|report|health|kya chal|kya hua|kaisa|kitne|published|ready|blocker)\b/i;
