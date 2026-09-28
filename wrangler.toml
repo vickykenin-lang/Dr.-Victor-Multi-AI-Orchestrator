@@ -1,5 +1,5 @@
 name = "victor-telegram-webhook"
-main = "victor-telegram-worker/worker_with_edge_control.js"
+main = "victor-telegram-worker/runtime_entry.js"
 compatibility_date = "2026-08-27"
 keep_vars = true
 
@@ -16,6 +16,17 @@ required = [ "COGNEE_API_KEY" ]
 
 [[kv_namespaces]]
 binding = "VICTOR_CONVERSATION_STATE"
+
+[[queues.producers]]
+binding = "VICTOR_TELEGRAM_QUEUE"
+queue = "victor-telegram-ingress"
+
+[[queues.consumers]]
+queue = "victor-telegram-ingress"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 3
+retry_delay = 10
 
 [triggers]
 crons = []

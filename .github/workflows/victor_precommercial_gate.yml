@@ -40,6 +40,11 @@ jobs:
           set -euo pipefail
           node --test brain/*.test.mjs
 
+      - name: Run queued Telegram architecture regressions
+        run: |
+          set -euo pipefail
+          node --test victor-telegram-worker/runtime_architecture.test.mjs
+
       - name: Commercial invariants
         run: |
           set -euo pipefail
@@ -91,8 +96,11 @@ jobs:
           if (!deploy.includes('VICTOR_DEPLOY_GIT_SHA:$WORKERS_CI_COMMIT_SHA')) throw new Error('DEPLOY_SHA_NOT_INJECTED');
           if (!deploy.includes('VICTOR_BUILD_UUID:$WORKERS_CI_BUILD_UUID')) throw new Error('BUILD_UUID_NOT_INJECTED');
           const wrangler = fs.readFileSync('wrangler.toml', 'utf8');
+          if (!/main\s*=\s*"victor-telegram-worker\/runtime_entry\.js"/.test(wrangler)) throw new Error('QUEUE_RUNTIME_ENTRY_NOT_ACTIVE');
           if (!/\[version_metadata\][\s\S]*binding\s*=\s*"CF_VERSION_METADATA"/.test(wrangler)) throw new Error('CF_VERSION_METADATA_BINDING_MISSING');
           if (!/\[\[kv_namespaces\]\][\s\S]*binding\s*=\s*"VICTOR_CONVERSATION_STATE"/.test(wrangler)) throw new Error('DURABLE_CONVERSATION_KV_BINDING_MISSING');
+          if (!/\[\[queues\.producers\]\][\s\S]*binding\s*=\s*"VICTOR_TELEGRAM_QUEUE"[\s\S]*queue\s*=\s*"victor-telegram-ingress"/.test(wrangler)) throw new Error('TELEGRAM_QUEUE_PRODUCER_MISSING');
+          if (!/\[\[queues\.consumers\]\][\s\S]*queue\s*=\s*"victor-telegram-ingress"/.test(wrangler)) throw new Error('TELEGRAM_QUEUE_CONSUMER_MISSING');
           console.log('RELEASE_CONTROL_INVARIANTS_OK');
           NODE
 
