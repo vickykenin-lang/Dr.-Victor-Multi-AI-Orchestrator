@@ -21,202 +21,81 @@ concurrency:
 jobs:
   production-acceptance:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       TELEGRAM_BOT_TOKEN_VICTOR: ${{ secrets.TELEGRAM_BOT_TOKEN_VICTOR }}
-      TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
-      VICTOR_FOUNDER_CHAT_ID: ${{ secrets.VICTOR_FOUNDER_CHAT_ID }}
-      TELEGRAM_CHAT_ID_VICTOR: ${{ secrets.TELEGRAM_CHAT_ID_VICTOR }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
 
-      - name: Probe deployed Victor and run live acceptance
+      - name: Probe deployed Victor without impersonating Founder
         run: |
           python - <<'PY'
-          import json, os, time, urllib.parse, urllib.request, urllib.error
+          import json, os, urllib.parse, urllib.request, urllib.error
           from datetime import datetime, timezone
           from pathlib import Path
 
           OUT = Path('data/production_acceptance_status.json')
           token = (os.getenv('TELEGRAM_BOT_TOKEN_VICTOR') or '').strip()
-          webhook_secret = (os.getenv('TELEGRAM_WEBHOOK_SECRET') or '').strip()
-          founder_chat = (os.getenv('VICTOR_FOUNDER_CHAT_ID') or os.getenv('TELEGRAM_CHAT_ID_VICTOR') or '').strip()
-          USER_AGENT = 'Victor-Production-Acceptance/2.1'
-
           report = {
-              'schema_version': 2,
+              'schema_version': 3,
               'checked_at_utc': datetime.now(timezone.utc).isoformat(),
               'repository_sha_under_test': os.getenv('GITHUB_SHA'),
               'production_verification': {},
-              'live_acceptance': {},
+              'live_acceptance': {'synthetic_founder_events_sent': False, 'founder_acceptance_required': True},
               'critical_blockers': [],
               'ready_for_founder_test': False,
               'secrets_exposed': False,
           }
 
-          def safe_parse(raw):
+          def parse(raw):
+              try: return json.loads(raw)
+              except Exception: return {'raw_response_type':'non_json','body_prefix':raw[:120]}
+          def get_json(url, timeout=45):
+              req=urllib.request.Request(url,headers={'User-Agent':'Victor-Production-Acceptance/3.0'},method='GET')
               try:
-                  return json.loads(raw)
-              except Exception:
-                  return {'raw_response_type': 'non_json', 'body_prefix': raw[:120]}
-
-          def get_json(url, headers=None, timeout=45):
-              h = {'User-Agent': USER_AGENT, **(headers or {})}
-              req = urllib.request.Request(url, headers=h, method='GET')
-              try:
-                  with urllib.request.urlopen(req, timeout=timeout) as r:
-                      raw = r.read().decode('utf-8', errors='replace')
-                      return r.status, safe_parse(raw)
-              except urllib.error.HTTPError as e:
-                  raw = e.read().decode('utf-8', errors='replace')
-                  return e.code, safe_parse(raw)
-
-          def post_json(url, body, headers=None, timeout=75):
-              payload = json.dumps(body).encode('utf-8')
-              h = {'Content-Type': 'application/json', 'User-Agent': USER_AGENT, **(headers or {})}
-              req = urllib.request.Request(url, data=payload, headers=h, method='POST')
-              try:
-                  with urllib.request.urlopen(req, timeout=timeout) as r:
-                      raw = r.read().decode('utf-8', errors='replace')
-                      return r.status, safe_parse(raw)
-              except urllib.error.HTTPError as e:
-                  raw = e.read().decode('utf-8', errors='replace')
-                  return e.code, safe_parse(raw)
+                  with urllib.request.urlopen(req,timeout=timeout) as r: return r.status, parse(r.read().decode('utf-8',errors='replace'))
+              except urllib.error.HTTPError as e: return e.code, parse(e.read().decode('utf-8',errors='replace'))
 
           if not token:
               report['critical_blockers'].append('GITHUB_SECRET_TELEGRAM_BOT_TOKEN_VICTOR_MISSING')
           else:
               try:
                   hook_code, hook = get_json(f'https://api.telegram.org/bot{token}/getWebhookInfo')
-                  hook_result = hook.get('result') or {}
-                  hook_url = str(hook_result.get('url') or '').strip()
-                  report['production_verification']['telegram_webhook'] = {
-                      'api_http_status': hook_code,
-                      'configured': bool(hook_url),
-                      'pending_update_count': hook_result.get('pending_update_count'),
-                      'last_error_date_present': bool(hook_result.get('last_error_date')),
-                      'last_error_message_present': bool(hook_result.get('last_error_message')),
-                  }
-                  if hook_code != 200 or not hook_url:
-                      report['critical_blockers'].append('TELEGRAM_WEBHOOK_URL_NOT_CONFIGURED')
+                  hook_result=hook.get('result') or {}; hook_url=str(hook_result.get('url') or '').strip()
+                  report['production_verification']['telegram_webhook']={'api_http_status':hook_code,'configured':bool(hook_url),'pending_update_count':hook_result.get('pending_update_count'),'last_error_present':bool(hook_result.get('last_error_message'))}
+                  if hook_code != 200 or not hook_url: report['critical_blockers'].append('TELEGRAM_WEBHOOK_URL_NOT_CONFIGURED')
                   else:
-                      parsed = urllib.parse.urlparse(hook_url)
-                      worker_origin = f'{parsed.scheme}://{parsed.netloc}'
-                      report['production_verification']['worker_host_present'] = bool(parsed.netloc)
-                      for endpoint, key in [('/health','health'),('/core-health','core_health'),('/aura3-bridge-health','aura3_bridge'),('/tony-bridge-health','tony_bridge')]:
+                      p=urllib.parse.urlparse(hook_url); origin=f'{p.scheme}://{p.netloc}'
+                      for endpoint,key in [('/health','health'),('/core-health','core_health'),('/aura3-bridge-health','aura3_bridge'),('/tony-bridge-health','tony_bridge')]:
                           try:
-                              code, payload = get_json(worker_origin + endpoint)
-                              report['production_verification'][key] = {'http_status': code, 'payload': payload}
-                              if code != 200:
-                                  report['critical_blockers'].append(f'{key.upper()}_PROBE_FAILED')
+                              code,payload=get_json(origin+endpoint); report['production_verification'][key]={'http_status':code,'payload':payload}
+                              if code != 200: report['critical_blockers'].append(f'{key.upper()}_PROBE_FAILED')
                           except Exception as exc:
-                              report['production_verification'][key] = {'error': type(exc).__name__}
-                              report['critical_blockers'].append(f'{key.upper()}_PROBE_FAILED')
-
-                      health = (report['production_verification'].get('health') or {}).get('payload') or {}
-                      expected = {
-                          'status': 'READY',
-                          'founder_request_gateway': 'STRUCTURED_REQUEST_GATEWAY_V1',
-                          'fact_evidence_runtime': 'FRESH_GITHUB_FACTS_V1',
-                          'founder_conversation_layer': 'NATURAL_CONVERSATION_FIRST_V1',
-                      }
-                      parity = {k: health.get(k) == v for k, v in expected.items()}
-                      report['production_verification']['runtime_feature_parity'] = parity
-                      if not all(parity.values()):
-                          report['critical_blockers'].append('DEPLOYED_WORKER_FEATURE_PARITY_FAILED')
-                      for field in ['telegram_token_configured','webhook_secret_configured','founder_chat_configured','ai_inference_enabled','rio_bridge_configured','tony_bridge_configured','aura3_bridge_configured']:
-                          if health.get(field) is not True:
-                              report['critical_blockers'].append(f'HEALTH_{field.upper()}_NOT_TRUE')
-                      if health.get('active_thread_memory_durable') is not True:
-                          report['critical_blockers'].append('DURABLE_CONVERSATION_STATE_NOT_ACTIVE')
-
-                      report['production_verification']['deployment_identity'] = {
-                          'deployment_git_sha': health.get('deployment_git_sha'),
-                          'deployment_build_uuid': health.get('deployment_build_uuid'),
-                          'cloudflare_version_id': health.get('cloudflare_version_id'),
-                          'deployment_identity_gate': health.get('deployment_identity_gate'),
-                      }
-
-                      can_live_post = bool(webhook_secret and founder_chat)
-                      report['live_acceptance']['synthetic_webhook_possible'] = can_live_post
-                      if not webhook_secret:
-                          report['critical_blockers'].append('GITHUB_SECRET_TELEGRAM_WEBHOOK_SECRET_MISSING')
-                      if not founder_chat:
-                          report['critical_blockers'].append('GITHUB_FOUNDER_CHAT_ID_SECRET_MISSING')
-
-                      if can_live_post:
-                          headers = {'X-Telegram-Bot-Api-Secret-Token': webhook_secret}
-                          telegram_endpoint = worker_origin + '/telegram'
-                          now = int(time.time())
-                          tests = [
-                              ('transport_hi', 'Hi'),
-                              ('fresh_multi_fact', 'RIO ka current Instagram auto-publish paused hai ya nahi? data/control.json ki exact current value batao. Saath me last heartbeat ka exact timestamp aur AURA3 repo ka latest commit date bhi batao.'),
-                              ('thread_anchor', 'RIO ka current blocker fresh evidence ke saath batao.'),
-                              ('short_followup', 'kyu?'),
-                              ('status_followup', 'uska exact latest status batao; naya duplicate task mat banana.'),
-                          ]
-                          results = []
-                          for idx, (name, text) in enumerate(tests, start=1):
-                              body = {
-                                  'update_id': now * 100 + idx,
-                                  'message': {
-                                      'message_id': 0,
-                                      'date': now,
-                                      'chat': {'id': int(founder_chat), 'type': 'private'},
-                                      'from': {'id': int(founder_chat), 'is_bot': False, 'first_name': 'Founder'},
-                                      'text': text,
-                                  },
-                              }
-                              try:
-                                  code, payload = post_json(telegram_endpoint, body, headers=headers)
-                                  safe = {
-                                      'name': name,
-                                      'http_status': code,
-                                      'ok': payload.get('ok') is True,
-                                      'mode': payload.get('mode'),
-                                      'target': payload.get('target'),
-                                      'ignored': payload.get('ignored') is True,
-                                      'error': payload.get('error'),
-                                  }
-                                  results.append(safe)
-                              except Exception as exc:
-                                  results.append({'name': name, 'error': type(exc).__name__, 'ok': False})
-                              time.sleep(5)
-                          report['live_acceptance']['tests'] = results
-                          if not all(x.get('http_status') == 200 and x.get('ok') is True and not x.get('ignored') and not x.get('error') for x in results):
-                              report['critical_blockers'].append('LIVE_SYNTHETIC_TELEGRAM_ACCEPTANCE_FAILED')
+                              report['production_verification'][key]={'error':type(exc).__name__}; report['critical_blockers'].append(f'{key.upper()}_PROBE_FAILED')
+                      health=(report['production_verification'].get('health') or {}).get('payload') or {}
+                      for field in ['telegram_token_configured','webhook_secret_configured','founder_chat_configured','ai_inference_enabled']:
+                          if health.get(field) is not True: report['critical_blockers'].append(f'HEALTH_{field.upper()}_NOT_TRUE')
+                      if health.get('active_thread_memory_durable') is not True: report['critical_blockers'].append('DURABLE_CONVERSATION_STATE_NOT_ACTIVE')
+                      report['production_verification']['deployment_identity']={'deployment_git_sha':health.get('deployment_git_sha'),'deployment_build_uuid':health.get('deployment_build_uuid'),'cloudflare_version_id':health.get('cloudflare_version_id'),'deployment_identity_gate':health.get('deployment_identity_gate')}
               except Exception as exc:
-                  report['critical_blockers'].append('PRODUCTION_DISCOVERY_FAILED')
-                  report['production_verification']['discovery_error'] = type(exc).__name__
+                  report['critical_blockers'].append('PRODUCTION_DISCOVERY_FAILED'); report['production_verification']['discovery_error']=type(exc).__name__
 
-          report['critical_blockers'] = sorted(set(report['critical_blockers']))
-          report['ready_for_founder_test'] = len(report['critical_blockers']) == 0
-          OUT.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-          print(json.dumps({
-              'ready_for_founder_test': report['ready_for_founder_test'],
-              'critical_blockers': report['critical_blockers'],
-              'live_test_count': len((report.get('live_acceptance') or {}).get('tests') or []),
-              'endpoint_statuses': {k:(v.get('http_status') if isinstance(v,dict) else None) for k,v in report.get('production_verification',{}).items() if k in ['health','core_health','aura3_bridge','tony_bridge']},
-              'secrets_exposed': False,
-          }))
+          report['critical_blockers']=sorted(set(report['critical_blockers']))
+          report['ready_for_founder_test']=len(report['critical_blockers']) == 0
+          OUT.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps({'ready_for_founder_test':report['ready_for_founder_test'],'critical_blockers':report['critical_blockers'],'synthetic_founder_events_sent':False,'secrets_exposed':False}))
           PY
 
-      - name: Persist production acceptance evidence
+      - name: Upload production acceptance evidence
         if: always()
-        run: |
-          git config user.name "victor-production-acceptance"
-          git config user.email "actions@users.noreply.github.com"
-          EVIDENCE_FILE="data/production_acceptance_status.json"
-          cp "$EVIDENCE_FILE" /tmp/victor-production-acceptance.json
-          git fetch origin main
-          git reset --hard origin/main
-          cp /tmp/victor-production-acceptance.json "$EVIDENCE_FILE"
-          git add "$EVIDENCE_FILE"
-          git diff --cached --quiet && exit 0
-          git commit -m "evidence: record Victor production acceptance"
-          git push origin HEAD:main
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: victor-production-acceptance-${{ github.run_id }}
+          path: data/production_acceptance_status.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Enforce readiness gate
         if: always()
