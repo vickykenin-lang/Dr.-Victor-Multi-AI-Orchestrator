@@ -7,6 +7,7 @@ import { applyEdgeProxyControl, parseEdgeProxyControlCommand } from './edge_prox
 const TELEGRAM_API = 'https://api.telegram.org';
 const UPDATE_TTL_SECONDS = 86400;
 const CHAT_HISTORY_TTL_SECONDS = 30 * 86400;
+const TASK_CONTEXT_TTL_SECONDS = 6 * 3600;
 const RESULT_TTL_SECONDS = 86400;
 const FIXED_PERSONA = `You are Dr. Victor, Vicky Gautam's personal AI assistant and executive orchestrator. This is the pure conversation path. Speak naturally, directly and concisely in the Founder's language. Do not call tools, departments, Cognee, evidence systems or status sources. Do not claim that any external action happened. Do not defend your identity mechanically. Handle casual conversation, humour, frustration and normal questions like a capable general AI assistant.`;
 
@@ -74,8 +75,22 @@ async function appendChatHistory(env, chatId, founderText, victorText) {
   await putJson(env, `victor:chat-history:${chatId}`, history.slice(-10), CHAT_HISTORY_TTL_SECONDS);
 }
 
+async function readTaskContext(env, chatId) {
+  return getJson(env, `victor:task-context:${chatId}`);
+}
+
+async function writeTaskContext(env, chatId, route) {
+  if (!route?.department) return;
+  await putJson(env, `victor:task-context:${chatId}`, {
+    department: route.department,
+    type: route.type,
+    action: route.action || null,
+    updated_at: new Date().toISOString(),
+  }, TASK_CONTEXT_TTL_SECONDS);
+}
+
 async function semanticFallback(env, text) {
-  const system = `Classify one Founder message for Victor. Return JSON only. Types: CHAT, STATUS, ACTION, REMINDER, STOP. Departments: rio, aura3, aura2, tony_stark, hulk, or null. Risk: GREEN, AMBER, RED. Default to CHAT. Dispatch ACTION only when the message clearly asks for an external/system action. Frustration, jokes and dismissive speech such as 'bhag jao' are CHAT. Schema: {"type":"CHAT|STATUS|ACTION|REMINDER|STOP","department":null,"action":null,"risk":"GREEN|AMBER|RED","confidence":0.0}`;
+  const system = `Classify one Founder message for Victor. Return JSON only. Types: CHAT, STATUS, FACT_QUERY, ACTION, REMINDER, STOP. Departments: rio, aura3, aura2, tony_stark, hulk, or null. Risk: GREEN, AMBER, RED. Default to CHAT. FACT_QUERY is for read-only exact facts. Dispatch ACTION only when the message clearly asks for an external/system action. Frustration, jokes and dismissive speech such as 'bhag jao' are CHAT. Schema: {"type":"CHAT|STATUS|FACT_QUERY|ACTION|REMINDER|STOP","department":null,"action":null,"risk":"GREEN|AMBER|RED","confidence":0.0}`;
   try {
     const result = await callVictorModel(env, system, text, { task: 'fast', maxTokens: 120, temperature: 0 });
     const cleaned = String(result.content || '').replace(/```json|```/gi, '').trim();
@@ -85,8 +100,8 @@ async function semanticFallback(env, text) {
   }
 }
 
-async function routeMessage(env, text) {
-  const deterministic = routeDeterministically(text);
+async function routeMessage(env, text, taskContext = null) {
+  const deterministic = routeDeterministically(text, taskContext || {});
   if (deterministic.type !== 'AMBIGUOUS') return deterministic;
   return semanticFallback(env, text);
 }
@@ -154,7 +169,8 @@ async function processQueuedMessage(env, ctx, envelope) {
     return;
   }
 
-  let route = await routeMessage(env, text);
+  const taskContext = await readTaskContext(env, chatId);
+  let route = await routeMessage(env, text, taskContext);
 
   if (route.type === 'APPROVAL') {
     const pending = await consumeApproval(env, route.approval_id, chatId);
@@ -170,6 +186,7 @@ async function processQueuedMessage(env, ctx, envelope) {
       await delegateLegacy(env, ctx, pending.update || update, envelope.original_url);
       return;
     }
+    await writeTaskContext(env, chatId, route);
     await putJson(env, resultKey, { reply: taskResult.reply, type: 'APPROVED_TASK', completed_at: new Date().toISOString() }, RESULT_TTL_SECONDS);
     await sendTelegram(env, chatId, taskResult.reply, message.message_id);
     return;
@@ -184,6 +201,7 @@ async function processQueuedMessage(env, ctx, envelope) {
 
   if (route.type === 'ACTION' && route.risk === 'RED') {
     const reply = await requestApproval(env, updateId, chatId, message.message_id, text, route, update);
+    await writeTaskContext(env, chatId, route);
     await putJson(env, resultKey, { reply, type: 'APPROVAL_REQUIRED', completed_at: new Date().toISOString() }, RESULT_TTL_SECONDS);
     await sendTelegram(env, chatId, reply, message.message_id);
     return;
@@ -194,6 +212,7 @@ async function processQueuedMessage(env, ctx, envelope) {
     await delegateLegacy(env, ctx, update, envelope.original_url);
     return;
   }
+  await writeTaskContext(env, chatId, route);
   await putJson(env, resultKey, { reply: taskResult.reply, type: route.type, completed_at: new Date().toISOString(), verified: taskResult.verified === true }, RESULT_TTL_SECONDS);
   await sendTelegram(env, chatId, taskResult.reply, message.message_id);
 }
