@@ -6,6 +6,7 @@ import {
 import { resolveProcedureRoute } from '../brain/procedure_registry.mjs';
 
 const REGISTRY_URL = 'https://raw.githubusercontent.com/vickykenin-lang/Dr.-Victor-Multi-AI-Orchestrator/main/data/department_registry.json';
+const RIO_IG_PUBLISHED_URL = 'https://raw.githubusercontent.com/vickykenin-lang/rio-affiliate-engine/main/data/ig_published.json';
 const TASK_STATE_TTL_SECONDS = 86400;
 
 function stateStore(env) {
@@ -27,12 +28,16 @@ async function writeTaskState(env, key, value) {
   await store.put(key, JSON.stringify(value), { expirationTtl: TASK_STATE_TTL_SECONDS });
 }
 
-async function fetchRegistry() {
-  const response = await fetch(`${REGISTRY_URL}?t=${Date.now()}`, {
-    headers: { 'User-Agent': 'Victor-Deterministic-Status/1.0', 'Cache-Control': 'no-cache' },
+async function fetchJson(url, userAgent) {
+  const response = await fetch(`${url}?t=${Date.now()}`, {
+    headers: { 'User-Agent': userAgent, 'Cache-Control': 'no-cache' },
   });
-  if (!response.ok) throw new Error(`DEPARTMENT_REGISTRY_HTTP_${response.status}`);
+  if (!response.ok) throw new Error(`EVIDENCE_HTTP_${response.status}`);
   return response.json();
+}
+
+async function fetchRegistry() {
+  return fetchJson(REGISTRY_URL, 'Victor-Deterministic-Status/1.0');
 }
 
 function departmentName(id) {
@@ -59,6 +64,30 @@ export async function renderDepartmentStatus(department) {
   if (verifiedAt) lines.push(`Last recorded verification: ${verifiedAt}`);
   lines.push(`Fetched at: ${fetchedAt}`);
   lines.push('Source: canonical department registry; no LLM-generated status facts.');
+  return lines.join('\n');
+}
+
+export async function renderRioInstagramLastPost() {
+  const data = await fetchJson(RIO_IG_PUBLISHED_URL, 'Victor-RIO-Fact-Query/1.0');
+  const posted = data?.posted && typeof data.posted === 'object' ? data.posted : {};
+  const entries = Object.entries(posted)
+    .map(([offerId, value]) => ({ offerId, ...(value || {}) }))
+    .filter(item => item.posted_at && Number.isFinite(Date.parse(item.posted_at)))
+    .sort((a, b) => Date.parse(b.posted_at) - Date.parse(a.posted_at));
+  const fetchedAt = new Date().toISOString();
+  if (!entries.length) {
+    return `RIO Instagram fact\nLast verified post: NOT_AVAILABLE\nFetched at: ${fetchedAt}\nSource: rio-affiliate-engine/data/ig_published.json`;
+  }
+  const latest = entries[0];
+  const lines = [
+    'RIO Instagram fact',
+    `Last verified post: ${latest.posted_at}`,
+    `Offer: ${latest.offerId}`,
+  ];
+  if (latest.product_name) lines.push(`Product: ${latest.product_name}`);
+  if (latest.permalink) lines.push(`Permalink: ${latest.permalink}`);
+  lines.push(`Fetched at: ${fetchedAt}`);
+  lines.push('Source: rio-affiliate-engine/data/ig_published.json; no LLM-generated fact.');
   return lines.join('\n');
 }
 
@@ -120,6 +149,14 @@ export async function executeTask(env, route, text, messageId, operationKey = nu
   if (route.type === 'STATUS') {
     const routePolicy = resolveProcedureRoute({ type: 'STATUS', department: route.department, action: 'status', risk: 'GREEN' });
     return { reply: await renderDepartmentStatus(route.department), verified: true, routePolicy };
+  }
+  if (route.type === 'FACT_QUERY') {
+    const routePolicy = resolveProcedureRoute({ type: 'FACT_QUERY', department: route.department, action: route.action, risk: 'GREEN' });
+    if (!routePolicy.ok) return { reply: `Fact route blocked: ${routePolicy.reason}.`, verified: false, routePolicy };
+    if (route.department === 'rio' && route.action === 'instagram_last_post') {
+      return { reply: await renderRioInstagramLastPost(), verified: true, routePolicy };
+    }
+    return { reply: 'Requested fact ke liye verified read path registered nahi hai. Koi guess nahi kiya gaya.', verified: false, routePolicy };
   }
   if (route.type === 'ACTION') return executeDepartmentAction(env, route, text, messageId, operationKey);
   if (route.type === 'REMINDER') {
