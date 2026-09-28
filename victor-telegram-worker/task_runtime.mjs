@@ -6,6 +6,26 @@ import {
 import { resolveProcedureRoute } from '../brain/procedure_registry.mjs';
 
 const REGISTRY_URL = 'https://raw.githubusercontent.com/vickykenin-lang/Dr.-Victor-Multi-AI-Orchestrator/main/data/department_registry.json';
+const TASK_STATE_TTL_SECONDS = 86400;
+
+function stateStore(env) {
+  return env?.VICTOR_CONVERSATION_STATE && typeof env.VICTOR_CONVERSATION_STATE.get === 'function' ? env.VICTOR_CONVERSATION_STATE : null;
+}
+
+async function readTaskState(env, key) {
+  const store = stateStore(env);
+  if (!store || !key) return null;
+  try {
+    const raw = await store.get(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+async function writeTaskState(env, key, value) {
+  const store = stateStore(env);
+  if (!store || !key) return;
+  await store.put(key, JSON.stringify(value), { expirationTtl: TASK_STATE_TTL_SECONDS });
+}
 
 async function fetchRegistry() {
   const response = await fetch(`${REGISTRY_URL}?t=${Date.now()}`, {
@@ -42,14 +62,30 @@ export async function renderDepartmentStatus(department) {
   return lines.join('\n');
 }
 
-async function executeDepartmentAction(env, route, text, messageId) {
+async function resolveOrDispatch(env, target, text, messageId, operationKey) {
+  const stateKey = operationKey ? `victor:department-task:${operationKey}` : null;
+  const existing = await readTaskState(env, stateKey);
+  if (existing?.taskId && existing?.target === target) return existing;
+
+  let dispatch;
+  if (target === 'aura3') dispatch = await dispatchAura3Task(env, text, { messageId });
+  else if (target === 'rio') dispatch = await dispatchRioTask(env, text, { messageId });
+  else if (target === 'tony_stark') dispatch = await dispatchTonyTask(env, text, { messageId });
+  else return null;
+
+  const state = { target, taskId: dispatch.taskId, taskType: dispatch.taskType, dispatched_at: new Date().toISOString() };
+  await writeTaskState(env, stateKey, state);
+  return state;
+}
+
+async function executeDepartmentAction(env, route, text, messageId, operationKey = null) {
   const target = route.department;
   const routePolicy = resolveProcedureRoute({ type: 'ACTION', department: target, action: route.action, risk: route.risk });
   if (!routePolicy.ok) return { reply: `Task route blocked: ${routePolicy.reason}.`, verified: false, routePolicy };
 
   if (target === 'aura3') {
     if (!aura3BridgeConfigured(env)) return { reply: 'AURA3 bridge configured nahi hai. Koi task dispatch nahi hua.', verified: false, routePolicy };
-    const dispatch = await dispatchAura3Task(env, text, { messageId });
+    const dispatch = await resolveOrDispatch(env, target, text, messageId, operationKey);
     const received = await waitForAura3Result(dispatch.taskId, { attempts: 18, delayMs: 4000 });
     if (received.status !== 'RESULT_RECEIVED') return { reply: `AURA3 task ${dispatch.taskId} dispatch hua, lekin verified result abhi receive nahi hua. Completion claim nahi ki gayi.`, verified: false, taskId: dispatch.taskId, routePolicy };
     const verification = verifyAura3Result(received.result, dispatch.taskId);
@@ -59,7 +95,7 @@ async function executeDepartmentAction(env, route, text, messageId) {
 
   if (target === 'rio') {
     if (!rioBridgeConfigured(env)) return { reply: 'RIO bridge configured nahi hai. Koi task dispatch nahi hua.', verified: false, routePolicy };
-    const dispatch = await dispatchRioTask(env, text, { messageId });
+    const dispatch = await resolveOrDispatch(env, target, text, messageId, operationKey);
     const received = await waitForRioResult(dispatch.taskId, { attempts: 18, delayMs: 4000 });
     if (received.status !== 'RESULT_RECEIVED') return { reply: `RIO task ${dispatch.taskId} dispatch hua, lekin verified result abhi receive nahi hua. Completion claim nahi ki gayi.`, verified: false, taskId: dispatch.taskId, routePolicy };
     const verification = verifyRioResult(received.result, dispatch.taskId);
@@ -69,7 +105,7 @@ async function executeDepartmentAction(env, route, text, messageId) {
 
   if (target === 'tony_stark') {
     if (!tonyBridgeConfigured(env)) return { reply: 'Tony Stark bridge configured nahi hai. Koi task dispatch nahi hua.', verified: false, routePolicy };
-    const dispatch = await dispatchTonyTask(env, text, { messageId });
+    const dispatch = await resolveOrDispatch(env, target, text, messageId, operationKey);
     const received = await waitForTonyResult(dispatch.taskId, env, { attempts: 18, delayMs: 4000 });
     if (received.status !== 'RESULT_RECEIVED') return { reply: `Tony Stark task ${dispatch.taskId} dispatch hua, lekin verified result abhi receive nahi hua. Completion claim nahi ki gayi.`, verified: false, taskId: dispatch.taskId, routePolicy };
     const verification = verifyTonyResult(received.result, dispatch.taskId);
@@ -77,15 +113,15 @@ async function executeDepartmentAction(env, route, text, messageId) {
     return { reply: formatTonyResultForFounder(received.result), verified: true, taskId: dispatch.taskId, routePolicy };
   }
 
-  return { reply: `${departmentName(target)} ke liye verified execution bridge available nahi hai. Koi dispatch nahi hua.`, verified: false, routePolicy };
+  return { delegate_legacy: true, routePolicy };
 }
 
-export async function executeTask(env, route, text, messageId) {
+export async function executeTask(env, route, text, messageId, operationKey = null) {
   if (route.type === 'STATUS') {
     const routePolicy = resolveProcedureRoute({ type: 'STATUS', department: route.department, action: 'status', risk: 'GREEN' });
     return { reply: await renderDepartmentStatus(route.department), verified: true, routePolicy };
   }
-  if (route.type === 'ACTION') return executeDepartmentAction(env, route, text, messageId);
+  if (route.type === 'ACTION') return executeDepartmentAction(env, route, text, messageId, operationKey);
   if (route.type === 'REMINDER') {
     const routePolicy = resolveProcedureRoute({ type: 'REMINDER', action: 'create_reminder', risk: 'GREEN' });
     return {
