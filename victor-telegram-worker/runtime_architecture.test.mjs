@@ -27,6 +27,28 @@ test('explicit department status is deterministic and green', () => {
   assert.equal(route.confidence, 1);
 });
 
+test('explicit RIO Instagram last-post question is a read-only fact query, not an action', () => {
+  const route = routeDeterministically('Rio ne last post instagram par kab kiya tha?');
+  assert.equal(route.type, 'FACT_QUERY');
+  assert.equal(route.department, 'rio');
+  assert.equal(route.action, 'instagram_last_post');
+  assert.equal(route.risk, 'GREEN');
+});
+
+test('last-post follow-up inherits recent RIO task context', () => {
+  const route = routeDeterministically('Last post kab hua tha?', { department: 'rio', type: 'STATUS', action: 'status' });
+  assert.equal(route.type, 'FACT_QUERY');
+  assert.equal(route.department, 'rio');
+  assert.equal(route.action, 'instagram_last_post');
+  assert.equal(route.source, 'context-rule');
+});
+
+test('last-post text without department context stays chat instead of guessing a department', () => {
+  const route = routeDeterministically('Last post kab hua tha?');
+  assert.equal(route.type, 'CHAT');
+  assert.equal(route.department, null);
+});
+
 test('explicit department action routes to the named department', () => {
   const route = routeDeterministically('AURA3 ko task do aur system fix karo');
   assert.equal(route.type, 'ACTION');
@@ -58,11 +80,16 @@ test('semantic fallback cannot dispatch below high confidence', () => {
   assert.equal(route.source, 'semantic-low-confidence');
 });
 
-test('procedure registry is the routing authority for status and actions', () => {
+test('procedure registry is the routing authority for status, fact reads and actions', () => {
   const status = resolveProcedureRoute({ type: 'STATUS', department: 'rio', action: 'status', risk: 'GREEN' });
   assert.equal(status.ok, true);
   assert.equal(status.procedure_id, 'founder-status-check-v1');
   assert.equal(status.approval_required, false);
+
+  const fact = resolveProcedureRoute({ type: 'FACT_QUERY', department: 'rio', action: 'instagram_last_post', risk: 'GREEN' });
+  assert.equal(fact.ok, true);
+  assert.equal(fact.procedure_id, 'founder-status-check-v1');
+  assert.equal(fact.approval_required, false);
 
   const action = resolveProcedureRoute({ type: 'ACTION', department: 'aura3', action: 'department_action', risk: 'AMBER' });
   assert.equal(action.procedure_id, 'department-action-v1');
