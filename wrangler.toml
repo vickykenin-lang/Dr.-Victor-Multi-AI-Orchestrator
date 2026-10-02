@@ -6,11 +6,18 @@ keep_vars = true
 [version_metadata]
 binding = "CF_VERSION_METADATA"
 
+[ai]
+binding = "AI"
+
 [vars]
 COGNEE_SERVICE_URL = "https://tenant-0a6a1d31-b1ae-4ac6-97c2-ca7516939878.aws.cognee.ai"
 COGNEE_TENANT_ID = "0a6a1d31-b1ae-4ac6-97c2-ca7516939878"
 COGNEE_MEMORY_ENABLED = "true"
 RIO_FLYER_TRANSPORT_ENABLED = "false"
+RIO_IMAGE_MONTHLY_PROVIDER_CALL_LIMIT = "30"
+RIO_IMAGE_MAX_ATTEMPTS = "2"
+RIO_IMAGE_MONTHLY_SPEND_LIMIT_USD = "1"
+RIO_IMAGE_PROVIDER_MODE = "HERMES_CENTRAL_WORKERS_AI"
 
 [secrets]
 required = [ "COGNEE_API_KEY" ]
