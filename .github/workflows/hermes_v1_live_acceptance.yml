@@ -1,0 +1,97 @@
+name: Hermes V1 Live Acceptance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hermes_v1_live_acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
+      TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+      VICTOR_FOUNDER_CHAT_ID: ${{ secrets.VICTOR_FOUNDER_CHAT_ID }}
+    steps:
+      - name: Verify Hermes health and durable command store
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP=$(curl --silent --show-error --output /tmp/hermes-health.json --write-out '%{http_code}' \
+            --header 'Cache-Control: no-cache' \
+            "$BASE_URL/v1/health")
+          python - "$HTTP" <<'PY'
+          import json,sys
+          code=int(sys.argv[1]); body=json.load(open('/tmp/hermes-health.json'))
+          assert code == 200, {'http_status':code,'body':body}
+          assert body.get('status') == 'READY_FOR_COMMAND_ACCEPTANCE', body
+          assert body.get('ready_for_authenticated_commands') is True, body
+          assert body.get('durable_store') is True, body
+          assert body.get('command_token_configured') is True, body
+          assert body.get('webhook_secret_configured') is True, body
+          assert body.get('secrets_exposed') is False, body
+          print(json.dumps({
+            'status':'HERMES_LIVE_HEALTH_VERIFIED',
+            'http_status':code,
+            'durable_store':body.get('durable_store'),
+            'ready_for_authenticated_commands':body.get('ready_for_authenticated_commands'),
+            'command_token_source':body.get('command_token_source'),
+            'webhook_secret_source':body.get('webhook_secret_source')
+          },indent=2))
+          PY
+
+      - name: Verify governed Hermes command on existing Telegram webhook
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$TELEGRAM_WEBHOOK_SECRET" || { echo 'TELEGRAM_WEBHOOK_SECRET missing' >&2; exit 42; }
+          test -n "$VICTOR_FOUNDER_CHAT_ID" || { echo 'VICTOR_FOUNDER_CHAT_ID missing' >&2; exit 43; }
+          python - <<'PY'
+          import json,os
+          payload={
+            'update_id': int(os.environ.get('GITHUB_RUN_ID','1')) % 2000000000,
+            'message': {
+              'message_id': int(os.environ.get('GITHUB_RUN_NUMBER','1')) + 900000000,
+              'chat': {'id': int(os.environ['VICTOR_FOUNDER_CHAT_ID'])},
+              'from': {'id': int(os.environ['VICTOR_FOUNDER_CHAT_ID'])},
+              'text': '/hermes status'
+            }
+          }
+          json.dump(payload,open('/tmp/hermes-telegram.json','w'),separators=(',',':'))
+          PY
+          HTTP=$(curl --silent --show-error --output /tmp/hermes-telegram-response.json --write-out '%{http_code}' \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header "X-Telegram-Bot-Api-Secret-Token: ${TELEGRAM_WEBHOOK_SECRET}" \
+            --data-binary @/tmp/hermes-telegram.json \
+            "$BASE_URL/telegram")
+          python - "$HTTP" <<'PY'
+          import json,sys
+          code=int(sys.argv[1]); body=json.load(open('/tmp/hermes-telegram-response.json'))
+          assert code == 200, {'http_status':code,'body':body}
+          assert body.get('ok') is True, body
+          assert body.get('accepted') is True, body
+          assert body.get('execution') == 'COMPLETED', body
+          assert body.get('status') == 'COMPLETED', body
+          assert body.get('governed_router') is True, body
+          assert body.get('telegram_reply_sent') is True, body
+          result=body.get('result') or {}
+          store=result.get('command_store') or {}
+          assert store.get('durable') is True, body
+          assert body.get('receipt_id'), body
+          print(json.dumps({
+            'status':'HERMES_TELEGRAM_COMMAND_LIVE_VERIFIED',
+            'http_status':code,
+            'command_id':body.get('command_id'),
+            'receipt_id':body.get('receipt_id'),
+            'execution':body.get('execution'),
+            'telegram_reply_sent':body.get('telegram_reply_sent'),
+            'durable_command_store':store.get('durable')
+          },indent=2))
+          PY
