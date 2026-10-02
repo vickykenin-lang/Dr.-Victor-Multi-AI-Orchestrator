@@ -2,6 +2,7 @@ import { authenticateHermesRequest } from './hermes_command_auth.mjs';
 import { buildHermesReceipt, parseHermesTelegramCommand, validateHermesCommandEnvelope } from './hermes_command_plane.mjs';
 import { getCommandState, hermesStoreCapability, persistCommandAcceptance } from './hermes_command_store.mjs';
 import { routeHermesCommandV2 } from './hermes_command_router_v2.mjs';
+import { centralRioImageCapability, getCentralRioFlyerAsset } from './hermes_rio_image_provider.mjs';
 
 export const HERMES_HTTP_VERSION = 'HERMES_COMMAND_HTTP_V2';
 
@@ -11,9 +12,10 @@ function commandId(){return `cmd_${Date.now()}_${crypto.randomUUID().slice(0,8)}
 function idemTelegram(message={},route={}){return `telegram:${clean(String(message?.chat?.id??''),64)}:${clean(String(message?.message_id??''),64)}:${route.action||'unknown'}`.slice(0,160);}
 function commandToken(env={}){return env.HERMES_COMMAND_TOKEN||env.API_VICTOR||'';}
 function webhookSecret(env={}){return env.HERMES_WEBHOOK_SECRET||env.TELEGRAM_WEBHOOK_SECRET||'';}
+function bearerAuthorized(request,env={}){const token=commandToken(env);return Boolean(token&&request.headers.get('Authorization')===`Bearer ${token}`);}
 
 async function auth(request,env,rawBody,idempotencyKey){return authenticateHermesRequest({authorizationHeader:request.headers.get('Authorization')||'',expectedBearerToken:commandToken(env),timestamp:request.headers.get('X-Hermes-Timestamp')||'',rawBody,signature:request.headers.get('X-Hermes-Signature')||'',idempotencyKey,webhookSecret:webhookSecret(env),replayStore:env.HERMES_COMMAND_STORE});}
-export function hermesHttpCapabilityV2(env={}){const store=hermesStoreCapability(env);const token=commandToken(env),secret=webhookSecret(env);return{http_version:HERMES_HTTP_VERSION,command_token_configured:Boolean(token),webhook_secret_configured:Boolean(secret),command_token_source:env.HERMES_COMMAND_TOKEN?'HERMES_COMMAND_TOKEN':env.API_VICTOR?'API_VICTOR_FALLBACK':'NONE',webhook_secret_source:env.HERMES_WEBHOOK_SECRET?'HERMES_WEBHOOK_SECRET':env.TELEGRAM_WEBHOOK_SECRET?'TELEGRAM_WEBHOOK_SECRET_FALLBACK':'NONE',durable_store:store.durable,store,ready_for_authenticated_commands:Boolean(token&&secret&&store.durable)};}
+export function hermesHttpCapabilityV2(env={}){const store=hermesStoreCapability(env);const token=commandToken(env),secret=webhookSecret(env);const imageProvider=centralRioImageCapability(env);return{http_version:HERMES_HTTP_VERSION,command_token_configured:Boolean(token),webhook_secret_configured:Boolean(secret),command_token_source:env.HERMES_COMMAND_TOKEN?'HERMES_COMMAND_TOKEN':env.API_VICTOR?'API_VICTOR_FALLBACK':'NONE',webhook_secret_source:env.HERMES_WEBHOOK_SECRET?'HERMES_WEBHOOK_SECRET':env.TELEGRAM_WEBHOOK_SECRET?'TELEGRAM_WEBHOOK_SECRET_FALLBACK':'NONE',durable_store:store.durable,store,rio_central_image_provider:imageProvider,ready_for_authenticated_commands:Boolean(token&&secret&&store.durable)};}
 
 async function acceptAndRoute(env,validation,receipt){
   const persisted=await persistCommandAcceptance(env,{command:validation.command,receipt});
@@ -30,20 +32,30 @@ function telegramSummary(action,body={}){
   if(action==='hermes.status'){
     lines.push(`Command store: ${r?.command_store?.durable?'READY':'NOT READY'}`);
     lines.push(`RIO flyer bridge: ${r?.rio_flyer_bridge?.ready_for_dispatch?'READY':'NOT READY'}`);
+    lines.push(`Central image provider: ${r?.rio_central_image_provider?.ready_for_generation?'READY':'NOT READY'}`);
   }else if(action==='rio.status'){
-    lines.push(`Flyer transport: ${r?.exact_flyer_transport_ready_for_dispatch?'READY':'NOT READY'}`);
-    lines.push(`Feature flag: ${r?.exact_flyer_transport_enabled?'ON':'OFF'}`);
+    const centralReady=r?.central_image_provider?.ready_for_generation===true;
+    lines.push(`Flyer transport: ${centralReady?'READY':'NOT READY'}`);
+    lines.push(`Generation route: ${r?.generation_route||'unknown'}`);
+    lines.push(`Central provider: ${centralReady?'READY':'NOT READY'}`);
+    lines.push(`Credential transfer: ${r?.credential_transfer_required?'REQUIRED':'NOT REQUIRED'}`);
   }else if(action==='rio.image_usage'){
     lines.push(`Monthly provider-call limit: ${r?.monthly_provider_call_limit??'unknown'}`);
-    lines.push(`Actual calls: ${r?.actual_monthly_provider_calls??'not connected'}`);
+    lines.push(`Provider calls: ${r?.provider_calls??'not connected'}`);
+    lines.push(`Generated assets: ${r?.generated_assets??'not connected'}`);
   }else if(action==='rio.image_budget'){
     lines.push(`Monthly AI spend limit: $${r?.monthly_spend_limit_usd??'unknown'}`);
     lines.push(`Actual spend: ${r?.actual_monthly_spend_usd==null?'not connected':`$${r.actual_monthly_spend_usd}`}`);
   }else if(action==='victor.status'){
     lines.push(`Deploy SHA: ${r?.deployment_git_sha||'not verified'}`);
-  }else if(action==='rio.generate_product_flyer'&&r?.task_id){
+    lines.push(`Workers AI: ${r?.workers_ai_binding_configured?'READY':'NOT READY'}`);
+  }else if((action==='rio.generate_product_flyer'||action==='rio.flyer_preflight')&&r?.task_id){
     lines.push(`Task: ${r.task_id}`);
-    lines.push(`Result: ${r.result_path||'pending'}`);
+    if(r.asset_id)lines.push(`Asset: ${r.asset_id}`);
+    if(r.provider_calls_this_month!=null)lines.push(`Calls this month: ${r.provider_calls_this_month}/${r.monthly_provider_call_limit??'?'}`);
+  }else if(action==='rio.flyer_result'&&r?.task_id){
+    lines.push(`Task: ${r.task_id}`);
+    if(r?.downstream?.asset_id)lines.push(`Asset: ${r.downstream.asset_id}`);
   }
   if(body.receipt_id)lines.push(`Receipt: ${body.receipt_id}`);
   return lines.join('\n').slice(0,3500);
@@ -84,9 +96,19 @@ export async function handleHermesHttpRequestV2(request,env={}){
     const capability=hermesHttpCapabilityV2(env);
     return json({service:'hermes-command-control-plane',status:capability.ready_for_authenticated_commands?'READY_FOR_COMMAND_ACCEPTANCE':'PENDING_CONFIGURATION',...capability,deployment_evidence:'NOT_ASSERTED_BY_HEALTH_ROUTE',live_request_verified:false,real_output_verified:false,secrets_exposed:false},capability.ready_for_authenticated_commands?200:503);
   }
+  const assetMatch=/^\/v1\/assets\/([^/]+)$/.exec(url.pathname);
+  if(request.method==='GET'&&assetMatch){
+    if(!bearerAuthorized(request,env))return json({error:'unauthorized'},401);
+    try{
+      const asset=await getCentralRioFlyerAsset(env,decodeURIComponent(assetMatch[1]));
+      if(!asset.found)return json({error:'asset_not_found'},404);
+      const type=clean(asset?.metadata?.content_type,100)||'application/octet-stream';
+      return new Response(asset.bytes,{status:200,headers:{'content-type':type,'cache-control':'private, no-store','x-hermes-asset-id':asset.asset_id}});
+    }catch(error){return json({error:String(error?.message||'asset_read_failed')},503);}
+  }
   const m=/^\/v1\/commands\/([^/]+)$/.exec(url.pathname);
   if(request.method==='GET'&&m){
-    const token=commandToken(env);if(!token||request.headers.get('Authorization')!==`Bearer ${token}`)return json({error:'unauthorized'},401);
+    if(!bearerAuthorized(request,env))return json({error:'unauthorized'},401);
     try{const record=await getCommandState(env,decodeURIComponent(m[1]));if(!record.found)return json({error:'command_not_found'},404);return json({command:record.state,store:record.capability});}catch(error){return json({error:String(error?.message||'command_state_read_failed')},503);}
   }
   if(request.method==='POST'&&url.pathname==='/v1/commands'){

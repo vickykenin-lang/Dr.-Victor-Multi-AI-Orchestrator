@@ -1,7 +1,13 @@
 import { HERMES_RISK_CLASS, classifyHermesAction } from './hermes_command_plane.mjs';
 import { hermesStoreCapability, putCommandState, putReceipt } from './hermes_command_store.mjs';
 import { loadHermesContext } from './hermes_context_registry.mjs';
-import { dispatchRioFlyerTask, readRioFlyerResult, rioFlyerBridgeCapability } from './hermes_rio_flyer_bridge.mjs';
+import { readRioFlyerResult, rioFlyerBridgeCapability } from './hermes_rio_flyer_bridge.mjs';
+import {
+  centralRioImageCapability,
+  executeCentralRioFlyer,
+  readCentralRioFlyerResult,
+  readCentralRioImageUsage,
+} from './hermes_rio_image_provider.mjs';
 
 export const HERMES_ROUTER_VERSION = 'HERMES_COMMAND_ROUTER_V2';
 const configured = (v) => Boolean(String(v ?? '').trim());
@@ -23,13 +29,14 @@ function hermesEvidence(env={}) {
   };
 }
 
-function rioEvidence(env={},bridge={}) {
+function rioEvidence(env={},provider={}) {
+  const live=productionRuntimeObserved(env);
   return {
-    credential_available: bridge.github_orchestration_token_configured===true,
-    endpoint_config_present: bridge.transport_feature_flag_enabled===true,
+    credential_available: provider.workers_ai_binding_configured===true,
+    endpoint_config_present: provider.ready_for_generation===true,
     source_implemented: true,
     test_passed: null,
-    production_deployed: false,
+    production_deployed: live,
     live_request_verified: false,
     real_output_verified: false,
     real_business_outcome_verified: false,
@@ -37,12 +44,29 @@ function rioEvidence(env={},bridge={}) {
 }
 
 export function hermesRuntimeSnapshot(env={}) {
-  return { service:'hermes-command-control-plane', router_version:HERMES_ROUTER_VERSION, command_store:hermesStoreCapability(env), command_token_configured:commandTokenConfigured(env), command_token_source:configured(env.HERMES_COMMAND_TOKEN)?'HERMES_COMMAND_TOKEN':configured(env.API_VICTOR)?'API_VICTOR_FALLBACK':'NONE', webhook_secret_configured:webhookSecretConfigured(env), webhook_secret_source:configured(env.HERMES_WEBHOOK_SECRET)?'HERMES_WEBHOOK_SECRET':configured(env.TELEGRAM_WEBHOOK_SECRET)?'TELEGRAM_WEBHOOK_SECRET_FALLBACK':'NONE', telegram_secret_configured:configured(env.TELEGRAM_WEBHOOK_SECRET), founder_chat_configured:configured(env.VICTOR_FOUNDER_CHAT_ID), github_orchestration_token_configured:configured(env.GITHUB_ORCHESTRATION_TOKEN), rio_flyer_bridge:rioFlyerBridgeCapability(env), evidence:hermesEvidence(env) };
+  return { service:'hermes-command-control-plane', router_version:HERMES_ROUTER_VERSION, command_store:hermesStoreCapability(env), command_token_configured:commandTokenConfigured(env), command_token_source:configured(env.HERMES_COMMAND_TOKEN)?'HERMES_COMMAND_TOKEN':configured(env.API_VICTOR)?'API_VICTOR_FALLBACK':'NONE', webhook_secret_configured:webhookSecretConfigured(env), webhook_secret_source:configured(env.HERMES_WEBHOOK_SECRET)?'HERMES_WEBHOOK_SECRET':configured(env.TELEGRAM_WEBHOOK_SECRET)?'TELEGRAM_WEBHOOK_SECRET_FALLBACK':'NONE', telegram_secret_configured:configured(env.TELEGRAM_WEBHOOK_SECRET), founder_chat_configured:configured(env.VICTOR_FOUNDER_CHAT_ID), github_orchestration_token_configured:configured(env.GITHUB_ORCHESTRATION_TOKEN), workers_ai_binding_configured:Boolean(env.AI&&typeof env.AI.run==='function'), rio_flyer_bridge:rioFlyerBridgeCapability(env), rio_central_image_provider:centralRioImageCapability(env), evidence:hermesEvidence(env) };
 }
 
 export function rioRuntimeSnapshot(env={}) {
   const bridge=rioFlyerBridgeCapability(env);
-  return { service:'rio', bridge_credential_configured:bridge.github_orchestration_token_configured, exact_flyer_transport_implemented:true, exact_flyer_workflow:bridge.workflow, exact_flyer_transport_enabled:bridge.transport_feature_flag_enabled, exact_flyer_transport_ready_for_dispatch:bridge.ready_for_dispatch, no_spend_preflight_action:'rio.flyer_preflight', result_readback_action:'rio.flyer_result', result_readback_implemented:bridge.result_readback_implemented===true, image_policy:{ monthly_provider_call_limit:Number(env.RIO_IMAGE_MONTHLY_PROVIDER_CALL_LIMIT||30), max_attempts_per_product:Number(env.RIO_IMAGE_MAX_ATTEMPTS||2), monthly_spend_limit_usd:Number(env.RIO_IMAGE_MONTHLY_SPEND_LIMIT_USD||1) }, evidence:rioEvidence(env,bridge) };
+  const provider=centralRioImageCapability(env);
+  return {
+    service:'rio',
+    generation_route:'HERMES_CENTRAL_WORKERS_AI',
+    credential_transfer_required:false,
+    central_image_provider:provider,
+    legacy_flyer_transport:{
+      bridge_credential_configured:bridge.github_orchestration_token_configured,
+      workflow:bridge.workflow,
+      enabled:bridge.transport_feature_flag_enabled,
+      ready_for_dispatch:bridge.ready_for_dispatch,
+      result_readback_implemented:bridge.result_readback_implemented===true,
+    },
+    no_spend_preflight_action:'rio.flyer_preflight',
+    result_readback_action:'rio.flyer_result',
+    image_policy:{ monthly_provider_call_limit:Number(env.RIO_IMAGE_MONTHLY_PROVIDER_CALL_LIMIT||30), max_attempts_per_product:Number(env.RIO_IMAGE_MAX_ATTEMPTS||2), monthly_spend_limit_usd:Number(env.RIO_IMAGE_MONTHLY_SPEND_LIMIT_USD||1) },
+    evidence:rioEvidence(env,provider),
+  };
 }
 
 async function persistResult(env,command,result){
@@ -64,31 +88,39 @@ export async function routeHermesCommandV2(env,command,options={}){
     r={status:'COMPLETED',execution:'COMPLETED',result:{...registry,runtime:hermesRuntimeSnapshot(env)},live_request_verified:productionRuntimeObserved(env)};
   }
   else if(command.action==='rio.status') r={status:'COMPLETED',execution:'COMPLETED',result:rioRuntimeSnapshot(env)};
-  else if(command.action==='rio.image_usage') r={status:'COMPLETED_WITH_LIMITATION',execution:'COMPLETED',error_code:'RIO_IMAGE_USAGE_LEDGER_NOT_CONNECTED_TO_HERMES_READ_PATH',result:{monthly_provider_call_limit:Number(env.RIO_IMAGE_MONTHLY_PROVIDER_CALL_LIMIT||30),actual_monthly_provider_calls:null,counter_live_read_verified:false}};
-  else if(command.action==='rio.image_budget') r={status:'COMPLETED_WITH_LIMITATION',execution:'COMPLETED',error_code:'RIO_IMAGE_BUDGET_TELEMETRY_NOT_WIRED',result:{monthly_spend_limit_usd:Number(env.RIO_IMAGE_MONTHLY_SPEND_LIMIT_USD||1),actual_monthly_spend_usd:null,provider_budget_verified:false}};
+  else if(command.action==='rio.image_usage') {
+    const usage=await readCentralRioImageUsage(env);
+    r=usage.ok
+      ? {status:'COMPLETED',execution:'COMPLETED',error_code:null,result:{...usage.usage,monthly_provider_call_limit:usage.capability.monthly_provider_call_limit,counter_live_read_verified:usage.counter_live_read_verified,provider_mode:usage.capability.provider_mode}}
+      : {status:'COMPLETED_WITH_LIMITATION',execution:'COMPLETED',error_code:usage.error_code,result:{monthly_provider_call_limit:usage.capability?.monthly_provider_call_limit??Number(env.RIO_IMAGE_MONTHLY_PROVIDER_CALL_LIMIT||30),actual_monthly_provider_calls:null,counter_live_read_verified:false}};
+  }
+  else if(command.action==='rio.image_budget') r={status:'COMPLETED_WITH_LIMITATION',execution:'COMPLETED',error_code:'PROVIDER_BUDGET_TELEMETRY_NOT_WIRED',result:{monthly_spend_limit_usd:Number(env.RIO_IMAGE_MONTHLY_SPEND_LIMIT_USD||1),actual_monthly_spend_usd:null,provider_budget_verified:false,monthly_provider_call_limit:Number(env.RIO_IMAGE_MONTHLY_PROVIDER_CALL_LIMIT||30),central_provider:true}};
   else if(command.action==='rio.flyer_result') {
     const taskId=String(command?.payload?.task_id||'').trim();
     if(!taskId) r={status:'SAFE_STOP',execution:'BLOCKED',error_code:'RIO_FLYER_TASK_ID_REQUIRED',result:null};
     else {
-      const read=await readRioFlyerResult(env,taskId);
-      if(read.status==='FOUND') {
-        r={status:'COMPLETED',execution:'COMPLETED',error_code:null,result:{task_id:read.task_id,result_path:read.result_path,blob_sha:read.blob_sha,downstream:read.result},live_request_verified:read.live_request_verified===true,real_output_verified:read.real_output_verified===true,business_outcome_verified:read.business_outcome_verified===true};
-      } else if(read.status==='NOT_FOUND') {
-        r={status:'COMPLETED_WITH_LIMITATION',execution:'COMPLETED',error_code:'RIO_RESULT_NOT_FOUND',result:{task_id:read.task_id,result_path:read.result_path,downstream:null},live_request_verified:read.live_request_verified===true,real_output_verified:false,business_outcome_verified:false};
+      const central=await readCentralRioFlyerResult(env,taskId);
+      if(central.status==='FOUND') {
+        r={status:'COMPLETED',execution:'COMPLETED',error_code:null,result:{task_id:central.task_id,source:'HERMES_CENTRAL_WORKERS_AI',downstream:central.result},live_request_verified:central.live_request_verified===true,real_output_verified:central.real_output_verified===true,business_outcome_verified:central.business_outcome_verified===true};
       } else {
-        r={status:'SAFE_STOP',execution:'BLOCKED',error_code:read.error_code||'RIO_RESULT_READ_FAILED',result:read,live_request_verified:read.live_request_verified===true,real_output_verified:false,business_outcome_verified:false};
+        const read=await readRioFlyerResult(env,taskId);
+        if(read.status==='FOUND') {
+          r={status:'COMPLETED',execution:'COMPLETED',error_code:null,result:{task_id:read.task_id,source:'LEGACY_RIO_GITHUB_TRANSPORT',result_path:read.result_path,blob_sha:read.blob_sha,downstream:read.result},live_request_verified:read.live_request_verified===true,real_output_verified:read.real_output_verified===true,business_outcome_verified:read.business_outcome_verified===true};
+        } else if(read.status==='NOT_FOUND') {
+          r={status:'COMPLETED_WITH_LIMITATION',execution:'COMPLETED',error_code:'RIO_RESULT_NOT_FOUND',result:{task_id:read.task_id,result_path:read.result_path,downstream:null},live_request_verified:read.live_request_verified===true,real_output_verified:false,business_outcome_verified:false};
+        } else {
+          r={status:'SAFE_STOP',execution:'BLOCKED',error_code:read.error_code||'RIO_RESULT_READ_FAILED',result:read,live_request_verified:read.live_request_verified===true,real_output_verified:false,business_outcome_verified:false};
+        }
       }
     }
   }
-  else if(command.action==='victor.status') r={status:'COMPLETED',execution:'COMPLETED',result:{service:'victor',deployment_git_sha:env.VICTOR_DEPLOY_GIT_SHA||null,deployment_build_uuid:env.VICTOR_BUILD_UUID||null,github_orchestration_token_configured:configured(env.GITHUB_ORCHESTRATION_TOKEN),production_identity_verified:productionRuntimeObserved(env)},live_request_verified:productionRuntimeObserved(env)};
+  else if(command.action==='victor.status') r={status:'COMPLETED',execution:'COMPLETED',result:{service:'victor',deployment_git_sha:env.VICTOR_DEPLOY_GIT_SHA||null,deployment_build_uuid:env.VICTOR_BUILD_UUID||null,github_orchestration_token_configured:configured(env.GITHUB_ORCHESTRATION_TOKEN),workers_ai_binding_configured:Boolean(env.AI&&typeof env.AI.run==='function'),production_identity_verified:productionRuntimeObserved(env)},live_request_verified:productionRuntimeObserved(env)};
   else if(command.action==='rio.generate_product_flyer' || command.action==='rio.flyer_preflight'){
-    const ref=String(command?.payload?.product_reference||'').trim();
-    const image=String(command?.payload?.product_image_url||'').trim();
-    if(!ref) r={status:'SAFE_STOP',execution:'BLOCKED',error_code:'PRODUCT_REFERENCE_REQUIRED',result:null};
-    else if(!/^https:\/\//i.test(image)) r={status:'SAFE_STOP',execution:'BLOCKED',error_code:'VERIFIED_PRODUCT_IMAGE_URL_REQUIRED',result:{product_reference:ref}};
-    else {
-      const d=await dispatchRioFlyerTask(env,command);
-      r=d.status==='DISPATCHED' ? {status:command.action==='rio.flyer_preflight'?'PREFLIGHT_DISPATCHED':'DISPATCHED',execution:'DISPATCHED',error_code:null,result:{task_id:d.task_id,product_reference:d.product_reference,repository:d.repository,workflow:d.workflow,preflight_only:d.preflight_only===true,result_path:d.result_path},live_request_verified:true,real_output_verified:false,business_outcome_verified:false} : {status:'SAFE_STOP',execution:'BLOCKED',error_code:d.error_code||'RIO_FLYER_DISPATCH_FAILED',result:d};
+    const generated=await executeCentralRioFlyer(env,command,{preflightOnly:command.action==='rio.flyer_preflight'});
+    if(generated.status==='SAFE_STOP') {
+      r={status:'SAFE_STOP',execution:generated.execution_status||'BLOCKED',error_code:generated.error_code||'CENTRAL_IMAGE_PROVIDER_FAILED',result:generated,live_request_verified:generated.live_request_verified===true,real_output_verified:false,business_outcome_verified:false};
+    } else {
+      r={status:generated.status,execution:generated.execution_status||'COMPLETED',error_code:generated.error_code||null,result:generated,live_request_verified:generated.live_request_verified===true,real_output_verified:generated.real_output_verified===true,business_outcome_verified:generated.business_outcome_verified===true};
     }
   } else r={status:'SAFE_STOP',execution:'BLOCKED',error_code:'ACTION_ROUTE_NOT_IMPLEMENTED',result:null};
   if(options.persist!==false) await persistResult(env,command,r);
