@@ -29,6 +29,7 @@ jobs:
             victor-telegram-worker/hermes_command_plane.test.mjs \
             victor-telegram-worker/hermes_command_auth.test.mjs \
             victor-telegram-worker/hermes_command_store.test.mjs \
+            victor-telegram-worker/hermes_context_registry.test.mjs \
             victor-telegram-worker/hermes_command_http.test.mjs \
             victor-telegram-worker/hermes_command_http_v2.test.mjs \
             victor-telegram-worker/hermes_command_router.test.mjs \
