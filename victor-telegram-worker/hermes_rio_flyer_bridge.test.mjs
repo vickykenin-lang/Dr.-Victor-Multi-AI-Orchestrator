@@ -18,7 +18,7 @@ test('dispatch posts exact workflow inputs and reports verified dispatch only on
   let seen;
   globalThis.fetch = async (url, init) => {
     seen = { url, init, body: JSON.parse(init.body) };
-    return new Response('', { status: 204 });
+    return { status: 204, text: async () => '' };
   };
   try {
     const out = await dispatchRioFlyerTask({ GITHUB_ORCHESTRATION_TOKEN: 'token', RIO_FLYER_TRANSPORT_ENABLED: 'true' }, {
