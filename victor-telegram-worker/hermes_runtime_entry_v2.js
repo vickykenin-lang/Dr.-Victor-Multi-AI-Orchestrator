@@ -1,4 +1,4 @@
-import primaryWorker from './worker.js';
+import primaryWorker from './llm_first_runtime.js';
 import { handleHermesHttpRequestV2 } from './hermes_command_http_v2.mjs';
 
 export default {
@@ -9,5 +9,8 @@ export default {
     const handled = await handleHermesHttpRequestV2(request, env);
     if (handled) return handled;
     return primaryWorker.fetch(request, env, ctx);
+  },
+  async queue(batch, env, ctx) {
+    return primaryWorker.queue(batch, env, ctx);
   },
 };
