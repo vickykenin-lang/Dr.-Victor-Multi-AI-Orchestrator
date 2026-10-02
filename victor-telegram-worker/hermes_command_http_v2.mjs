@@ -31,10 +31,13 @@ function telegramSummary(action,body={}){
   const r=body.result||{};
   if(action==='hermes.status'){
     lines.push(`Command store: ${r?.command_store?.durable?'READY':'NOT READY'}`);
+    lines.push(`RIO flyer bridge: ${r?.rio_flyer_bridge?.ready_for_dispatch?'READY':'NOT READY'}`);
     lines.push(`Central image provider: ${r?.rio_central_image_provider?.ready_for_generation?'READY':'NOT READY'}`);
   }else if(action==='rio.status'){
+    const centralReady=r?.central_image_provider?.ready_for_generation===true;
+    lines.push(`Flyer transport: ${centralReady?'READY':'NOT READY'}`);
     lines.push(`Generation route: ${r?.generation_route||'unknown'}`);
-    lines.push(`Central provider: ${r?.central_image_provider?.ready_for_generation?'READY':'NOT READY'}`);
+    lines.push(`Central provider: ${centralReady?'READY':'NOT READY'}`);
     lines.push(`Credential transfer: ${r?.credential_transfer_required?'REQUIRED':'NOT REQUIRED'}`);
   }else if(action==='rio.image_usage'){
     lines.push(`Monthly provider-call limit: ${r?.monthly_provider_call_limit??'unknown'}`);
