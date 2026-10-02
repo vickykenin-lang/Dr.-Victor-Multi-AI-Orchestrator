@@ -1,0 +1,49 @@
+name: Hermes Wrangler Audit Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/hermes-command-control-plane-v1
+    paths:
+      - '.github/workflows/hermes-wrangler-audit-diagnostic.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        wrangler: ['4.141.0', '4.144.0']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Audit Wrangler ${{ matrix.wrangler }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          cd "$work"
+          npm init -y >/dev/null 2>&1
+          npm install --package-lock-only --ignore-scripts "wrangler@${{ matrix.wrangler }}" >/dev/null 2>&1
+          npm audit --json > audit.json || true
+          node - <<'NODE'
+          const fs = require('fs');
+          const j = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+          const vulns = Object.entries(j.vulnerabilities || {}).map(([name, v]) => ({
+            name,
+            severity: v.severity,
+            direct: v.isDirect,
+            range: v.range,
+            via: (v.via || []).map(x => typeof x === 'string' ? x : ({source:x.source,name:x.name,severity:x.severity,title:x.title,range:x.range,url:x.url})),
+            fixAvailable: v.fixAvailable,
+          }));
+          console.log(JSON.stringify({metadata:j.metadata, vulnerabilities:vulns}, null, 2));
+          const counts = (j.metadata && j.metadata.vulnerabilities) || {};
+          if ((counts.high || 0) > 0 || (counts.critical || 0) > 0) process.exitCode = 2;
+          NODE
