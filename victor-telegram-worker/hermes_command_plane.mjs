@@ -92,13 +92,16 @@ export function buildHermesReceipt({ command, status = 'RECEIVED', validation = 
 }
 
 export function parseHermesTelegramCommand(text = '') {
-  const raw = cleanString(text, 500);
+  const raw = cleanString(text, 1000);
   const parts = raw.split(/\s+/).filter(Boolean);
   if (!parts.length) return null;
 
   const cmd = parts[0].toLowerCase();
   if (cmd === '/hermes' && parts[1]?.toLowerCase() === 'status') {
     return { target: 'hermes', action: 'hermes.status', payload: {} };
+  }
+  if (cmd === '/hermes' && parts[1]?.toLowerCase() === 'audit') {
+    return { target: 'hermes', action: 'hermes.audit', payload: {} };
   }
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'status') {
     return { target: 'rio', action: 'rio.status', payload: {} };
@@ -110,10 +113,17 @@ export function parseHermesTelegramCommand(text = '') {
     return { target: 'rio', action: 'rio.image_budget', payload: {} };
   }
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'flyer' && parts[2]) {
+    const args = parts.slice(2);
+    const finalArg = args.at(-1) || '';
+    const hasImageUrl = /^https:\/\//i.test(finalArg) && args.length >= 2;
+    const productReference = hasImageUrl ? args.slice(0, -1).join(' ') : args.join(' ');
     return {
       target: 'rio',
       action: 'rio.generate_product_flyer',
-      payload: { product_reference: parts.slice(2).join(' ') },
+      payload: {
+        product_reference: productReference,
+        ...(hasImageUrl ? { product_image_url: finalArg } : {}),
+      },
     };
   }
   if (cmd === '/victor' && parts[1]?.toLowerCase() === 'status') {
