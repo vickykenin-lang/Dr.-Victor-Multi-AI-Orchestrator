@@ -1,11 +1,24 @@
 const GITHUB_API = 'https://api.github.com';
 const RIO_REPO = 'vickykenin-lang/rio-affiliate-engine';
 const RIO_FLYER_WORKFLOW = 'hermes-rio-flyer-transport.yml';
+const RIO_RESULT_PREFIX = 'integration/results/flyer_tasks';
 
 export const HERMES_RIO_FLYER_BRIDGE_VERSION = 'HERMES_RIO_FLYER_BRIDGE_V1';
 
 function clean(value, max = 1000) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+function safeTaskId(value) {
+  const taskId = clean(value, 180);
+  return /^[A-Za-z0-9._-]+$/.test(taskId) ? taskId : '';
+}
+
+function decodeBase64Utf8(value = '') {
+  const raw = atob(String(value).replace(/\s+/g, ''));
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
 }
 
 export function rioFlyerBridgeCapability(env = {}) {
@@ -15,20 +28,25 @@ export function rioFlyerBridgeCapability(env = {}) {
     bridge_version: HERMES_RIO_FLYER_BRIDGE_VERSION,
     repository: RIO_REPO,
     workflow: RIO_FLYER_WORKFLOW,
+    result_prefix: RIO_RESULT_PREFIX,
     github_orchestration_token_configured: token,
     transport_feature_flag_enabled: enabled,
     ready_for_dispatch: token && enabled,
+    result_readback_implemented: true,
   };
 }
 
-function githubHeaders(env) {
-  return {
-    Authorization: `Bearer ${env.GITHUB_ORCHESTRATION_TOKEN}`,
+function githubHeaders(env, { json = true } = {}) {
+  const headers = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'Content-Type': 'application/json',
     'User-Agent': 'Hermes-RIO-Flyer-Bridge/1.0',
   };
+  if (clean(env?.GITHUB_ORCHESTRATION_TOKEN)) {
+    headers.Authorization = `Bearer ${env.GITHUB_ORCHESTRATION_TOKEN}`;
+  }
+  if (json) headers['Content-Type'] = 'application/json';
+  return headers;
 }
 
 export function validateRioFlyerPayload(command = {}) {
@@ -43,6 +61,92 @@ export function validateRioFlyerPayload(command = {}) {
     product_reference: productReference,
     product_image_url: productImageUrl,
   };
+}
+
+export async function readRioFlyerResult(env, taskIdInput) {
+  const taskId = safeTaskId(taskIdInput);
+  if (!taskId) {
+    return {
+      status: 'SAFE_STOP',
+      error_code: 'RIO_FLYER_TASK_ID_INVALID',
+      task_id: null,
+      result: null,
+    };
+  }
+
+  const path = `${RIO_RESULT_PREFIX}/${taskId}.json`;
+  const url = `${GITHUB_API}/repos/${RIO_REPO}/contents/${path}?ref=main`;
+  let response;
+  try {
+    response = await fetch(url, { method: 'GET', headers: githubHeaders(env, { json: false }) });
+  } catch (error) {
+    return {
+      status: 'SAFE_STOP',
+      error_code: 'RIO_RESULT_READ_FAILED',
+      task_id: taskId,
+      detail: clean(error?.message || error, 240),
+      result: null,
+    };
+  }
+
+  if (response.status === 404) {
+    return {
+      status: 'NOT_FOUND',
+      error_code: 'RIO_RESULT_NOT_FOUND',
+      task_id: taskId,
+      result_path: path,
+      result: null,
+      live_request_verified: true,
+    };
+  }
+
+  if (!response.ok) {
+    return {
+      status: 'SAFE_STOP',
+      error_code: 'RIO_RESULT_GITHUB_HTTP_ERROR',
+      task_id: taskId,
+      github_http_status: response.status,
+      result: null,
+      live_request_verified: true,
+    };
+  }
+
+  try {
+    const body = await response.json();
+    const decoded = decodeBase64Utf8(body?.content || '');
+    const result = JSON.parse(decoded);
+    if (result?.task_id !== taskId) {
+      return {
+        status: 'SAFE_STOP',
+        error_code: 'RIO_RESULT_TASK_ID_MISMATCH',
+        task_id: taskId,
+        result_path: path,
+        result: null,
+        live_request_verified: true,
+      };
+    }
+    return {
+      status: 'FOUND',
+      error_code: null,
+      task_id: taskId,
+      result_path: path,
+      blob_sha: body?.sha || null,
+      result,
+      live_request_verified: true,
+      real_output_verified: result?.real_output_verified === true,
+      business_outcome_verified: result?.business_outcome_verified === true,
+    };
+  } catch (error) {
+    return {
+      status: 'SAFE_STOP',
+      error_code: 'RIO_RESULT_PARSE_FAILED',
+      task_id: taskId,
+      result_path: path,
+      detail: clean(error?.message || error, 240),
+      result: null,
+      live_request_verified: true,
+    };
+  }
 }
 
 export async function dispatchRioFlyerTask(env, command = {}) {
@@ -121,6 +225,7 @@ export async function dispatchRioFlyerTask(env, command = {}) {
     workflow: RIO_FLYER_WORKFLOW,
     repository: RIO_REPO,
     preflight_only: preflightOnly,
+    result_path: `${RIO_RESULT_PREFIX}/${taskId}.json`,
     capability,
     live_request_verified: true,
     real_output_verified: false,
