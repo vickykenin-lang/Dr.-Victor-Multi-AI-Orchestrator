@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleHermesHttpRequestV2, hermesHttpCapabilityV2 } from './hermes_command_http_v2.mjs';
+import { computeHermesSignature } from './hermes_command_auth.mjs';
+import { chatgptTelegramMirrorText, handleHermesHttpRequestV2, hermesHttpCapabilityV2 } from './hermes_command_http_v2.mjs';
 
 function memoryKv() {
   const map = new Map();
@@ -42,6 +43,34 @@ function telegramRequest(text, secret = 'tg-secret', messageId = 101) {
         text,
       },
     }),
+  });
+}
+
+async function signedChatgptRequest(env, overrides = {}) {
+  const idempotencyKey = overrides.idempotency_key || `chatgpt-mirror-${crypto.randomUUID()}`;
+  const command = {
+    command_id: overrides.command_id || `cmd_chatgpt_mirror_${crypto.randomUUID().slice(0, 8)}`,
+    source: 'chatgpt',
+    actor: 'founder_authorized_assistant',
+    target: overrides.target || 'hermes',
+    action: overrides.action || 'hermes.status',
+    payload: overrides.payload || {},
+    execution_mode: 'manual',
+    idempotency_key: idempotencyKey,
+  };
+  const rawBody = JSON.stringify(command);
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = await computeHermesSignature(env.TELEGRAM_WEBHOOK_SECRET, timestamp, rawBody);
+  return new Request('https://example.com/v1/commands', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      Authorization: `Bearer ${env.API_VICTOR}`,
+      'X-Hermes-Timestamp': timestamp,
+      'X-Hermes-Signature': signature,
+      'X-Idempotency-Key': idempotencyKey,
+    },
+    body: rawBody,
   });
 }
 
@@ -97,4 +126,58 @@ test('flyer command keeps missing verified image fail-closed', async (t) => {
   assert.equal(body.accepted, true);
   assert.equal(body.execution, 'BLOCKED');
   assert.equal(body.error_code, 'VERIFIED_PRODUCT_IMAGE_URL_REQUIRED');
+});
+
+test('ChatGPT mirror redacts sensitive fields before Telegram delivery', () => {
+  const text = chatgptTelegramMirrorText({
+    command_id: 'cmd_1',
+    source: 'chatgpt',
+    actor: 'founder_authorized_assistant',
+    target: 'hermes',
+    action: 'hermes.status',
+    payload: { note: 'visible-note', api_token: 'do-not-leak', nested: { secret: 'hidden' } },
+    execution_mode: 'manual',
+    idempotency_key: 'idem-1',
+  }, {
+    status: 'COMPLETED',
+    execution: 'COMPLETED',
+    receipt_id: 'rcpt_1',
+    result: { ok: true, credential_value: 'also-hidden' },
+  });
+  assert.match(text, /ChatGPT → Hermes/);
+  assert.match(text, /visible-note/);
+  assert.match(text, /\[REDACTED\]/);
+  assert.doesNotMatch(text, /do-not-leak|also-hidden|hidden/);
+});
+
+test('authenticated ChatGPT command is mirrored with exact sanitized command and Hermes receipt to founder Telegram', async (t) => {
+  const env = runtimeEnv();
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (url, init) => {
+    outbound.push({ url: String(url), init });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const request = await signedChatgptRequest(env, {
+    command_id: 'cmd_chatgpt_mirror_acceptance',
+    idempotency_key: 'chatgpt-mirror-acceptance',
+    payload: { note: 'show-this-command', api_token: 'must-stay-private' },
+  });
+  const response = await handleHermesHttpRequestV2(request, env);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.accepted, true);
+  assert.equal(body.execution, 'COMPLETED');
+  assert.equal(body.telegram_mirror_sent, true);
+  assert.equal(outbound.length, 1);
+  assert.match(outbound[0].url, /api\.telegram\.org\/bottg-bot-token\/sendMessage$/);
+  const telegramBody = JSON.parse(outbound[0].init.body);
+  assert.equal(String(telegramBody.chat_id), '12345');
+  assert.match(telegramBody.text, /ChatGPT → Hermes/);
+  assert.match(telegramBody.text, /Action: hermes\.status/);
+  assert.match(telegramBody.text, /show-this-command/);
+  assert.match(telegramBody.text, /Receipt:/);
+  assert.doesNotMatch(telegramBody.text, /must-stay-private/);
 });
