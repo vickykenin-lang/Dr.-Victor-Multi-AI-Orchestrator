@@ -23,13 +23,13 @@ test('bearer parsing and constant-time compare accept exact token', () => {
   assert.equal(verifyBearerToken('abc123', 'abc124'), false);
 });
 
-test('HMAC signature verifies canonical timestamp.body payload', () => {
+test('HMAC signature verifies canonical timestamp.body payload', async () => {
   const secret = 'secret';
   const timestamp = '1790910300';
   const rawBody = '{"hello":"world"}';
-  const signature = computeHermesSignature(secret, timestamp, rawBody);
-  assert.equal(verifyHermesSignature({ secret, timestamp, rawBody, signature }), true);
-  assert.equal(verifyHermesSignature({ secret, timestamp, rawBody: '{}', signature }), false);
+  const signature = await computeHermesSignature(secret, timestamp, rawBody);
+  assert.equal(await verifyHermesSignature({ secret, timestamp, rawBody, signature }), true);
+  assert.equal(await verifyHermesSignature({ secret, timestamp, rawBody: '{}', signature }), false);
 });
 
 test('timestamp freshness fails closed outside five minute window', () => {
@@ -45,7 +45,7 @@ test('full auth accepts first request and blocks replay', async () => {
   const webhookSecret = 'hook-secret';
   const timestamp = '1790910300';
   const rawBody = '{"command_id":"cmd_1"}';
-  const signature = computeHermesSignature(webhookSecret, timestamp, rawBody);
+  const signature = await computeHermesSignature(webhookSecret, timestamp, rawBody);
   const replayStore = memoryReplayStore();
   const base = {
     authorizationHeader: 'Bearer token-1',
