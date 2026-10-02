@@ -33,7 +33,7 @@ test('health reports ready when auth and store are configured', async () => {
   assert.equal(body.ready_for_authenticated_commands, true);
 });
 
-test('authenticated POST /v1/commands accepts and persists command', async () => {
+test('authenticated read-only command is accepted, routed and persisted', async () => {
   const runtime = env();
   const input = {
     command_id: 'cmd_test_1',
@@ -61,10 +61,10 @@ test('authenticated POST /v1/commands accepts and persists command', async () =>
   });
 
   const response = await handleHermesHttpRequest(request, runtime);
-  assert.equal(response.status, 202);
+  assert.equal(response.status, 200);
   const accepted = await response.json();
   assert.equal(accepted.accepted, true);
-  assert.equal(accepted.execution, 'NOT_STARTED');
+  assert.equal(accepted.execution, 'COMPLETED');
 
   const read = await handleHermesHttpRequest(new Request('https://example.com/v1/commands/cmd_test_1', {
     headers: { Authorization: 'Bearer cmd-token' },
@@ -72,6 +72,7 @@ test('authenticated POST /v1/commands accepts and persists command', async () =>
   assert.equal(read.status, 200);
   const record = await read.json();
   assert.equal(record.command.action, 'rio.status');
+  assert.equal(record.command.execution, 'COMPLETED');
 });
 
 test('invalid external auth is rejected', async () => {
@@ -90,7 +91,7 @@ test('invalid external auth is rejected', async () => {
   assert.equal(response.status, 401);
 });
 
-test('telegram adapter accepts founder command and only persists it', async () => {
+test('telegram read-only founder command is accepted and routed', async () => {
   const runtime = env();
   const update = {
     message: {
@@ -105,8 +106,8 @@ test('telegram adapter accepts founder command and only persists it', async () =
     headers: { 'X-Telegram-Bot-Api-Secret-Token': 'tg-secret' },
     body: JSON.stringify(update),
   }), runtime);
-  assert.equal(response.status, 202);
+  assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.accepted, true);
-  assert.equal(body.execution, 'NOT_STARTED');
+  assert.equal(body.execution, 'COMPLETED');
 });
