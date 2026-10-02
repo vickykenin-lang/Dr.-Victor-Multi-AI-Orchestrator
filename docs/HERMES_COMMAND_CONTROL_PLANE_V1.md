@@ -62,7 +62,7 @@ Before any consequential execution, the runtime must support:
 9. Policy/risk classification.
 10. Receipt persistence before and after execution.
 
-Block 2 now provides deterministic primitives for Bearer validation, HMAC verification, a default 5-minute timestamp window, and replay protection through an injected key-value store. HTTP endpoint wiring and production secrets are still not configured by this branch.
+Block 2 provides deterministic primitives for Bearer validation, HMAC verification, a default 5-minute timestamp window, and replay protection through an injected key-value store. HTTP endpoint wiring and production secrets are still not configured by this branch.
 
 ## Authentication contract
 Expected request headers for the future HTTP endpoint:
@@ -77,6 +77,18 @@ Canonical signature input:
 `HMAC_SHA256(secret, timestamp + "." + raw_request_body)`
 
 The request must fail closed when the token, timestamp, signature, idempotency key, or replay store is invalid/missing.
+
+## Persistence contract
+Block 3 adds a fail-closed durable store abstraction using one KV-like binding named `HERMES_COMMAND_STORE`.
+
+Key namespaces:
+- `idempotency:<key>` — reserves one logical command key and detects duplicates.
+- `command:<command_id>` — stores current command lifecycle state.
+- `receipt:<receipt_id>` — stores evidence and execution receipts.
+
+The persistence layer does not fall back to transient cache for command acceptance. If `HERMES_COMMAND_STORE` is unavailable, command persistence fails closed.
+
+Default idempotency retention is 35 days. This is a source-level default and is not proof that a production KV binding exists.
 
 ## Evidence states
 Never collapse these into one status:
@@ -142,9 +154,11 @@ Planned policy (not yet wired):
 - [x] Unit tests added.
 
 ### Block 3 — persistence
-- [ ] Idempotency store.
-- [ ] Command state store.
-- [ ] Receipt/evidence store.
+- [x] Idempotency store contract.
+- [x] Command state store.
+- [x] Receipt/evidence store.
+- [x] Fail-closed missing-store behavior.
+- [x] Unit tests added.
 
 ### Block 4 — HTTP wiring
 - [ ] `POST /v1/commands`.
@@ -166,4 +180,4 @@ Planned policy (not yet wired):
 - [ ] Verify real RIO output separately.
 
 ## Current status
-Block 1 and Block 2 source are present on `feature/hermes-command-control-plane-v1`. Nothing in this document proves production deployment, configured production credentials, CI success, or live command execution.
+Block 1, Block 2, and Block 3 source are present on `feature/hermes-command-control-plane-v1`. Nothing in this document proves a production `HERMES_COMMAND_STORE` binding, production deployment, configured production credentials, CI success, or live command execution.
