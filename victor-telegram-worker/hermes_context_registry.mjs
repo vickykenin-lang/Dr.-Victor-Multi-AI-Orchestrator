@@ -2,7 +2,7 @@ export const HERMES_CONTEXT_REGISTRY_VERSION = 'HERMES_CONTEXT_REGISTRY_V1';
 const ACTIVE_CONTEXT_KEY = 'context:hermes:active';
 
 export const DEFAULT_HERMES_CONTEXT = Object.freeze({
-  context_version: '2026-10-02-v2',
+  context_version: '2026-10-02-v3',
   purpose: 'Persistent bootstrap context for Founder-authorized Hermes operations and development.',
   founder_command_policy: 'manual_governed',
   architecture: {
@@ -44,6 +44,8 @@ export const DEFAULT_HERMES_CONTEXT = Object.freeze({
     exact_https_product_image_required: true,
     reference_image_max_dimension_px: 511,
     monthly_provider_call_limit: 30,
+    quota_counter_atomic: false,
+    quota_counter_note: 'Current counter uses Workers KV and is auditable but not a concurrency-safe hard cap; upgrade to Durable Object or D1 before autonomous concurrent generation.',
     max_attempts_per_product: 2,
     generated_output_requires_semantic_qa_before_final: true,
   },
