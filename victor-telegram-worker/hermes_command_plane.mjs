@@ -10,6 +10,7 @@ export const HERMES_RISK_CLASS = Object.freeze({
 export const HERMES_ACTIONS = Object.freeze({
   'hermes.status': { target: 'hermes', risk: HERMES_RISK_CLASS.READ_ONLY },
   'hermes.audit': { target: 'hermes', risk: HERMES_RISK_CLASS.READ_ONLY },
+  'hermes.context': { target: 'hermes', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.status': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.image_usage': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.image_budget': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
@@ -102,6 +103,9 @@ export function parseHermesTelegramCommand(text = '') {
   }
   if (cmd === '/hermes' && parts[1]?.toLowerCase() === 'audit') {
     return { target: 'hermes', action: 'hermes.audit', payload: {} };
+  }
+  if (cmd === '/hermes' && parts[1]?.toLowerCase() === 'context') {
+    return { target: 'hermes', action: 'hermes.context', payload: {} };
   }
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'status') {
     return { target: 'rio', action: 'rio.status', payload: {} };
