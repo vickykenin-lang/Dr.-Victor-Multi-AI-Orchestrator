@@ -9,6 +9,7 @@ import {
   hermesStoreCapability,
   persistCommandAcceptance,
 } from './hermes_command_store.mjs';
+import { routeHermesCommand } from './hermes_command_router.mjs';
 
 export const HERMES_HTTP_VERSION = 'HERMES_COMMAND_HTTP_V1';
 
@@ -58,6 +59,39 @@ export function hermesHttpCapability(env = {}) {
     durable_store: store.durable,
     store,
     ready_for_authenticated_commands: Boolean(env.HERMES_COMMAND_TOKEN && env.HERMES_WEBHOOK_SECRET && store.durable),
+  };
+}
+
+async function acceptAndRoute(env, validation, receipt) {
+  const persisted = await persistCommandAcceptance(env, { command: validation.command, receipt });
+  if (!persisted.accepted) {
+    return {
+      http_status: 409,
+      body: {
+        accepted: false,
+        duplicate: true,
+        existing_command_id: persisted.existing_command_id,
+      },
+    };
+  }
+
+  const execution = await routeHermesCommand(env, validation.command);
+  const completed = execution.execution === 'COMPLETED';
+  const blocked = execution.execution === 'BLOCKED';
+  return {
+    http_status: completed ? 200 : 202,
+    body: {
+      accepted: true,
+      duplicate: false,
+      command_id: persisted.command_id,
+      receipt_id: persisted.receipt_id,
+      status: execution.status,
+      execution: execution.execution,
+      error_code: execution.error_code || null,
+      result: execution.result ?? null,
+      governed_router: true,
+      blocked,
+    },
   };
 }
 
@@ -119,24 +153,10 @@ export async function handleHermesHttpRequest(request, env = {}) {
     });
 
     try {
-      const persisted = await persistCommandAcceptance(env, { command: validation.command, receipt });
-      if (!persisted.accepted) {
-        return json({
-          accepted: false,
-          duplicate: true,
-          existing_command_id: persisted.existing_command_id,
-        }, 409);
-      }
-      return json({
-        accepted: true,
-        duplicate: false,
-        command_id: persisted.command_id,
-        receipt_id: persisted.receipt_id,
-        status: 'ACCEPTED',
-        execution: 'NOT_STARTED',
-      }, 202);
+      const routed = await acceptAndRoute(env, validation, receipt);
+      return json(routed.body, routed.http_status);
     } catch (error) {
-      return json({ error: String(error?.message || 'command_persistence_failed') }, 503);
+      return json({ error: String(error?.message || 'command_persistence_or_routing_failed') }, 503);
     }
   }
 
@@ -179,19 +199,10 @@ export async function handleHermesHttpRequest(request, env = {}) {
     });
 
     try {
-      const persisted = await persistCommandAcceptance(env, { command: validation.command, receipt });
-      if (!persisted.accepted) {
-        return json({ ok: true, accepted: false, duplicate: true, existing_command_id: persisted.existing_command_id });
-      }
-      return json({
-        ok: true,
-        accepted: true,
-        command_id: persisted.command_id,
-        receipt_id: persisted.receipt_id,
-        execution: 'NOT_STARTED',
-      }, 202);
+      const routed = await acceptAndRoute(env, validation, receipt);
+      return json({ ok: true, ...routed.body }, routed.http_status);
     } catch (error) {
-      return json({ ok: false, error: String(error?.message || 'command_persistence_failed') }, 503);
+      return json({ ok: false, error: String(error?.message || 'command_persistence_or_routing_failed') }, 503);
     }
   }
 
