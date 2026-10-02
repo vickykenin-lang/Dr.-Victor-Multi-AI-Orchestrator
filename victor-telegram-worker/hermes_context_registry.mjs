@@ -2,7 +2,7 @@ export const HERMES_CONTEXT_REGISTRY_VERSION = 'HERMES_CONTEXT_REGISTRY_V1';
 const ACTIVE_CONTEXT_KEY = 'context:hermes:active';
 
 export const DEFAULT_HERMES_CONTEXT = Object.freeze({
-  context_version: '2026-10-02-v1',
+  context_version: '2026-10-02-v2',
   purpose: 'Persistent bootstrap context for Founder-authorized Hermes operations and development.',
   founder_command_policy: 'manual_governed',
   architecture: {
@@ -11,6 +11,7 @@ export const DEFAULT_HERMES_CONTEXT = Object.freeze({
     command_store: 'HERMES_COMMAND_STORE durable KV',
     chatgpt_bridge: 'Founder-authored GitHub issue -> signed /v1/commands request',
     telegram_bridge: 'Existing /telegram webhook -> governed Hermes slash commands; other messages pass through to Victor',
+    rio_image_provider: 'Hermes central Cloudflare Workers AI binding; RIO requests generation through Hermes and does not receive Cloudflare provider credentials',
   },
   repositories: {
     victor: 'vickykenin-lang/Dr.-Victor-Multi-AI-Orchestrator',
@@ -36,8 +37,12 @@ export const DEFAULT_HERMES_CONTEXT = Object.freeze({
     never_treat_memory_as_runtime_proof: true,
   },
   rio_image_policy: {
+    provider_mode: 'HERMES_CENTRAL_WORKERS_AI',
+    model: '@cf/black-forest-labs/flux-2-klein-9b',
+    provider_credential_transfer_to_rio: false,
     exact_product_reference_required: true,
     exact_https_product_image_required: true,
+    reference_image_max_dimension_px: 511,
     monthly_provider_call_limit: 30,
     max_attempts_per_product: 2,
     generated_output_requires_semantic_qa_before_final: true,
