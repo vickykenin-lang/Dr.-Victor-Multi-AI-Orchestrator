@@ -61,6 +61,64 @@ function telegramSummary(action,body={}){
   return lines.join('\n').slice(0,3500);
 }
 
+function sanitizeMirrorValue(value,depth=0){
+  if(depth>4)return '[TRUNCATED]';
+  if(Array.isArray(value))return value.slice(0,12).map((item)=>sanitizeMirrorValue(item,depth+1));
+  if(value&&typeof value==='object'){
+    const out={};
+    for(const [key,item] of Object.entries(value).slice(0,40)){
+      if(/token|secret|authorization|credential|password|cookie|signature/i.test(key))out[key]='[REDACTED]';
+      else out[key]=sanitizeMirrorValue(item,depth+1);
+    }
+    return out;
+  }
+  if(typeof value==='string')return value.slice(0,600);
+  return value;
+}
+
+function compactMirrorJson(value,max=1400){
+  let text='{}';
+  try{text=JSON.stringify(sanitizeMirrorValue(value));}catch{}
+  return text.length>max?`${text.slice(0,max-12)}…[truncated]`:text;
+}
+
+export function chatgptTelegramMirrorText(command={},body={}){
+  const safeCommand={
+    command_id:command.command_id||null,
+    source:command.source||null,
+    actor:command.actor||null,
+    target:command.target||null,
+    action:command.action||null,
+    payload:command.payload||{},
+    execution_mode:command.execution_mode||null,
+    idempotency_key:command.idempotency_key||null,
+  };
+  const lines=[
+    'ChatGPT → Hermes',
+    `Action: ${command.action||'unknown'}`,
+    `Target: ${command.target||'unknown'}`,
+    `Command: ${compactMirrorJson(safeCommand,1600)}`,
+    '— Hermes receipt —',
+    `Status: ${body.status|| (body.duplicate?'DUPLICATE':'UNKNOWN')}`,
+    `Execution: ${body.execution||'UNKNOWN'}`,
+  ];
+  if(body.error_code)lines.push(`Code: ${body.error_code}`);
+  if(body.receipt_id)lines.push(`Receipt: ${body.receipt_id}`);
+  if(body.existing_command_id)lines.push(`Existing command: ${body.existing_command_id}`);
+  if(body.result!=null)lines.push(`Result: ${compactMirrorJson(body.result,1100)}`);
+  lines.push('Secrets/credentials are redacted before Telegram delivery.');
+  return lines.join('\n').slice(0,3900);
+}
+
+async function sendFounderTelegramMirror(env,command,body){
+  const token=clean(env.TELEGRAM_BOT_TOKEN_VICTOR,512),chatId=clean(String(env.VICTOR_FOUNDER_CHAT_ID??''),64);
+  if(!token||!chatId)return{sent:false,reason:'TELEGRAM_MIRROR_BINDING_MISSING'};
+  try{
+    const response=await fetch(`https://api.telegram.org/bot${token}/sendMessage`,{method:'POST',headers:{'content-type':'application/json','user-agent':'Hermes-ChatGPT-Telegram-Mirror/1.0'},body:JSON.stringify({chat_id:chatId,text:chatgptTelegramMirrorText(command,body),disable_web_page_preview:true})});
+    return{sent:response.ok,status:response.status,reason:response.ok?null:'TELEGRAM_MIRROR_SEND_FAILED'};
+  }catch(error){return{sent:false,reason:'TELEGRAM_MIRROR_SEND_EXCEPTION',error_type:error?.name||'Error'};}
+}
+
 async function sendTelegramSummary(env,message,action,body){
   const token=clean(env.TELEGRAM_BOT_TOKEN_VICTOR,512),chatId=clean(String(message?.chat?.id??''),64);
   if(!token||!chatId)return{sent:false,reason:'TELEGRAM_REPLY_BINDING_MISSING'};
@@ -117,7 +175,12 @@ export async function handleHermesHttpRequestV2(request,env={}){
     const a=await auth(request,env,rawBody,idempotencyKey);if(!a.ok)return json({error:'unauthorized',reasons:a.reasons,auth_version:a.auth_version},401);
     const validation=validateHermesCommandEnvelope({...input,idempotency_key:idempotencyKey});if(!validation.ok)return json({error:'command_validation_failed',reasons:validation.errors,classification:validation.classification,policy_version:validation.policy_version},400);
     const receipt=buildHermesReceipt({command:validation.command,status:'ACCEPTED',validation:'PASS',execution:'NOT_STARTED',receiptId:`rcpt_${validation.command.command_id}`});
-    try{const routed=await acceptAndRoute(env,validation,receipt);return json(routed.body,routed.http_status);}catch(error){return json({error:String(error?.message||'command_persistence_or_routing_failed')},503);}
+    try{
+      const routed=await acceptAndRoute(env,validation,receipt);
+      let mirror={sent:false,reason:'NOT_CHATGPT_SOURCE'};
+      if(validation.command.source==='chatgpt')mirror=await sendFounderTelegramMirror(env,validation.command,routed.body);
+      return json({...routed.body,telegram_mirror_sent:mirror.sent,telegram_mirror_reason:mirror.reason||null},routed.http_status);
+    }catch(error){return json({error:String(error?.message||'command_persistence_or_routing_failed')},503);}
   }
   if(request.method==='POST'&&url.pathname==='/integrations/telegram/webhook')return processTelegramUpdate(request,env,{passthroughOnNoMatch:false});
   if(request.method==='POST'&&url.pathname==='/telegram')return processTelegramUpdate(request,env,{passthroughOnNoMatch:true});
