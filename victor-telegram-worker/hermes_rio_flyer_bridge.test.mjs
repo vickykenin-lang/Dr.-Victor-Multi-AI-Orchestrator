@@ -22,16 +22,42 @@ test('dispatch posts exact workflow inputs and reports verified dispatch only on
   };
   try {
     const out = await dispatchRioFlyerTask({ GITHUB_ORCHESTRATION_TOKEN: 'token', RIO_FLYER_TRANSPORT_ENABLED: 'true' }, {
-      command_id: 'cmd-1', actor: 'founder_authorized_assistant',
+      command_id: 'cmd-1', actor: 'founder_authorized_assistant', action: 'rio.generate_product_flyer',
       payload: { product_reference: 'B0ABC123', product_image_url: 'https://example.com/p.jpg', title: 'Socket Cover' },
     });
     assert.equal(out.status, 'DISPATCHED');
     assert.equal(out.live_request_verified, true);
+    assert.equal(out.preflight_only, false);
     assert.match(seen.url, /hermes-rio-flyer-transport\.yml\/dispatches$/);
     assert.equal(seen.body.ref, 'main');
     assert.equal(seen.body.inputs.product_reference, 'B0ABC123');
+    assert.equal(seen.body.inputs.preflight_only, 'false');
     const payload = JSON.parse(seen.body.inputs.payload);
     assert.equal(payload.product_image_url, 'https://example.com/p.jpg');
+    assert.equal(payload.preflight_only, false);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('preflight command dispatches same workflow with provider inference disabled', async () => {
+  const original = globalThis.fetch;
+  let seen;
+  globalThis.fetch = async (url, init) => {
+    seen = { url, body: JSON.parse(init.body) };
+    return { status: 204, text: async () => '' };
+  };
+  try {
+    const out = await dispatchRioFlyerTask({ GITHUB_ORCHESTRATION_TOKEN: 'token', RIO_FLYER_TRANSPORT_ENABLED: 'true' }, {
+      command_id: 'cmd-preflight', actor: 'founder_authorized_assistant', action: 'rio.flyer_preflight',
+      payload: { product_reference: 'PRE-FLIGHT-FIXTURE', product_image_url: 'https://example.invalid/reference.jpg' },
+    });
+    assert.equal(out.status, 'DISPATCHED');
+    assert.equal(out.preflight_only, true);
+    assert.equal(seen.body.inputs.preflight_only, 'true');
+    assert.match(seen.body.inputs.task_id, /^hermes-rio-preflight-/);
+    const payload = JSON.parse(seen.body.inputs.payload);
+    assert.equal(payload.preflight_only, true);
   } finally {
     globalThis.fetch = original;
   }
