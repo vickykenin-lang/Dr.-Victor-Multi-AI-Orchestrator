@@ -23,6 +23,21 @@ test('registered read-only action validates', () => {
   assert.equal(result.classification.risk, HERMES_RISK_CLASS.READ_ONLY);
 });
 
+test('flyer result readback is registered read-only', () => {
+  const result = validateHermesCommandEnvelope({
+    command_id: 'cmd_result',
+    source: 'chatgpt',
+    actor: 'founder_authorized_assistant',
+    target: 'rio',
+    action: 'rio.flyer_result',
+    execution_mode: 'manual',
+    idempotency_key: 'rio-result-1',
+    payload: { task_id: 'task-1' },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.classification.risk, HERMES_RISK_CLASS.READ_ONLY);
+});
+
 test('flyer preflight is registered as safe execution', () => {
   const result = validateHermesCommandEnvelope({
     command_id: 'cmd_preflight',
@@ -88,6 +103,15 @@ test('telegram rio preflight normalizes into no-spend transport action', () => {
       product_reference: 'PRE-FLIGHT-FIXTURE',
       product_image_url: 'https://example.invalid/reference.jpg',
     },
+  });
+});
+
+test('telegram rio result normalizes into read-only result action', () => {
+  const parsed = parseHermesTelegramCommand('/rio result hermes-rio-preflight-123-cmd');
+  assert.deepEqual(parsed, {
+    target: 'rio',
+    action: 'rio.flyer_result',
+    payload: { task_id: 'hermes-rio-preflight-123-cmd' },
   });
 });
 

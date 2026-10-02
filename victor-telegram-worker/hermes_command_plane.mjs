@@ -14,6 +14,7 @@ export const HERMES_ACTIONS = Object.freeze({
   'rio.status': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.image_usage': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.image_budget': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
+  'rio.flyer_result': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.flyer_preflight': { target: 'rio', risk: HERMES_RISK_CLASS.SAFE_EXECUTION },
   'rio.generate_product_flyer': { target: 'rio', risk: HERMES_RISK_CLASS.SAFE_EXECUTION },
   'victor.status': { target: 'victor', risk: HERMES_RISK_CLASS.READ_ONLY },
@@ -130,6 +131,9 @@ export function parseHermesTelegramCommand(text = '') {
   }
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'budget') {
     return { target: 'rio', action: 'rio.image_budget', payload: {} };
+  }
+  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'result' && parts[2]) {
+    return { target: 'rio', action: 'rio.flyer_result', payload: { task_id: parts[2] } };
   }
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'preflight' && parts[2]) {
     return parseRioProductCommand('rio.flyer_preflight', parts.slice(2));
