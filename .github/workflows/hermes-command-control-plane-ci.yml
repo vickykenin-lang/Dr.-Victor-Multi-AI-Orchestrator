@@ -1,0 +1,34 @@
+name: Hermes Command Control Plane CI
+
+on:
+  pull_request:
+    paths:
+      - 'victor-telegram-worker/hermes_*'
+      - '.github/workflows/hermes-command-control-plane-ci.yml'
+  push:
+    branches:
+      - feature/hermes-command-control-plane-v1
+    paths:
+      - 'victor-telegram-worker/hermes_*'
+      - '.github/workflows/hermes-command-control-plane-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run Hermes control plane tests
+        run: |
+          node --test \
+            victor-telegram-worker/hermes_command_plane.test.mjs \
+            victor-telegram-worker/hermes_command_auth.test.mjs \
+            victor-telegram-worker/hermes_command_store.test.mjs \
+            victor-telegram-worker/hermes_command_http.test.mjs \
+            victor-telegram-worker/hermes_command_router.test.mjs \
+            victor-telegram-worker/hermes_rio_flyer_bridge.test.mjs
