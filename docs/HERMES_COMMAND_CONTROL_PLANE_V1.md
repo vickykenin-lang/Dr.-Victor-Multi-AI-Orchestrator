@@ -1,6 +1,6 @@
 # Hermes Command Control Plane V1
 
-Status: IMPLEMENTATION STARTED — NOT DEPLOYED
+Status: IMPLEMENTATION IN PROGRESS — NOT DEPLOYED
 
 ## Purpose
 Create one governed command plane that can accept Founder-authorized commands from Telegram, ChatGPT, dashboard, or internal services without duplicating business logic in each channel.
@@ -62,7 +62,21 @@ Before any consequential execution, the runtime must support:
 9. Policy/risk classification.
 10. Receipt persistence before and after execution.
 
-The current implementation step only adds the deterministic command contract and tests. Authentication, persistence, endpoint wiring, and deployment remain pending.
+Block 2 now provides deterministic primitives for Bearer validation, HMAC verification, a default 5-minute timestamp window, and replay protection through an injected key-value store. HTTP endpoint wiring and production secrets are still not configured by this branch.
+
+## Authentication contract
+Expected request headers for the future HTTP endpoint:
+
+- `Authorization: Bearer <HERMES_COMMAND_TOKEN>`
+- `X-Hermes-Timestamp: <unix-seconds>`
+- `X-Hermes-Signature: sha256=<hmac>`
+- `X-Idempotency-Key: <unique-key>`
+
+Canonical signature input:
+
+`HMAC_SHA256(secret, timestamp + "." + raw_request_body)`
+
+The request must fail closed when the token, timestamp, signature, idempotency key, or replay store is invalid/missing.
 
 ## Evidence states
 Never collapse these into one status:
@@ -121,10 +135,11 @@ Planned policy (not yet wired):
 - [x] Unit tests added.
 
 ### Block 2 — authentication and replay protection
-- [ ] Bearer token validation.
-- [ ] HMAC signature validation.
-- [ ] Timestamp freshness window.
-- [ ] Nonce/replay store.
+- [x] Bearer token validation.
+- [x] HMAC signature validation.
+- [x] Timestamp freshness window.
+- [x] Replay-store contract and replay detection.
+- [x] Unit tests added.
 
 ### Block 3 — persistence
 - [ ] Idempotency store.
@@ -151,4 +166,4 @@ Planned policy (not yet wired):
 - [ ] Verify real RIO output separately.
 
 ## Current status
-As of this implementation start, Block 1 source is being added on a feature branch. Nothing in this document proves production deployment or live command execution.
+Block 1 and Block 2 source are present on `feature/hermes-command-control-plane-v1`. Nothing in this document proves production deployment, configured production credentials, CI success, or live command execution.
