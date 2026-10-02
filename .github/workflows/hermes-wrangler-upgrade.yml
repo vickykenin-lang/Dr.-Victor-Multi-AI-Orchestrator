@@ -1,0 +1,53 @@
+name: Hermes Wrangler Upgrade
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/hermes-command-control-plane-v1
+    paths:
+      - '.github/workflows/hermes-wrangler-upgrade.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: feature/hermes-command-control-plane-v1
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Upgrade Wrangler and regenerate lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --save-dev --package-lock-only --ignore-scripts wrangler@4.144.0
+          npm ci --ignore-scripts
+          npm audit --json > /tmp/npm-audit.json || true
+          node - <<'NODE'
+          const fs = require('fs');
+          const j = JSON.parse(fs.readFileSync('/tmp/npm-audit.json','utf8'));
+          const v = (j.metadata && j.metadata.vulnerabilities) || {};
+          console.log(JSON.stringify({status:'POST_UPGRADE_AUDIT', vulnerabilities:v}, null, 2));
+          if ((v.high || 0) > 0 || (v.critical || 0) > 0) {
+            throw new Error(`HIGH_OR_CRITICAL_DEPENDENCY_FINDINGS_REMAIN:${v.high||0}:${v.critical||0}`);
+          }
+          NODE
+      - name: Commit dependency update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "hermes-security-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "No dependency files changed."
+            exit 0
+          fi
+          git commit -m "fix(security): upgrade wrangler to 4.144.0"
+          git push origin HEAD:feature/hermes-command-control-plane-v1
