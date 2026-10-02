@@ -1,0 +1,206 @@
+name: Hermes ChatGPT Command Bridge
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Hermes command target
+        required: true
+        default: hermes
+      action:
+        description: Registered Hermes action
+        required: true
+        default: hermes.status
+      payload_json:
+        description: JSON object payload
+        required: false
+        default: '{}'
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  HERMES_BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
+
+jobs:
+  command:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && startsWith(github.event.issue.title, '[HERMES-CMD]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Authorize command source
+        id: authorize
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTOR: ${{ github.actor }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          set -euo pipefail
+          test "$EVENT_ACTOR" = 'vickykenin-lang' || { echo 'Only the Founder GitHub identity may invoke this bridge.' >&2; exit 40; }
+          if [ "$EVENT_NAME" = 'issues' ]; then
+            test "$ISSUE_AUTHOR" = 'vickykenin-lang' || { echo 'Issue author is not the Founder identity.' >&2; exit 41; }
+          fi
+          echo 'authorized=true' >> "$GITHUB_OUTPUT"
+
+      - name: Normalize command envelope
+        id: normalize
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          INPUT_TARGET: ${{ inputs.target }}
+          INPUT_ACTION: ${{ inputs.action }}
+          INPUT_PAYLOAD: ${{ inputs.payload_json }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, re
+
+          event = os.environ['EVENT_NAME']
+          if event == 'issues':
+              raw = os.environ.get('ISSUE_BODY', '').strip()
+              fence = re.fullmatch(r'```(?:json)?\s*(.*?)\s*```', raw, flags=re.S|re.I)
+              if fence:
+                  raw = fence.group(1).strip()
+              try:
+                  supplied = json.loads(raw)
+              except Exception as exc:
+                  raise SystemExit(f'ISSUE_BODY_MUST_BE_JSON: {exc}')
+              issue = os.environ.get('ISSUE_NUMBER', '0')
+              target = str(supplied.get('target', '')).strip()
+              action = str(supplied.get('action', '')).strip()
+              payload = supplied.get('payload', {})
+              execution_mode = str(supplied.get('execution_mode', 'manual')).strip() or 'manual'
+              idem = f'chatgpt-github-issue-{issue}-{action}'
+              command_id = f'cmd_chatgpt_gh_{issue}_{os.environ["RUN_ID"]}'
+          else:
+              target = os.environ.get('INPUT_TARGET', '').strip()
+              action = os.environ.get('INPUT_ACTION', '').strip()
+              try:
+                  payload = json.loads(os.environ.get('INPUT_PAYLOAD', '{}') or '{}')
+              except Exception as exc:
+                  raise SystemExit(f'PAYLOAD_JSON_INVALID: {exc}')
+              execution_mode = 'manual'
+              idem = f'github-dispatch-{os.environ["RUN_ID"]}-{os.environ["RUN_ATTEMPT"]}-{action}'
+              command_id = f'cmd_chatgpt_dispatch_{os.environ["RUN_ID"]}_{os.environ["RUN_ATTEMPT"]}'
+
+          if not isinstance(payload, dict):
+              raise SystemExit('PAYLOAD_MUST_BE_OBJECT')
+          if not target or not action:
+              raise SystemExit('TARGET_AND_ACTION_REQUIRED')
+
+          envelope = {
+              'command_id': command_id,
+              'source': 'chatgpt',
+              'actor': 'founder_authorized_assistant',
+              'target': target,
+              'action': action,
+              'payload': payload,
+              'execution_mode': execution_mode,
+              'idempotency_key': idem,
+          }
+          raw_body = json.dumps(envelope, separators=(',', ':'), ensure_ascii=False)
+          open('/tmp/hermes-command.json', 'w', encoding='utf-8').write(raw_body)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f'command_id={command_id}\n')
+              out.write(f'idempotency_key={idem}\n')
+              out.write(f'action={action}\n')
+          print(json.dumps({'normalized': True, 'command_id': command_id, 'target': target, 'action': action}, indent=2))
+          PY
+
+      - name: Sign and submit authenticated Hermes command
+        id: submit
+        shell: bash
+        env:
+          COMMAND_TOKEN: ${{ secrets.API_VICTOR }}
+          HMAC_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          IDEMPOTENCY_KEY: ${{ steps.normalize.outputs.idempotency_key }}
+        run: |
+          set -euo pipefail
+          test -n "$COMMAND_TOKEN" || { echo 'API_VICTOR secret missing' >&2; exit 42; }
+          test -n "$HMAC_SECRET" || { echo 'TELEGRAM_WEBHOOK_SECRET missing' >&2; exit 43; }
+          TIMESTAMP=$(date +%s)
+          SIGNATURE=$(python - "$TIMESTAMP" <<'PY'
+          import hashlib,hmac,os,sys
+          ts=sys.argv[1]
+          body=open('/tmp/hermes-command.json','rb').read()
+          material=ts.encode()+b'.'+body
+          digest=hmac.new(os.environ['HMAC_SECRET'].encode(),material,hashlib.sha256).hexdigest()
+          print('sha256='+digest)
+          PY
+          )
+          HTTP=$(curl --silent --show-error --output /tmp/hermes-response.json --write-out '%{http_code}' \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer ${COMMAND_TOKEN}" \
+            --header "X-Hermes-Timestamp: ${TIMESTAMP}" \
+            --header "X-Hermes-Signature: ${SIGNATURE}" \
+            --header "X-Idempotency-Key: ${IDEMPOTENCY_KEY}" \
+            --data-binary @/tmp/hermes-command.json \
+            "$HERMES_BASE_URL/v1/commands")
+          echo "http_status=$HTTP" >> "$GITHUB_OUTPUT"
+          python - "$HTTP" <<'PY'
+          import json,sys
+          code=int(sys.argv[1])
+          body=json.load(open('/tmp/hermes-response.json'))
+          if code not in (200,202,409):
+              raise SystemExit(f'HERMES_COMMAND_HTTP_{code}: {body}')
+          if code != 409 and body.get('accepted') is not True:
+              raise SystemExit(f'HERMES_COMMAND_NOT_ACCEPTED: {body}')
+          print(json.dumps({'http_status':code,'status':body.get('status'),'execution':body.get('execution'),'command_id':body.get('command_id'),'receipt_id':body.get('receipt_id')},indent=2))
+          PY
+
+      - name: Publish sanitized receipt to command issue
+        if: ${{ github.event_name == 'issues' && always() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          JOB_STATUS: ${{ job.status }}
+          ACTION_NAME: ${{ steps.normalize.outputs.action }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          response = {}
+          try:
+              response=json.load(open('/tmp/hermes-response.json'))
+          except Exception:
+              pass
+
+          banned=('token','secret','authorization','credential')
+          def sanitize(value):
+              if isinstance(value,dict):
+                  return {k:sanitize(v) for k,v in value.items() if not any(x in k.lower() for x in banned)}
+              if isinstance(value,list):
+                  return [sanitize(x) for x in value]
+              return value
+          safe=sanitize(response)
+          summary={
+              'bridge_job_status': os.environ.get('JOB_STATUS'),
+              'action': os.environ.get('ACTION_NAME') or None,
+              'accepted': safe.get('accepted'),
+              'command_id': safe.get('command_id'),
+              'receipt_id': safe.get('receipt_id'),
+              'status': safe.get('status'),
+              'execution': safe.get('execution'),
+              'error_code': safe.get('error_code'),
+              'result': safe.get('result'),
+          }
+          text='Hermes ChatGPT bridge receipt\n\n```json\n'+json.dumps(summary,indent=2,ensure_ascii=False)[:55000]+'\n```\n'
+          open('/tmp/issue-comment.md','w',encoding='utf-8').write(text)
+          PY
+          gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file /tmp/issue-comment.md
+          if [ "$JOB_STATUS" = 'success' ]; then
+            gh issue close "$ISSUE_NUMBER" --repo "$REPO" --reason completed
+          fi
