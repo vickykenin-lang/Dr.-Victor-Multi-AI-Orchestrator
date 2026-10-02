@@ -66,6 +66,7 @@ export function centralRioImageCapability(env = {}) {
     credential_transfer_required: false,
     credential_transfer_performed: false,
     monthly_provider_call_limit: limit,
+    quota_counter_atomic: false,
     ready_for_preflight: ai && store,
     ready_for_generation: ai && store,
   };
@@ -118,6 +119,13 @@ export function detectImageDimensions(arrayBuffer, contentType = '') {
   if (mime.includes('gif')) return gifDimensions(bytes);
   if (mime.includes('jpeg') || mime.includes('jpg')) return jpegDimensions(bytes);
   return pngDimensions(bytes) || jpegDimensions(bytes) || gifDimensions(bytes);
+}
+
+function mimeForFormat(format) {
+  if (format === 'png') return 'image/png';
+  if (format === 'jpeg') return 'image/jpeg';
+  if (format === 'gif') return 'image/gif';
+  return 'application/octet-stream';
 }
 
 function buildPrompt(payload = {}) {
@@ -245,6 +253,7 @@ export async function executeCentralRioFlyer(env = {}, command = {}, { preflight
       provider_call_counted: false,
       provider_calls_this_month: currentCalls,
       monthly_provider_call_limit: limit,
+      quota_counter_atomic: false,
       reference_image_fetch_attempted: false,
       note: 'Central Workers AI binding, durable result/asset store and monthly call gate verified without image fetch or inference.',
     };
@@ -262,6 +271,13 @@ export async function executeCentralRioFlyer(env = {}, command = {}, { preflight
   }
   if (!response.ok) {
     const result = { ...base, status: 'SAFE_STOP', execution_status: 'BLOCKED', error_code: 'PRODUCT_IMAGE_FETCH_HTTP_ERROR', product_image_http_status: response.status };
+    await persistTaskResult(env, taskId, result);
+    return result;
+  }
+
+  const finalUrlCheck = validateCentralProductImageUrl(response.url || imageCheck.url);
+  if (!finalUrlCheck.ok) {
+    const result = { ...base, status: 'SAFE_STOP', execution_status: 'BLOCKED', error_code: 'PRODUCT_IMAGE_REDIRECT_TARGET_NOT_ALLOWED' };
     await persistTaskResult(env, taskId, result);
     return result;
   }
@@ -293,6 +309,7 @@ export async function executeCentralRioFlyer(env = {}, command = {}, { preflight
   }
 
   // Count before inference so a failed or billable provider request remains bounded and auditable.
+  // HERMES_COMMAND_STORE is KV, so this monthly counter is intentionally reported as non-atomic.
   usage.provider_calls = currentCalls + 1;
   usage.last_updated_at = new Date().toISOString();
   await saveUsage(env, usageKey, usage);
@@ -332,11 +349,24 @@ export async function executeCentralRioFlyer(env = {}, command = {}, { preflight
     return result;
   }
 
+  const generatedDimensions = detectImageDimensions(generated, '');
+  if (!generatedDimensions || !['png', 'jpeg'].includes(generatedDimensions.format)) {
+    const result = { ...base, status: 'SAFE_STOP', execution_status: 'FAILED', error_code: 'GENERATED_IMAGE_FORMAT_UNVERIFIED', provider_call_counted: true, generated_bytes: generated.byteLength };
+    await persistTaskResult(env, taskId, result);
+    return result;
+  }
+  if (generatedDimensions.width < 512 || generatedDimensions.height < 512) {
+    const result = { ...base, status: 'SAFE_STOP', execution_status: 'FAILED', error_code: 'GENERATED_IMAGE_DIMENSIONS_TOO_SMALL', provider_call_counted: true, generated_dimensions: [generatedDimensions.width, generatedDimensions.height] };
+    await persistTaskResult(env, taskId, result);
+    return result;
+  }
+  const assetContentType = mimeForFormat(generatedDimensions.format);
+
   const assetId = randomId('rio-flyer-asset');
   await env.HERMES_COMMAND_STORE.put(`${ASSET_PREFIX}${assetId}`, generated, {
     expirationTtl: 90 * 24 * 60 * 60,
     metadata: {
-      content_type: 'image/png',
+      content_type: assetContentType,
       task_id: taskId,
       product_reference: productReference.slice(0, 180),
       provider: 'cloudflare-workers-ai',
@@ -359,13 +389,16 @@ export async function executeCentralRioFlyer(env = {}, command = {}, { preflight
     qa_approved: false,
     asset_id: assetId,
     asset_endpoint: `/v1/assets/${assetId}`,
-    asset_content_type: 'image/png',
+    asset_content_type: assetContentType,
     generated_bytes: generated.byteLength,
+    generated_dimensions: [generatedDimensions.width, generatedDimensions.height],
+    generated_format: generatedDimensions.format,
     reference_dimensions: [dimensions.width, dimensions.height],
     provider_call_counted: true,
     provider_calls_this_month: usage.provider_calls,
     generated_assets_this_month: usage.generated_assets,
     monthly_provider_call_limit: limit,
+    quota_counter_atomic: false,
     prompt_version: 'HERMES_RIO_FLYER_PROMPT_V1',
     credential_transfer_required: false,
   };
