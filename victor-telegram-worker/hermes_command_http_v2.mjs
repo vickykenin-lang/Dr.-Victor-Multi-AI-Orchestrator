@@ -9,9 +9,11 @@ function json(body,status=200){return new Response(JSON.stringify(body),{status,
 function clean(value,max=256){return typeof value==='string'?value.trim().slice(0,max):'';}
 function commandId(){return `cmd_${Date.now()}_${crypto.randomUUID().slice(0,8)}`;}
 function idemTelegram(message={},route={}){return `telegram:${clean(String(message?.chat?.id??''),64)}:${clean(String(message?.message_id??''),64)}:${route.action||'unknown'}`.slice(0,160);}
+function commandToken(env={}){return env.HERMES_COMMAND_TOKEN||env.API_VICTOR||'';}
+function webhookSecret(env={}){return env.HERMES_WEBHOOK_SECRET||env.TELEGRAM_WEBHOOK_SECRET||'';}
 
-async function auth(request,env,rawBody,idempotencyKey){return authenticateHermesRequest({authorizationHeader:request.headers.get('Authorization')||'',expectedBearerToken:env.HERMES_COMMAND_TOKEN||'',timestamp:request.headers.get('X-Hermes-Timestamp')||'',rawBody,signature:request.headers.get('X-Hermes-Signature')||'',idempotencyKey,webhookSecret:env.HERMES_WEBHOOK_SECRET||'',replayStore:env.HERMES_COMMAND_STORE});}
-export function hermesHttpCapabilityV2(env={}){const store=hermesStoreCapability(env);return{http_version:HERMES_HTTP_VERSION,command_token_configured:Boolean(env.HERMES_COMMAND_TOKEN),webhook_secret_configured:Boolean(env.HERMES_WEBHOOK_SECRET),durable_store:store.durable,store,ready_for_authenticated_commands:Boolean(env.HERMES_COMMAND_TOKEN&&env.HERMES_WEBHOOK_SECRET&&store.durable)};}
+async function auth(request,env,rawBody,idempotencyKey){return authenticateHermesRequest({authorizationHeader:request.headers.get('Authorization')||'',expectedBearerToken:commandToken(env),timestamp:request.headers.get('X-Hermes-Timestamp')||'',rawBody,signature:request.headers.get('X-Hermes-Signature')||'',idempotencyKey,webhookSecret:webhookSecret(env),replayStore:env.HERMES_COMMAND_STORE});}
+export function hermesHttpCapabilityV2(env={}){const store=hermesStoreCapability(env);const token=commandToken(env),secret=webhookSecret(env);return{http_version:HERMES_HTTP_VERSION,command_token_configured:Boolean(token),webhook_secret_configured:Boolean(secret),command_token_source:env.HERMES_COMMAND_TOKEN?'HERMES_COMMAND_TOKEN':env.API_VICTOR?'API_VICTOR_FALLBACK':'NONE',webhook_secret_source:env.HERMES_WEBHOOK_SECRET?'HERMES_WEBHOOK_SECRET':env.TELEGRAM_WEBHOOK_SECRET?'TELEGRAM_WEBHOOK_SECRET_FALLBACK':'NONE',durable_store:store.durable,store,ready_for_authenticated_commands:Boolean(token&&secret&&store.durable)};}
 
 async function acceptAndRoute(env,validation,receipt){
   const persisted=await persistCommandAcceptance(env,{command:validation.command,receipt});
@@ -28,7 +30,7 @@ export async function handleHermesHttpRequestV2(request,env={}){
   }
   const m=/^\/v1\/commands\/([^/]+)$/.exec(url.pathname);
   if(request.method==='GET'&&m){
-    if(!env.HERMES_COMMAND_TOKEN||request.headers.get('Authorization')!==`Bearer ${env.HERMES_COMMAND_TOKEN}`)return json({error:'unauthorized'},401);
+    const token=commandToken(env);if(!token||request.headers.get('Authorization')!==`Bearer ${token}`)return json({error:'unauthorized'},401);
     try{const record=await getCommandState(env,decodeURIComponent(m[1]));if(!record.found)return json({error:'command_not_found'},404);return json({command:record.state,store:record.capability});}catch(error){return json({error:String(error?.message||'command_state_read_failed')},503);}
   }
   if(request.method==='POST'&&url.pathname==='/v1/commands'){
