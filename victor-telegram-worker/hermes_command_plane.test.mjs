@@ -52,13 +52,30 @@ test('target mismatch is rejected', () => {
   assert.ok(result.errors.includes('TARGET_ACTION_MISMATCH'));
 });
 
-test('telegram rio flyer command normalizes into canonical action', () => {
+test('telegram rio flyer command keeps exact reference and optional image URL separate', () => {
+  const parsed = parseHermesTelegramCommand('/rio flyer B0ABC123 https://images.example.com/product.jpg');
+  assert.deepEqual(parsed, {
+    target: 'rio',
+    action: 'rio.generate_product_flyer',
+    payload: {
+      product_reference: 'B0ABC123',
+      product_image_url: 'https://images.example.com/product.jpg',
+    },
+  });
+});
+
+test('telegram flyer without image remains parseable and later fails closed at execution gate', () => {
   const parsed = parseHermesTelegramCommand('/rio flyer B0ABC123');
   assert.deepEqual(parsed, {
     target: 'rio',
     action: 'rio.generate_product_flyer',
     payload: { product_reference: 'B0ABC123' },
   });
+});
+
+test('telegram hermes audit normalizes into read-only audit action', () => {
+  const parsed = parseHermesTelegramCommand('/hermes audit');
+  assert.deepEqual(parsed, { target: 'hermes', action: 'hermes.audit', payload: {} });
 });
 
 test('receipt keeps evidence states separate', () => {
