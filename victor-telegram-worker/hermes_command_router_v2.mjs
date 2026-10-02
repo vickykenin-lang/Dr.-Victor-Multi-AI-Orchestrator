@@ -5,9 +5,11 @@ import { dispatchRioFlyerTask, rioFlyerBridgeCapability } from './hermes_rio_fly
 export const HERMES_ROUTER_VERSION = 'HERMES_COMMAND_ROUTER_V2';
 const configured = (v) => Boolean(String(v ?? '').trim());
 const baseEvidence = () => ({ credential_available:false, endpoint_config_present:false, source_implemented:true, test_passed:false, production_deployed:false, live_request_verified:false, real_output_verified:false, real_business_outcome_verified:false });
+const commandTokenConfigured=(env={})=>configured(env.HERMES_COMMAND_TOKEN||env.API_VICTOR);
+const webhookSecretConfigured=(env={})=>configured(env.HERMES_WEBHOOK_SECRET||env.TELEGRAM_WEBHOOK_SECRET);
 
 export function hermesRuntimeSnapshot(env={}) {
-  return { service:'hermes-command-control-plane', router_version:HERMES_ROUTER_VERSION, command_store:hermesStoreCapability(env), command_token_configured:configured(env.HERMES_COMMAND_TOKEN), webhook_secret_configured:configured(env.HERMES_WEBHOOK_SECRET), telegram_secret_configured:configured(env.TELEGRAM_WEBHOOK_SECRET), founder_chat_configured:configured(env.VICTOR_FOUNDER_CHAT_ID), github_orchestration_token_configured:configured(env.GITHUB_ORCHESTRATION_TOKEN), rio_flyer_bridge:rioFlyerBridgeCapability(env), evidence:baseEvidence() };
+  return { service:'hermes-command-control-plane', router_version:HERMES_ROUTER_VERSION, command_store:hermesStoreCapability(env), command_token_configured:commandTokenConfigured(env), command_token_source:configured(env.HERMES_COMMAND_TOKEN)?'HERMES_COMMAND_TOKEN':configured(env.API_VICTOR)?'API_VICTOR_FALLBACK':'NONE', webhook_secret_configured:webhookSecretConfigured(env), webhook_secret_source:configured(env.HERMES_WEBHOOK_SECRET)?'HERMES_WEBHOOK_SECRET':configured(env.TELEGRAM_WEBHOOK_SECRET)?'TELEGRAM_WEBHOOK_SECRET_FALLBACK':'NONE', telegram_secret_configured:configured(env.TELEGRAM_WEBHOOK_SECRET), founder_chat_configured:configured(env.VICTOR_FOUNDER_CHAT_ID), github_orchestration_token_configured:configured(env.GITHUB_ORCHESTRATION_TOKEN), rio_flyer_bridge:rioFlyerBridgeCapability(env), evidence:baseEvidence() };
 }
 
 export function rioRuntimeSnapshot(env={}) {
