@@ -70,7 +70,7 @@ export async function handleHermesHttpRequest(request, env = {}) {
       service: 'hermes-command-control-plane',
       status: capability.ready_for_authenticated_commands ? 'READY_FOR_COMMAND_ACCEPTANCE' : 'PENDING_CONFIGURATION',
       ...capability,
-      production_deployed: false,
+      deployment_evidence: 'NOT_ASSERTED_BY_HEALTH_ROUTE',
       live_request_verified: false,
       real_output_verified: false,
       secrets_exposed: false,
