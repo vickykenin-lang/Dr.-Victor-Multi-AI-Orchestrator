@@ -2,11 +2,18 @@ name: Hermes Wrangler Audit Diagnostic
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/hermes-wrangler-audit-diagnostic.yml'
+      - 'package.json'
+      - 'package-lock.json'
   push:
     branches:
       - feature/hermes-command-control-plane-v1
     paths:
       - '.github/workflows/hermes-wrangler-audit-diagnostic.yml'
+      - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: read
