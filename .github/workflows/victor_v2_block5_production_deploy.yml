@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/victor_v2_block5_production_deploy.yml'
+      - 'wrangler.toml'
       - 'victor-telegram-worker/**'
       - 'brain/endgame_runtime_gate.mjs'
       - 'brain/procedure_registry.mjs'
@@ -56,6 +57,7 @@ jobs:
         run: |
           node --check victor-telegram-worker/worker.js
           node --check victor-telegram-worker/endgame_runtime_acceptance.mjs
+          node --check victor-telegram-worker/hermes_rio_image_provider.mjs
           node --test \
             brain/founder_conversation.test.mjs \
             brain/conversation_runtime.test.mjs \
@@ -65,7 +67,10 @@ jobs:
             brain/block3_sandbox_security.test.mjs \
             brain/block4_promotion_shadow.test.mjs \
             brain/block5_redteam_security.test.mjs \
-            victor-telegram-worker/endgame_runtime_acceptance.test.mjs
+            victor-telegram-worker/endgame_runtime_acceptance.test.mjs \
+            victor-telegram-worker/hermes_command_plane.test.mjs \
+            victor-telegram-worker/hermes_rio_flyer_bridge.test.mjs \
+            victor-telegram-worker/hermes_rio_image_provider.test.mjs
 
       - name: Build exact Worker module bundle
         shell: bash
@@ -100,7 +105,7 @@ jobs:
           print(json.dumps({'status':'WORKER_CONTENT_UPLOADED','modified_on':result.get('modified_on'),'etag':result.get('etag')},indent=2))
           PY
 
-      - name: Stamp exact Git identity while inheriting protected bindings
+      - name: Stamp exact Git identity and central Workers AI binding
         shell: bash
         run: |
           set -euo pipefail
@@ -115,11 +120,12 @@ jobs:
           inherited=[]; seen=set()
           for b in bindings:
               name=b.get('name')
-              if not name or name == 'VICTOR_DEPLOY_GIT_SHA' or name in seen: continue
+              if not name or name in {'VICTOR_DEPLOY_GIT_SHA','AI'} or name in seen: continue
               seen.add(name); inherited.append({'name':name,'type':'inherit','version_id':'latest'})
+          inherited.append({'name':'AI','type':'ai'})
           inherited.append({'name':'VICTOR_DEPLOY_GIT_SHA','type':'plain_text','text':sha})
           json.dump({'bindings':inherited},open('/tmp/settings-patch.json','w'),separators=(',',':'))
-          print(json.dumps({'status':'IDENTITY_PATCH_PREPARED','protected_bindings_inherited':len(inherited)-1,'target_git_sha':sha}))
+          print(json.dumps({'status':'CENTRAL_AI_BINDING_PATCH_PREPARED','protected_bindings_inherited':len(inherited)-2,'workers_ai_binding':'AI','target_git_sha':sha}))
           PY
           HTTP=$(curl --silent --show-error --output /tmp/cf-settings-patch.json --write-out '%{http_code}' \
             --request PATCH \
@@ -130,8 +136,25 @@ jobs:
           import json,sys
           code=int(sys.argv[1]); body=json.load(open('/tmp/cf-settings-patch.json'))
           if code != 200 or body.get('success') is not True:
-              print(json.dumps({'http_status':code,'errors':body.get('errors',[])},indent=2)); raise SystemExit('IDENTITY_STAMP_FAILED')
-          print(json.dumps({'status':'DEPLOYMENT_IDENTITY_STAMPED','http_status':code}))
+              print(json.dumps({'http_status':code,'errors':body.get('errors',[])},indent=2)); raise SystemExit('CENTRAL_AI_BINDING_PATCH_FAILED')
+          print(json.dumps({'status':'DEPLOYMENT_IDENTITY_AND_AI_BINDING_STAMPED','http_status':code}))
+          PY
+
+      - name: Verify central Workers AI binding exists without inference
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP=$(curl --silent --show-error --output /tmp/cf-settings-verify.json --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/settings")
+          python - "$HTTP" <<'PY'
+          import json,sys
+          code=int(sys.argv[1]); body=json.load(open('/tmp/cf-settings-verify.json'))
+          if code != 200 or body.get('success') is not True: raise SystemExit(f'CLOUDFLARE_SETTINGS_VERIFY_FAILED:{code}')
+          bindings=(body.get('result') or {}).get('bindings') or []
+          ai=[b for b in bindings if b.get('name')=='AI' and b.get('type')=='ai']
+          if len(ai)!=1: raise SystemExit('WORKERS_AI_BINDING_NOT_VERIFIED')
+          print(json.dumps({'status':'WORKERS_AI_BINDING_VERIFIED','binding':'AI','provider_inference_performed':False}))
           PY
 
       - name: Wait for exact primary deployment identity
@@ -165,6 +188,7 @@ jobs:
             'core':primary+'/core-health',
             'aura3':primary+'/aura3-bridge-health',
             'tony':primary+'/tony-bridge-health',
+            'hermes':primary+'/v1/health',
             'proxy':edge+'/proxy-health',
             'webhook':edge+'/telegram-webhook-health',
           }
@@ -174,14 +198,20 @@ jobs:
               with urllib.request.urlopen(req,timeout=20) as r:
                   out[name]={'http_status':r.status,'body':json.loads(r.read().decode())}
           assert all(v['http_status']==200 for v in out.values()), out
-          h=out['health']['body']; v2=out['v2']['body']; eg=out['endgame']['body']; proxy=out['proxy']['body']; wh=out['webhook']['body']
+          h=out['health']['body']; v2=out['v2']['body']; eg=out['endgame']['body']; hermes=out['hermes']['body']; proxy=out['proxy']['body']; wh=out['webhook']['body']
           assert h.get('deployment_git_sha')==os.environ['GITHUB_SHA'], h
           assert h.get('v2_production_autonomy_enabled') is False, h
           assert h.get('autonomy_allowed_trigger')=='founder-command', h
           assert v2.get('status')=='READY' and v2.get('production_autonomy_enabled') is False, v2
           assert eg.get('status')=='READY' and eg.get('production_autonomy_enabled') is False, eg
+          assert hermes.get('status')=='READY_FOR_COMMAND_ACCEPTANCE', hermes
+          provider=hermes.get('rio_central_image_provider') or {}
+          assert provider.get('workers_ai_binding_configured') is True, provider
+          assert provider.get('asset_store_configured') is True, provider
+          assert provider.get('credential_transfer_required') is False, provider
+          assert provider.get('ready_for_preflight') is True, provider
           assert proxy.get('status')=='READY', proxy
           assert wh.get('status')=='WEBHOOK_CONFIGURED_MATCHING', wh
           assert wh.get('webhook_url_matches_expected') is True, wh
-          print(json.dumps({'status':'LIVE_PROXY_AWARE_DEPLOYMENT_VERIFIED','git_sha':h.get('deployment_git_sha'),'cloudflare_version_id':h.get('cloudflare_version_id'),'edge_proxy_ready':True,'telegram_webhook_matching':True,'production_autonomy_enabled':False,'consequential_trigger':'founder-command','synthetic_founder_event_used':False},indent=2))
+          print(json.dumps({'status':'LIVE_PROXY_AWARE_DEPLOYMENT_VERIFIED','git_sha':h.get('deployment_git_sha'),'cloudflare_version_id':h.get('cloudflare_version_id'),'edge_proxy_ready':True,'telegram_webhook_matching':True,'central_workers_ai_binding_ready':True,'provider_inference_performed':False,'production_autonomy_enabled':False,'consequential_trigger':'founder-command','synthetic_founder_event_used':False},indent=2))
           PY
