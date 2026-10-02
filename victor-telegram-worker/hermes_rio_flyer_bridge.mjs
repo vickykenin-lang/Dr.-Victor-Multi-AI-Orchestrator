@@ -67,7 +67,9 @@ export async function dispatchRioFlyerTask(env, command = {}) {
     };
   }
 
-  const taskId = `hermes-rio-flyer-${Date.now()}-${clean(command.command_id, 80) || 'cmd'}`;
+  const preflightOnly = command?.action === 'rio.flyer_preflight' || command?.payload?.preflight_only === true;
+  const taskPrefix = preflightOnly ? 'hermes-rio-preflight' : 'hermes-rio-flyer';
+  const taskId = `${taskPrefix}-${Date.now()}-${clean(command.command_id, 80) || 'cmd'}`;
   const payload = {
     product_image_url: validation.product_image_url,
     title: clean(command?.payload?.title, 180),
@@ -80,6 +82,7 @@ export async function dispatchRioFlyerTask(env, command = {}) {
     source_url: clean(command?.payload?.source_url, 1500),
     requested_by: command?.actor || null,
     hermes_command_id: command?.command_id || null,
+    preflight_only: preflightOnly,
   };
 
   const url = `${GITHUB_API}/repos/${RIO_REPO}/actions/workflows/${RIO_FLYER_WORKFLOW}/dispatches`;
@@ -92,6 +95,7 @@ export async function dispatchRioFlyerTask(env, command = {}) {
         task_id: taskId,
         product_reference: validation.product_reference,
         payload: JSON.stringify(payload),
+        preflight_only: preflightOnly ? 'true' : 'false',
       },
     }),
   });
@@ -105,6 +109,7 @@ export async function dispatchRioFlyerTask(env, command = {}) {
       github_http_status: response.status,
       detail,
       capability,
+      preflight_only: preflightOnly,
     };
   }
 
@@ -115,6 +120,7 @@ export async function dispatchRioFlyerTask(env, command = {}) {
     product_reference: validation.product_reference,
     workflow: RIO_FLYER_WORKFLOW,
     repository: RIO_REPO,
+    preflight_only: preflightOnly,
     capability,
     live_request_verified: true,
     real_output_verified: false,

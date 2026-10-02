@@ -14,6 +14,7 @@ export const HERMES_ACTIONS = Object.freeze({
   'rio.status': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.image_usage': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.image_budget': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
+  'rio.flyer_preflight': { target: 'rio', risk: HERMES_RISK_CLASS.SAFE_EXECUTION },
   'rio.generate_product_flyer': { target: 'rio', risk: HERMES_RISK_CLASS.SAFE_EXECUTION },
   'victor.status': { target: 'victor', risk: HERMES_RISK_CLASS.READ_ONLY },
 });
@@ -92,6 +93,20 @@ export function buildHermesReceipt({ command, status = 'RECEIVED', validation = 
   };
 }
 
+function parseRioProductCommand(action, args) {
+  const finalArg = args.at(-1) || '';
+  const hasImageUrl = /^https:\/\//i.test(finalArg) && args.length >= 2;
+  const productReference = hasImageUrl ? args.slice(0, -1).join(' ') : args.join(' ');
+  return {
+    target: 'rio',
+    action,
+    payload: {
+      product_reference: productReference,
+      ...(hasImageUrl ? { product_image_url: finalArg } : {}),
+    },
+  };
+}
+
 export function parseHermesTelegramCommand(text = '') {
   const raw = cleanString(text, 1000);
   const parts = raw.split(/\s+/).filter(Boolean);
@@ -116,19 +131,11 @@ export function parseHermesTelegramCommand(text = '') {
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'budget') {
     return { target: 'rio', action: 'rio.image_budget', payload: {} };
   }
+  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'preflight' && parts[2]) {
+    return parseRioProductCommand('rio.flyer_preflight', parts.slice(2));
+  }
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'flyer' && parts[2]) {
-    const args = parts.slice(2);
-    const finalArg = args.at(-1) || '';
-    const hasImageUrl = /^https:\/\//i.test(finalArg) && args.length >= 2;
-    const productReference = hasImageUrl ? args.slice(0, -1).join(' ') : args.join(' ');
-    return {
-      target: 'rio',
-      action: 'rio.generate_product_flyer',
-      payload: {
-        product_reference: productReference,
-        ...(hasImageUrl ? { product_image_url: finalArg } : {}),
-      },
-    };
+    return parseRioProductCommand('rio.generate_product_flyer', parts.slice(2));
   }
   if (cmd === '/victor' && parts[1]?.toLowerCase() === 'status') {
     return { target: 'victor', action: 'victor.status', payload: {} };

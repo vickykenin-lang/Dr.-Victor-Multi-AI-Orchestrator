@@ -42,7 +42,7 @@ export function hermesRuntimeSnapshot(env={}) {
 
 export function rioRuntimeSnapshot(env={}) {
   const bridge=rioFlyerBridgeCapability(env);
-  return { service:'rio', bridge_credential_configured:bridge.github_orchestration_token_configured, exact_flyer_transport_implemented:true, exact_flyer_workflow:bridge.workflow, exact_flyer_transport_enabled:bridge.transport_feature_flag_enabled, exact_flyer_transport_ready_for_dispatch:bridge.ready_for_dispatch, image_policy:{ monthly_provider_call_limit:Number(env.RIO_IMAGE_MONTHLY_PROVIDER_CALL_LIMIT||30), max_attempts_per_product:Number(env.RIO_IMAGE_MAX_ATTEMPTS||2), monthly_spend_limit_usd:Number(env.RIO_IMAGE_MONTHLY_SPEND_LIMIT_USD||1) }, evidence:rioEvidence(env,bridge) };
+  return { service:'rio', bridge_credential_configured:bridge.github_orchestration_token_configured, exact_flyer_transport_implemented:true, exact_flyer_workflow:bridge.workflow, exact_flyer_transport_enabled:bridge.transport_feature_flag_enabled, exact_flyer_transport_ready_for_dispatch:bridge.ready_for_dispatch, no_spend_preflight_action:'rio.flyer_preflight', image_policy:{ monthly_provider_call_limit:Number(env.RIO_IMAGE_MONTHLY_PROVIDER_CALL_LIMIT||30), max_attempts_per_product:Number(env.RIO_IMAGE_MAX_ATTEMPTS||2), monthly_spend_limit_usd:Number(env.RIO_IMAGE_MONTHLY_SPEND_LIMIT_USD||1) }, evidence:rioEvidence(env,bridge) };
 }
 
 async function persistResult(env,command,result){
@@ -67,14 +67,14 @@ export async function routeHermesCommandV2(env,command,options={}){
   else if(command.action==='rio.image_usage') r={status:'COMPLETED_WITH_LIMITATION',execution:'COMPLETED',error_code:'RIO_IMAGE_USAGE_LEDGER_NOT_CONNECTED_TO_HERMES_READ_PATH',result:{monthly_provider_call_limit:Number(env.RIO_IMAGE_MONTHLY_PROVIDER_CALL_LIMIT||30),actual_monthly_provider_calls:null,counter_live_read_verified:false}};
   else if(command.action==='rio.image_budget') r={status:'COMPLETED_WITH_LIMITATION',execution:'COMPLETED',error_code:'RIO_IMAGE_BUDGET_TELEMETRY_NOT_WIRED',result:{monthly_spend_limit_usd:Number(env.RIO_IMAGE_MONTHLY_SPEND_LIMIT_USD||1),actual_monthly_spend_usd:null,provider_budget_verified:false}};
   else if(command.action==='victor.status') r={status:'COMPLETED',execution:'COMPLETED',result:{service:'victor',deployment_git_sha:env.VICTOR_DEPLOY_GIT_SHA||null,deployment_build_uuid:env.VICTOR_BUILD_UUID||null,github_orchestration_token_configured:configured(env.GITHUB_ORCHESTRATION_TOKEN),production_identity_verified:productionRuntimeObserved(env)},live_request_verified:productionRuntimeObserved(env)};
-  else if(command.action==='rio.generate_product_flyer'){
+  else if(command.action==='rio.generate_product_flyer' || command.action==='rio.flyer_preflight'){
     const ref=String(command?.payload?.product_reference||'').trim();
     const image=String(command?.payload?.product_image_url||'').trim();
     if(!ref) r={status:'SAFE_STOP',execution:'BLOCKED',error_code:'PRODUCT_REFERENCE_REQUIRED',result:null};
     else if(!/^https:\/\//i.test(image)) r={status:'SAFE_STOP',execution:'BLOCKED',error_code:'VERIFIED_PRODUCT_IMAGE_URL_REQUIRED',result:{product_reference:ref}};
     else {
       const d=await dispatchRioFlyerTask(env,command);
-      r=d.status==='DISPATCHED' ? {status:'DISPATCHED',execution:'DISPATCHED',error_code:null,result:{task_id:d.task_id,product_reference:d.product_reference,repository:d.repository,workflow:d.workflow,result_path:`integration/results/flyer_tasks/${d.task_id}.json`},live_request_verified:true,real_output_verified:false,business_outcome_verified:false} : {status:'SAFE_STOP',execution:'BLOCKED',error_code:d.error_code||'RIO_FLYER_DISPATCH_FAILED',result:d};
+      r=d.status==='DISPATCHED' ? {status:command.action==='rio.flyer_preflight'?'PREFLIGHT_DISPATCHED':'DISPATCHED',execution:'DISPATCHED',error_code:null,result:{task_id:d.task_id,product_reference:d.product_reference,repository:d.repository,workflow:d.workflow,preflight_only:d.preflight_only===true,result_path:`integration/results/flyer_tasks/${d.task_id}.json`},live_request_verified:true,real_output_verified:false,business_outcome_verified:false} : {status:'SAFE_STOP',execution:'BLOCKED',error_code:d.error_code||'RIO_FLYER_DISPATCH_FAILED',result:d};
     }
   } else r={status:'SAFE_STOP',execution:'BLOCKED',error_code:'ACTION_ROUTE_NOT_IMPLEMENTED',result:null};
   if(options.persist!==false) await persistResult(env,command,r);

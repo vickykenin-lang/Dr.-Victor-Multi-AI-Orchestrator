@@ -23,6 +23,21 @@ test('registered read-only action validates', () => {
   assert.equal(result.classification.risk, HERMES_RISK_CLASS.READ_ONLY);
 });
 
+test('flyer preflight is registered as safe execution', () => {
+  const result = validateHermesCommandEnvelope({
+    command_id: 'cmd_preflight',
+    source: 'chatgpt',
+    actor: 'founder_authorized_assistant',
+    target: 'rio',
+    action: 'rio.flyer_preflight',
+    execution_mode: 'manual',
+    idempotency_key: 'rio-preflight-1',
+    payload: {},
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.classification.risk, HERMES_RISK_CLASS.SAFE_EXECUTION);
+});
+
 test('unknown action fails closed', () => {
   const result = validateHermesCommandEnvelope({
     command_id: 'cmd_2',
@@ -60,6 +75,18 @@ test('telegram rio flyer command keeps exact reference and optional image URL se
     payload: {
       product_reference: 'B0ABC123',
       product_image_url: 'https://images.example.com/product.jpg',
+    },
+  });
+});
+
+test('telegram rio preflight normalizes into no-spend transport action', () => {
+  const parsed = parseHermesTelegramCommand('/rio preflight PRE-FLIGHT-FIXTURE https://example.invalid/reference.jpg');
+  assert.deepEqual(parsed, {
+    target: 'rio',
+    action: 'rio.flyer_preflight',
+    payload: {
+      product_reference: 'PRE-FLIGHT-FIXTURE',
+      product_image_url: 'https://example.invalid/reference.jpg',
     },
   });
 });
