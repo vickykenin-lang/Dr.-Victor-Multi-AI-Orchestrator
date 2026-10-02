@@ -9,15 +9,17 @@ Create one governed command plane that can accept Founder-authorized commands fr
 Every external channel is only an adapter. All commands normalize into one canonical envelope before routing to Hermes/RIO/Victor.
 
 ## Canonical command endpoint
-Planned external contract:
+Source-level routes now implemented:
 
 - `POST /v1/commands`
 - `GET /v1/commands/{id}`
 - `GET /v1/health`
 - `POST /integrations/telegram/webhook`
+
+Planned but not yet implemented:
 - `POST /v1/approvals/{command_id}`
 
-These routes are not deployed by this document.
+These routes are wired through `victor-telegram-worker/hermes_runtime_entry.js`. The production deployment entrypoint has not been changed by this branch.
 
 ## Command envelope
 ```json
@@ -62,10 +64,10 @@ Before any consequential execution, the runtime must support:
 9. Policy/risk classification.
 10. Receipt persistence before and after execution.
 
-Block 2 provides deterministic primitives for Bearer validation, HMAC verification, a default 5-minute timestamp window, and replay protection through an injected key-value store. HTTP endpoint wiring and production secrets are still not configured by this branch.
+Block 2 provides deterministic primitives for Bearer validation, HMAC verification, a default 5-minute timestamp window, and replay protection through an injected key-value store. Production secrets are still not configured by this branch.
 
 ## Authentication contract
-Expected request headers for the future HTTP endpoint:
+Expected request headers for `POST /v1/commands`:
 
 - `Authorization: Bearer <HERMES_COMMAND_TOKEN>`
 - `X-Hermes-Timestamp: <unix-seconds>`
@@ -76,7 +78,7 @@ Canonical signature input:
 
 `HMAC_SHA256(secret, timestamp + "." + raw_request_body)`
 
-The request must fail closed when the token, timestamp, signature, idempotency key, or replay store is invalid/missing.
+The request fails closed when token, timestamp, signature, idempotency key, or replay store is invalid/missing.
 
 ## Persistence contract
 Block 3 adds a fail-closed durable store abstraction using one KV-like binding named `HERMES_COMMAND_STORE`.
@@ -89,6 +91,25 @@ Key namespaces:
 The persistence layer does not fall back to transient cache for command acceptance. If `HERMES_COMMAND_STORE` is unavailable, command persistence fails closed.
 
 Default idempotency retention is 35 days. This is a source-level default and is not proof that a production KV binding exists.
+
+## HTTP behavior
+`GET /v1/health` reports only capability/configuration state and does not expose secrets.
+
+`POST /v1/commands` performs:
+1. Raw-body capture.
+2. Bearer/HMAC/timestamp/replay authentication.
+3. Canonical envelope validation.
+4. Risk/action classification.
+5. Receipt creation.
+6. Durable idempotency reservation.
+7. Command + receipt persistence.
+8. Returns `202 ACCEPTED` with `execution=NOT_STARTED`.
+
+No command execution is performed in Block 4.
+
+`GET /v1/commands/{id}` reads persisted command state and requires the Hermes bearer token.
+
+`POST /integrations/telegram/webhook` validates the Telegram webhook secret, Founder chat ID, normalizes recognized commands into the canonical envelope, and persists them with `execution=NOT_STARTED`.
 
 ## Evidence states
 Never collapse these into one status:
@@ -117,7 +138,9 @@ Examples:
 - `/rio flyer B0ABC123` -> `rio.generate_product_flyer`
 - `/victor status` -> `victor.status`
 
-Telegram must not contain a second copy of execution policy. It only normalizes into the canonical command envelope.
+Telegram does not contain a second copy of execution policy. It only normalizes into the canonical command envelope.
+
+The existing production `/telegram` route is intentionally untouched. The new control-plane adapter is isolated at `/integrations/telegram/webhook` until deployment/cutover is explicitly approved.
 
 ## ChatGPT adapter
 When an authenticated ChatGPT-to-Hermes connector is available, ChatGPT should submit the same canonical envelope with `source=chatgpt` and `actor=founder_authorized_assistant`.
@@ -161,10 +184,12 @@ Planned policy (not yet wired):
 - [x] Unit tests added.
 
 ### Block 4 — HTTP wiring
-- [ ] `POST /v1/commands`.
-- [ ] `GET /v1/commands/{id}`.
-- [ ] `GET /v1/health`.
-- [ ] Telegram adapter route integration.
+- [x] `POST /v1/commands`.
+- [x] `GET /v1/commands/{id}`.
+- [x] `GET /v1/health`.
+- [x] Telegram adapter route integration.
+- [x] Isolated runtime entrypoint added.
+- [x] HTTP/adapter unit tests added.
 
 ### Block 5 — governed routing
 - [ ] Route read-only commands.
@@ -180,4 +205,4 @@ Planned policy (not yet wired):
 - [ ] Verify real RIO output separately.
 
 ## Current status
-Block 1, Block 2, and Block 3 source are present on `feature/hermes-command-control-plane-v1`. Nothing in this document proves a production `HERMES_COMMAND_STORE` binding, production deployment, configured production credentials, CI success, or live command execution.
+Blocks 1–4 source are present on `feature/hermes-command-control-plane-v1`. Nothing in this document proves a production `HERMES_COMMAND_STORE` binding, production deployment, configured production credentials, CI success, live command execution, real output, or business outcome.
