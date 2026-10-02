@@ -1,5 +1,3 @@
-import { timingSafeEqual, createHmac } from 'node:crypto';
-
 export const HERMES_AUTH_VERSION = 'HERMES_COMMAND_AUTH_V1';
 export const DEFAULT_MAX_SKEW_SECONDS = 300;
 
@@ -7,8 +5,21 @@ function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function toBuffer(value) {
-  return Buffer.from(value, 'utf8');
+function encoder() {
+  return new TextEncoder();
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function constantTimeStringEqual(a, b) {
+  const left = clean(a);
+  const right = clean(b);
+  if (!left || !right || left.length !== right.length) return false;
+  let diff = 0;
+  for (let i = 0; i < left.length; i += 1) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  return diff === 0;
 }
 
 export function parseBearerToken(header = '') {
@@ -17,30 +28,32 @@ export function parseBearerToken(header = '') {
 }
 
 export function verifyBearerToken(provided, expected) {
-  const a = clean(provided);
-  const b = clean(expected);
-  if (!a || !b) return false;
-  const ab = toBuffer(a);
-  const bb = toBuffer(b);
-  if (ab.length !== bb.length) return false;
-  return timingSafeEqual(ab, bb);
+  return constantTimeStringEqual(provided, expected);
 }
 
-export function computeHermesSignature(secret, timestamp, rawBody) {
+async function hmacHex(secret, material) {
   const key = clean(secret);
   if (!key) throw new Error('HERMES_WEBHOOK_SECRET_REQUIRED');
-  const canonical = `${timestamp}.${rawBody}`;
-  return `sha256=${createHmac('sha256', key).update(canonical, 'utf8').digest('hex')}`;
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    encoder().encode(key),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, encoder().encode(material));
+  return bytesToHex(new Uint8Array(signature));
 }
 
-export function verifyHermesSignature({ secret, timestamp, rawBody, signature }) {
+export async function computeHermesSignature(secret, timestamp, rawBody) {
+  const canonical = `${timestamp}.${rawBody}`;
+  return `sha256=${await hmacHex(secret, canonical)}`;
+}
+
+export async function verifyHermesSignature({ secret, timestamp, rawBody, signature }) {
   try {
-    const expected = computeHermesSignature(secret, timestamp, rawBody);
-    const provided = clean(signature);
-    const a = toBuffer(provided);
-    const b = toBuffer(expected);
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
+    const expected = await computeHermesSignature(secret, timestamp, rawBody);
+    return constantTimeStringEqual(signature, expected);
   } catch {
     return false;
   }
@@ -58,9 +71,9 @@ export function verifyTimestampFreshness(timestamp, { nowMs = Date.now(), maxSke
   return { ok: true, reason: 'TIMESTAMP_FRESH', age_seconds: ageSeconds };
 }
 
-export function buildReplayKey({ signature, timestamp, idempotencyKey }) {
+export async function buildReplayKey({ signature, timestamp, idempotencyKey }) {
   const material = `${clean(signature)}|${clean(String(timestamp))}|${clean(idempotencyKey)}`;
-  return createHmac('sha256', 'hermes-replay-key-v1').update(material).digest('hex');
+  return hmacHex('hermes-replay-key-v1', material);
 }
 
 export async function checkReplayProtection({ store, replayKey, ttlSeconds = DEFAULT_MAX_SKEW_SECONDS }) {
@@ -93,7 +106,7 @@ export async function authenticateHermesRequest({
   const freshness = verifyTimestampFreshness(timestamp, { nowMs, maxSkewSeconds });
   if (!freshness.ok) reasons.push(freshness.reason);
 
-  if (!verifyHermesSignature({ secret: webhookSecret, timestamp, rawBody, signature })) {
+  if (!(await verifyHermesSignature({ secret: webhookSecret, timestamp, rawBody, signature }))) {
     reasons.push('SIGNATURE_INVALID');
   }
 
@@ -108,7 +121,7 @@ export async function authenticateHermesRequest({
     };
   }
 
-  const replayKey = buildReplayKey({ signature, timestamp, idempotencyKey });
+  const replayKey = await buildReplayKey({ signature, timestamp, idempotencyKey });
   const replay = await checkReplayProtection({ store: replayStore, replayKey, ttlSeconds: maxSkewSeconds });
   if (!replay.ok) {
     return {
