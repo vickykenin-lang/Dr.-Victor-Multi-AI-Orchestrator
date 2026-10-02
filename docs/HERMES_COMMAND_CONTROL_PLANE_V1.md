@@ -95,21 +95,33 @@ Default idempotency retention is 35 days. This is a source-level default and is 
 ## HTTP behavior
 `GET /v1/health` reports only capability/configuration state and does not expose secrets.
 
-`POST /v1/commands` performs:
-1. Raw-body capture.
-2. Bearer/HMAC/timestamp/replay authentication.
-3. Canonical envelope validation.
-4. Risk/action classification.
-5. Receipt creation.
-6. Durable idempotency reservation.
-7. Command + receipt persistence.
-8. Returns `202 ACCEPTED` with `execution=NOT_STARTED`.
-
-No command execution is performed in Block 4.
+`POST /v1/commands` performs authentication, canonical validation, durable acceptance, then passes the accepted command through the governed router. Read-only commands may complete immediately. Blocked commands persist their SAFE_STOP result and error code.
 
 `GET /v1/commands/{id}` reads persisted command state and requires the Hermes bearer token.
 
-`POST /integrations/telegram/webhook` validates the Telegram webhook secret, Founder chat ID, normalizes recognized commands into the canonical envelope, and persists them with `execution=NOT_STARTED`.
+`POST /integrations/telegram/webhook` validates the Telegram webhook secret and Founder chat ID, normalizes recognized commands, persists them, then sends them through the same governed router used by the API path.
+
+## Governed routing
+Block 5 adds `hermes_command_router.mjs`.
+
+Rules:
+- Unknown actions fail closed.
+- Approval-required actions cannot run without approval mode.
+- Read-only status commands may complete synchronously.
+- Evidence states remain separate; credential/config presence never becomes live verification.
+- `rio.image_usage` does not invent a current count when the counter is not wired.
+- `rio.image_budget` does not invent current provider spend when telemetry is not wired.
+- `rio.generate_product_flyer` requires an exact product reference.
+- The existing generic RIO bridge is not repurposed as an image-flyer transport without fresh evidence that the exact transport exists.
+
+## Fresh RIO transport evidence
+Current RIO repository inspection found no `.github/workflows/victor-rio-transport.yml` on `main`; the workflows directory currently exposes only `deploy-pages.yml`.
+
+Therefore the existing Victor-side `dispatchRioTask()` reference to `victor-rio-transport.yml` is not treated as proof of a live RIO transport. The flyer action currently SAFE_STOPs with:
+
+`RIO_EXACT_FLYER_TRANSPORT_NOT_IMPLEMENTED`
+
+This is intentional. The next dependency is to implement and verify an exact RIO flyer transport before any real image-generation dispatch is enabled.
 
 ## Evidence states
 Never collapse these into one status:
@@ -122,12 +134,7 @@ Never collapse these into one status:
 - real output verified
 - real business outcome verified
 
-A receipt must preserve at least:
-- validation status
-- execution status
-- live request verified
-- real output verified
-- business outcome verified
+A receipt preserves validation, execution, live-request verification, real-output verification, and business-outcome verification separately.
 
 ## Telegram adapter
 Examples:
@@ -138,27 +145,27 @@ Examples:
 - `/rio flyer B0ABC123` -> `rio.generate_product_flyer`
 - `/victor status` -> `victor.status`
 
-Telegram does not contain a second copy of execution policy. It only normalizes into the canonical command envelope.
-
 The existing production `/telegram` route is intentionally untouched. The new control-plane adapter is isolated at `/integrations/telegram/webhook` until deployment/cutover is explicitly approved.
 
 ## ChatGPT adapter
 When an authenticated ChatGPT-to-Hermes connector is available, ChatGPT should submit the same canonical envelope with `source=chatgpt` and `actor=founder_authorized_assistant`.
 
 ## Persistent context model
-Hermes development should separate:
+Hermes development separates:
 1. Context Registry — stable architecture, policies, provider purposes, locked decisions.
 2. State Registry — current deployment, active version, current usage, pending jobs, failures.
 3. Evidence Registry — tests, live receipts, provider responses, output verification.
 4. Command API — governed reads and executions against the above registries.
 
 ## RIO image policy target
-Planned policy (not yet wired):
+Planned policy:
 - 30 approved final images per month.
 - Max 2 generation attempts per product.
 - External AI spend hard cap handled separately at provider/gateway level.
 - Product identity and factual copy must be verified before generation.
 - Final image count increments only after QA approval.
+
+Current counter and provider-spend telemetry are not yet wired and are reported as unverified instead of fabricated.
 
 ## Implementation sequence
 ### Block 1 — command contract
@@ -192,17 +199,24 @@ Planned policy (not yet wired):
 - [x] HTTP/adapter unit tests added.
 
 ### Block 5 — governed routing
-- [ ] Route read-only commands.
-- [ ] Route RIO flyer command to existing RIO bridge only after policy gates.
-- [ ] Add approval boundary for consequential actions.
+- [x] Route read-only commands.
+- [x] Preserve approval boundary in router.
+- [x] Persist routed results and SAFE_STOP receipts.
+- [x] Add RIO flyer product-reference gate.
+- [x] Refuse to reuse unverified generic RIO transport.
+- [x] Add governed router unit tests.
+- [ ] Implement exact RIO flyer transport in RIO repository.
+- [ ] Wire verified monthly image counter.
+- [ ] Wire verified provider spend telemetry/hard-stop evidence.
 
 ### Block 6 — deployment and live verification
 - [ ] CI tests pass.
+- [ ] Configure production `HERMES_COMMAND_STORE` and secrets.
 - [ ] Deploy candidate.
 - [ ] Verify health.
 - [ ] Verify Telegram command.
 - [ ] Verify ChatGPT connector when available.
-- [ ] Verify real RIO output separately.
+- [ ] Verify real RIO flyer output separately.
 
 ## Current status
-Blocks 1–4 source are present on `feature/hermes-command-control-plane-v1`. Nothing in this document proves a production `HERMES_COMMAND_STORE` binding, production deployment, configured production credentials, CI success, live command execution, real output, or business outcome.
+Blocks 1–5 control-plane source are present on `feature/hermes-command-control-plane-v1`, but exact RIO flyer transport remains a verified dependency gap. Nothing here proves production KV/secrets, CI success, production deployment, live command execution, real image output, or business outcome.
