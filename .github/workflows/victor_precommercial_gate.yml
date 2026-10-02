@@ -87,8 +87,8 @@ jobs:
           import fs from 'node:fs';
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
-          const expectedWranglerRange = '^4.141.0';
-          const expectedWranglerLocked = '4.141.0';
+          const expectedWranglerRange = '^4.144.0';
+          const expectedWranglerLocked = '4.144.0';
           if (pkg?.devDependencies?.wrangler !== expectedWranglerRange) throw new Error('WRANGLER_SECURITY_RANGE_MISMATCH');
           if (lock?.packages?.['']?.devDependencies?.wrangler !== expectedWranglerRange) throw new Error('ROOT_LOCK_WRANGLER_MISMATCH');
           if (lock?.packages?.['node_modules/wrangler']?.version !== expectedWranglerLocked) throw new Error('LOCKED_WRANGLER_VERSION_MISMATCH');
@@ -97,10 +97,14 @@ jobs:
           if (!deploy.includes('VICTOR_DEPLOY_GIT_SHA:$WORKERS_CI_COMMIT_SHA')) throw new Error('DEPLOY_SHA_NOT_INJECTED');
           if (!deploy.includes('VICTOR_BUILD_UUID:$WORKERS_CI_BUILD_UUID')) throw new Error('BUILD_UUID_NOT_INJECTED');
           const wrangler = fs.readFileSync('wrangler.toml', 'utf8');
-          if (!/main\s*=\s*"victor-telegram-worker\/llm_first_runtime\.js"/.test(wrangler)) throw new Error('LLM_FIRST_QUEUE_RUNTIME_ENTRY_NOT_ACTIVE');
+          if (!/main\s*=\s*"victor-telegram-worker\/hermes_runtime_entry_v2\.js"/.test(wrangler)) throw new Error('HERMES_GOVERNED_RUNTIME_ENTRY_NOT_ACTIVE');
+          const hermesEntry = fs.readFileSync('victor-telegram-worker/hermes_runtime_entry_v2.js', 'utf8');
+          if (!hermesEntry.includes("from './llm_first_runtime.js'")) throw new Error('LLM_FIRST_RUNTIME_NOT_PRESERVED_BEHIND_HERMES');
+          if (!/async\s+queue\s*\([\s\S]*primaryWorker\.queue/.test(hermesEntry)) throw new Error('LLM_FIRST_QUEUE_HANDLER_NOT_PRESERVED');
           if (!fs.existsSync('victor-telegram-worker/runtime_entry.js')) throw new Error('LEGACY_ROLLBACK_RUNTIME_MISSING');
           if (!/\[version_metadata\][\s\S]*binding\s*=\s*"CF_VERSION_METADATA"/.test(wrangler)) throw new Error('CF_VERSION_METADATA_BINDING_MISSING');
           if (!/\[\[kv_namespaces\]\][\s\S]*binding\s*=\s*"VICTOR_CONVERSATION_STATE"/.test(wrangler)) throw new Error('DURABLE_CONVERSATION_KV_BINDING_MISSING');
+          if (!/\[\[kv_namespaces\]\][\s\S]*binding\s*=\s*"HERMES_COMMAND_STORE"/.test(wrangler)) throw new Error('HERMES_COMMAND_STORE_BINDING_MISSING');
           if (!/\[\[queues\.producers\]\][\s\S]*binding\s*=\s*"VICTOR_TELEGRAM_QUEUE"[\s\S]*queue\s*=\s*"victor-telegram-ingress"/.test(wrangler)) throw new Error('TELEGRAM_QUEUE_PRODUCER_MISSING');
           if (!/\[\[queues\.consumers\]\][\s\S]*queue\s*=\s*"victor-telegram-ingress"/.test(wrangler)) throw new Error('TELEGRAM_QUEUE_CONSUMER_MISSING');
           console.log('RELEASE_CONTROL_INVARIANTS_OK');
@@ -110,7 +114,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --ignore-scripts --no-audit --no-fund
-          npx --no-install wrangler --version | grep -F '4.141.0'
+          npx --no-install wrangler --version | grep -F '4.144.0'
 
       - name: Guard against emergency source-repair workflows
         run: |
