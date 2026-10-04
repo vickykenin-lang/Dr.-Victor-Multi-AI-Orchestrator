@@ -1,5 +1,6 @@
 import { HERMES_RISK_CLASS, classifyHermesAction } from './hermes_command_plane.mjs';
 import { hermesStoreCapability, putCommandState, putReceipt } from './hermes_command_store.mjs';
+import { gulaboBridgeSnapshot, postGulaboCallback } from './gulabo_bridge.mjs';
 
 export const HERMES_ROUTER_VERSION = 'HERMES_COMMAND_ROUTER_V1';
 
@@ -35,6 +36,7 @@ export function hermesRuntimeSnapshot(env = {}) {
     telegram_secret_configured: configured(env.TELEGRAM_WEBHOOK_SECRET),
     founder_chat_configured: configured(env.VICTOR_FOUNDER_CHAT_ID),
     github_orchestration_token_configured: configured(env.GITHUB_ORCHESTRATION_TOKEN),
+    gulabo: gulaboBridgeSnapshot(env),
     evidence: baseEvidence(),
   };
 }
@@ -97,6 +99,26 @@ async function persistResult(env, command, result) {
   return receipt;
 }
 
+function gulaboCallbackResult(callback) {
+  if (!callback.ok) {
+    return {
+      status: 'SAFE_STOP',
+      execution: callback.live_request_verified ? 'FAILED' : 'BLOCKED',
+      error_code: callback.error_code || 'GULABO_CALLBACK_FAILED',
+      result: callback.body ?? null,
+      live_request_verified: callback.live_request_verified === true,
+      real_output_verified: false,
+    };
+  }
+  return {
+    status: 'COMPLETED',
+    execution: 'COMPLETED',
+    result: callback.body,
+    live_request_verified: callback.live_request_verified === true,
+    real_output_verified: Boolean(callback.body),
+  };
+}
+
 export async function routeHermesCommand(env, command, options = {}) {
   const classification = classifyHermesAction(command?.action);
   if (!classification.known) {
@@ -141,6 +163,104 @@ export async function routeHermesCommand(env, command, options = {}) {
         },
       };
       break;
+    case 'hermes.gulabo_review_ready': {
+      const imageId = clean(command?.payload?.image_id, 160);
+      const revision = Number(command?.payload?.revision || 0);
+      const assetUri = clean(command?.payload?.asset_uri, 1000);
+      if (!imageId || !Number.isInteger(revision) || revision < 1 || !assetUri) {
+        result = {
+          status: 'SAFE_STOP',
+          execution: 'BLOCKED',
+          error_code: 'GULABO_REVIEW_PACKET_INVALID',
+          result: null,
+        };
+        break;
+      }
+      result = {
+        status: 'AWAITING_FOUNDER_REVIEW',
+        execution: 'COMPLETED',
+        result: {
+          review_type: 'GULABO_IMAGE',
+          image_id: imageId,
+          revision,
+          requester: clean(command?.payload?.requester, 64) || null,
+          requester_ref: clean(command?.payload?.requester_ref, 160) || null,
+          asset_uri: assetUri,
+          rating: command?.payload?.rating ?? null,
+          qa_defects: Array.isArray(command?.payload?.qa_defects) ? command.payload.qa_defects.slice(0, 20) : [],
+          founder_actions: ['REVISE', 'GOOD_TO_GO'],
+        },
+        real_output_verified: Boolean(command?.payload?.rating?.evidence_verified),
+      };
+      break;
+    }
+    case 'gulabo.status':
+      result = {
+        status: 'COMPLETED',
+        execution: 'COMPLETED',
+        result: gulaboBridgeSnapshot(env),
+      };
+      break;
+    case 'gulabo.request_revision': {
+      const imageId = clean(command?.payload?.image_id, 160);
+      const fromRevision = Number(command?.payload?.from_revision || 0);
+      const founderFeedback = clean(command?.payload?.founder_feedback, 4000);
+      const changes = Array.isArray(command?.payload?.change)
+        ? command.payload.change.map((x) => clean(x, 500)).filter(Boolean).slice(0, 20)
+        : [];
+      if (!imageId || !Number.isInteger(fromRevision) || fromRevision < 1 || !founderFeedback || !changes.length) {
+        result = {
+          status: 'SAFE_STOP',
+          execution: 'BLOCKED',
+          error_code: 'GULABO_CORRECTION_PACKET_INVALID',
+          result: null,
+        };
+        break;
+      }
+      const callback = await postGulaboCallback(
+        env,
+        '/v1/hermes/correction',
+        {
+          image_id: imageId,
+          from_revision: fromRevision,
+          preserve: Array.isArray(command?.payload?.preserve)
+            ? command.payload.preserve.map((x) => clean(x, 500)).filter(Boolean).slice(0, 20)
+            : [],
+          change: changes,
+          founder_feedback: founderFeedback,
+          regenerate_from_scratch: command?.payload?.regenerate_from_scratch === true,
+        },
+        { fetchImpl: options.fetchImpl, nowMs: options.nowMs },
+      );
+      result = gulaboCallbackResult(callback);
+      break;
+    }
+    case 'gulabo.good_to_go': {
+      const imageId = clean(command?.payload?.image_id, 160);
+      const revision = Number(command?.payload?.revision || 0);
+      if (!imageId || !Number.isInteger(revision) || revision < 1) {
+        result = {
+          status: 'SAFE_STOP',
+          execution: 'BLOCKED',
+          error_code: 'GULABO_FOUNDER_DECISION_INVALID',
+          result: null,
+        };
+        break;
+      }
+      const callback = await postGulaboCallback(
+        env,
+        '/v1/hermes/founder-decision',
+        {
+          image_id: imageId,
+          revision,
+          decision: 'GOOD_TO_GO',
+          note: clean(command?.payload?.note, 2000) || null,
+        },
+        { fetchImpl: options.fetchImpl, nowMs: options.nowMs },
+      );
+      result = gulaboCallbackResult(callback);
+      break;
+    }
     case 'rio.status':
       result = {
         status: 'COMPLETED',
@@ -197,8 +317,6 @@ export async function routeHermesCommand(env, command, options = {}) {
         break;
       }
 
-      // Do not repurpose the existing generic RIO transport. Fresh repository
-      // evidence must prove an exact flyer-generation transport before dispatch.
       result = {
         status: 'SAFE_STOP',
         execution: 'BLOCKED',
