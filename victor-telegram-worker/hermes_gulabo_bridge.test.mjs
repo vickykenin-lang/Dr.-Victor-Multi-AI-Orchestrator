@@ -2,12 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { approveGulabo, gulaboBridgeCapability, readGulaboStatus, requestGulaboRevision } from './hermes_gulabo_bridge.mjs';
 
-test('gulabo bridge capability requires API base URL but bearer token is optional at source-contract stage',()=>{
+const signedEnv=()=>({
+  GULABO_API_BASE_URL:'https://gulabo.example',
+  GULABO_HERMES_CALLBACK_TOKEN:'callback-token',
+  GULABO_HERMES_CALLBACK_SECRET:'callback-secret',
+});
+
+test('gulabo bridge exposes signed callback readiness only when callback credentials are present',()=>{
   assert.equal(gulaboBridgeCapability({}).ready_for_calls,false);
   const cap=gulaboBridgeCapability({GULABO_API_BASE_URL:'https://gulabo.example'});
   assert.equal(cap.ready_for_calls,true);
-  assert.equal(cap.auth_mode,'NONE');
-  assert.equal(gulaboBridgeCapability({GULABO_API_BASE_URL:'https://gulabo.example',GULABO_API_TOKEN:'x'}).auth_mode,'BEARER');
+  assert.equal(cap.signed_callback_ready,false);
+  const signed=gulaboBridgeCapability(signedEnv());
+  assert.equal(signed.signed_callback_ready,true);
+  assert.equal(signed.callback_auth_mode,'BEARER_HMAC_SHA256');
 });
 
 test('status call reports live request only after actual HTTP response',async()=>{
@@ -25,7 +33,7 @@ test('status call reports live request only after actual HTTP response',async()=
   }finally{globalThis.fetch=original;}
 });
 
-test('revision call sends founder feedback as targeted rectification and preserves approved elements',async()=>{
+test('revision call uses signed Hermes callback endpoint and preserves approved elements',async()=>{
   const original=globalThis.fetch;
   let seen;
   globalThis.fetch=async(url,init)=>{
@@ -33,9 +41,11 @@ test('revision call sends founder feedback as targeted rectification and preserv
     return new Response(JSON.stringify({image_id:'GULABO-IMG-1',revision:2,status:'READY_FOR_REVIEW',real_output_verified:true}),{status:200,headers:{'content-type':'application/json'}});
   };
   try{
-    const out=await requestGulaboRevision({GULABO_API_BASE_URL:'https://gulabo.example',GULABO_API_TOKEN:'secret'}, {image_id:'GULABO-IMG-1',from_revision:1,founder_feedback:'make background warmer'});
-    assert.equal(seen.url,'https://gulabo.example/v1/revisions/generate');
-    assert.equal(seen.init.headers.authorization,'Bearer secret');
+    const out=await requestGulaboRevision(signedEnv(), {image_id:'GULABO-IMG-1',from_revision:1,founder_feedback:'make background warmer'});
+    assert.equal(seen.url,'https://gulabo.example/v1/hermes/correction');
+    assert.equal(seen.init.headers.authorization,'Bearer callback-token');
+    assert.match(seen.init.headers['x-gulabo-timestamp'],/^\d+$/);
+    assert.match(seen.init.headers['x-gulabo-signature'],/^sha256=[0-9a-f]{64}$/);
     assert.deepEqual(seen.body.change,['make background warmer']);
     assert.deepEqual(seen.body.preserve,['all approved elements not explicitly changed']);
     assert.equal(seen.body.regenerate_from_scratch,false);
@@ -45,16 +55,26 @@ test('revision call sends founder feedback as targeted rectification and preserv
   }finally{globalThis.fetch=original;}
 });
 
-test('founder approval posts GOOD_TO_GO but does not invent requester return outcome',async()=>{
+test('revision call fails closed when signed callback auth is missing',async()=>{
+  const out=await requestGulaboRevision({GULABO_API_BASE_URL:'https://gulabo.example'}, {image_id:'GULABO-IMG-1',from_revision:1,founder_feedback:'make background warmer'});
+  assert.equal(out.status,'SAFE_STOP');
+  assert.equal(out.error_code,'GULABO_CALLBACK_AUTH_NOT_CONFIGURED');
+  assert.equal(out.live_request_verified,false);
+});
+
+test('founder approval uses signed GOOD_TO_GO endpoint without inventing requester return outcome',async()=>{
   const original=globalThis.fetch;
-  let body;
+  let seen;
   globalThis.fetch=async(url,init)=>{
-    body=JSON.parse(init.body);
+    seen={url,init,body:JSON.parse(init.body)};
     return new Response(JSON.stringify({image_id:'GULABO-IMG-1',revision:2,status:'GOOD_TO_GO',founder_approved:true,real_output_verified:true}),{status:200,headers:{'content-type':'application/json'}});
   };
   try{
-    const out=await approveGulabo({GULABO_API_BASE_URL:'https://gulabo.example'}, {image_id:'GULABO-IMG-1',revision:2,note:'good'});
-    assert.equal(body.decision,'GOOD_TO_GO');
+    const out=await approveGulabo(signedEnv(), {image_id:'GULABO-IMG-1',revision:2,note:'good'});
+    assert.equal(seen.url,'https://gulabo.example/v1/hermes/founder-decision');
+    assert.equal(seen.init.headers.authorization,'Bearer callback-token');
+    assert.match(seen.init.headers['x-gulabo-signature'],/^sha256=[0-9a-f]{64}$/);
+    assert.equal(seen.body.decision,'GOOD_TO_GO');
     assert.equal(out.status,'COMPLETED');
     assert.equal(out.business_outcome_verified,false);
   }finally{globalThis.fetch=original;}
