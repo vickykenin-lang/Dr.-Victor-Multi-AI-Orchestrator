@@ -1,0 +1,71 @@
+name: Gulabo Signed Production Verify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/gulabo-signed-production-verify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PRIMARY_BASE_URL: https://victor-telegram-webhook.vickykenin.workers.dev
+      EXPECTED_WORKER_SHA: b757ab22136d57fc8585fbd5e2638271618f60d9
+    steps:
+      - name: Verify stable signed Gulabo production bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, time, urllib.request
+          base=os.environ['PRIMARY_BASE_URL'].rstrip('/')
+          expected=os.environ['EXPECTED_WORKER_SHA']
+          consecutive=0
+          last=None
+          for _ in range(30):
+              try:
+                  req=urllib.request.Request(base+'/health',headers={'User-Agent':'Gulabo-Signed-Production-Verify/1.0','Cache-Control':'no-cache'})
+                  with urllib.request.urlopen(req,timeout=15) as r:
+                      h=json.loads(r.read().decode())
+                  req=urllib.request.Request(base+'/v1/health',headers={'User-Agent':'Gulabo-Signed-Production-Verify/1.0','Cache-Control':'no-cache'})
+                  with urllib.request.urlopen(req,timeout=15) as r:
+                      hermes=json.loads(r.read().decode())
+                  bridge=hermes.get('gulabo_bridge') or {}
+                  last={'sha':h.get('deployment_git_sha'),'version':h.get('cloudflare_version_id'),'hermes_status':hermes.get('status'),'bridge':bridge}
+                  ok=(
+                      h.get('deployment_git_sha')==expected and
+                      bool(h.get('cloudflare_version_id')) and
+                      hermes.get('status')=='READY_FOR_COMMAND_ACCEPTANCE' and
+                      bridge.get('api_base_url_configured') is True and
+                      bridge.get('signed_callback_ready') is True and
+                      bridge.get('callback_auth_mode')=='BEARER_HMAC_SHA256'
+                  )
+                  if ok:
+                      consecutive += 1
+                      if consecutive >= 3:
+                          print(json.dumps({
+                              'status':'GULABO_SIGNED_PRODUCTION_BRIDGE_VERIFIED',
+                              'git_sha':expected,
+                              'cloudflare_version_id':h.get('cloudflare_version_id'),
+                              'stable_consecutive_reads':consecutive,
+                              'hermes_command_plane':'READY_FOR_COMMAND_ACCEPTANCE',
+                              'gulabo_api_base_url_configured':True,
+                              'signed_callback_ready':True,
+                              'callback_auth_mode':'BEARER_HMAC_SHA256'
+                          },indent=2))
+                          raise SystemExit(0)
+                  else:
+                      consecutive=0
+              except Exception as exc:
+                  consecutive=0
+                  last={'error':str(exc)[:500]}
+              time.sleep(3)
+          print(json.dumps({'status':'GULABO_SIGNED_PRODUCTION_BRIDGE_NOT_STABLE','expected':expected,'last':last},indent=2))
+          raise SystemExit(1)
+          PY
