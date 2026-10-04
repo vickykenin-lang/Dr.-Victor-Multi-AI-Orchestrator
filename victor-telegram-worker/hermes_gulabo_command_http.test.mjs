@@ -12,6 +12,10 @@ function replayStore() {
   };
 }
 
+function freshTimestamp() {
+  return String(Math.floor(Date.now() / 1000));
+}
+
 test('dedicated Gulabo command auth is isolated and fully configured', async () => {
   const env = {
     GULABO_HERMES_COMMAND_TOKEN: 'gulabo-token',
@@ -24,7 +28,7 @@ test('dedicated Gulabo command auth is isolated and fully configured', async () 
   assert.equal(capability.replay_store_configured, true);
 
   const raw = JSON.stringify({ command_id: 'cmd-1', idempotency_key: 'idem-1' });
-  const timestamp = '1000';
+  const timestamp = freshTimestamp();
   const signature = await computeHermesSignature('gulabo-secret', timestamp, raw);
   const request = new Request('https://example.com/v1/commands', {
     method: 'POST',
@@ -49,7 +53,7 @@ test('wrong dedicated token is rejected without using primary Hermes credentials
     HERMES_COMMAND_STORE: replayStore(),
   };
   const raw = JSON.stringify({ command_id: 'cmd-2', idempotency_key: 'idem-2' });
-  const timestamp = '1000';
+  const timestamp = freshTimestamp();
   const signature = await computeHermesSignature('gulabo-secret', timestamp, raw);
   const request = new Request('https://example.com/v1/commands', {
     method: 'POST',
