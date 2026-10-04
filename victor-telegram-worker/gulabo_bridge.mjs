@@ -6,6 +6,14 @@ function configured(value) {
   return Boolean(clean(String(value ?? '')));
 }
 
+function callbackToken(env = {}) {
+  return env.GULABO_HERMES_CALLBACK_TOKEN || env.API_VICTOR || '';
+}
+
+function callbackSecret(env = {}) {
+  return env.GULABO_HERMES_CALLBACK_SECRET || env.TELEGRAM_WEBHOOK_SECRET || '';
+}
+
 function bytesToHex(bytes) {
   return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -24,11 +32,15 @@ async function hmacSha256Hex(secret, material) {
 }
 
 export function gulaboBridgeSnapshot(env = {}) {
+  const token = callbackToken(env);
+  const secret = callbackSecret(env);
   return {
     service: 'gulabo-image-agent',
     api_base_url_configured: configured(env.GULABO_API_BASE_URL),
-    callback_token_configured: configured(env.GULABO_HERMES_CALLBACK_TOKEN),
-    callback_secret_configured: configured(env.GULABO_HERMES_CALLBACK_SECRET),
+    callback_token_configured: configured(token),
+    callback_secret_configured: configured(secret),
+    callback_token_source: env.GULABO_HERMES_CALLBACK_TOKEN ? 'GULABO_HERMES_CALLBACK_TOKEN' : env.API_VICTOR ? 'API_VICTOR_FALLBACK' : 'NONE',
+    callback_secret_source: env.GULABO_HERMES_CALLBACK_SECRET ? 'GULABO_HERMES_CALLBACK_SECRET' : env.TELEGRAM_WEBHOOK_SECRET ? 'TELEGRAM_WEBHOOK_SECRET_FALLBACK' : 'NONE',
     production_deployed: false,
     live_request_verified: false,
   };
@@ -36,8 +48,8 @@ export function gulaboBridgeSnapshot(env = {}) {
 
 export async function postGulaboCallback(env, path, payload, options = {}) {
   const baseUrl = clean(env.GULABO_API_BASE_URL, 1000).replace(/\/$/, '');
-  const token = clean(env.GULABO_HERMES_CALLBACK_TOKEN, 1000);
-  const secret = clean(env.GULABO_HERMES_CALLBACK_SECRET, 1000);
+  const token = clean(callbackToken(env), 1000);
+  const secret = clean(callbackSecret(env), 1000);
   if (!baseUrl || !token || !secret) {
     return {
       ok: false,

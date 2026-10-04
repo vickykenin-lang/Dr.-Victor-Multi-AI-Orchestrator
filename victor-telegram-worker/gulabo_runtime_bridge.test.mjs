@@ -26,6 +26,14 @@ function bridgeEnv() {
   };
 }
 
+function fallbackBridgeEnv() {
+  return {
+    GULABO_API_BASE_URL: 'https://gulabo.example.com',
+    API_VICTOR: 'token-fallback',
+    TELEGRAM_WEBHOOK_SECRET: 'secret-fallback',
+  };
+}
+
 test('canonical Gulabo actions keep expected risk classes', () => {
   const review = validateHermesCommandEnvelope(command('hermes.gulabo_review_ready', 'hermes', {
     image_id: 'GULABO-IMG-1', revision: 1, asset_uri: 'data/assets/GULABO-IMG-1/v1.png',
@@ -99,6 +107,30 @@ test('revision request dispatches signed callback to Gulabo', async () => {
   const body = JSON.parse(seen.init.body);
   assert.deepEqual(body.change, ['make background warmer']);
   assert.deepEqual(body.preserve, ['product identity']);
+});
+
+test('callback bridge can safely fall back to existing Hermes credentials', async () => {
+  const snapshot = gulaboBridgeSnapshot(fallbackBridgeEnv());
+  assert.equal(snapshot.callback_token_configured, true);
+  assert.equal(snapshot.callback_secret_configured, true);
+  assert.equal(snapshot.callback_token_source, 'API_VICTOR_FALLBACK');
+  assert.equal(snapshot.callback_secret_source, 'TELEGRAM_WEBHOOK_SECRET_FALLBACK');
+
+  let seen = null;
+  const fakeFetch = async (url, init) => {
+    seen = { url, init };
+    return { ok: true, status: 200, async json() { return { status: 'READY_FOR_REVIEW' }; }, async text() { return ''; } };
+  };
+  const result = await routeHermesCommand(
+    fallbackBridgeEnv(),
+    command('gulabo.request_revision', 'gulabo', {
+      image_id: 'GULABO-IMG-1', from_revision: 1, change: ['warmer background'], founder_feedback: 'warmer background',
+    }),
+    { persist: false, fetchImpl: fakeFetch, nowMs: 1_000_000 },
+  );
+  assert.equal(result.status, 'COMPLETED');
+  assert.equal(seen.init.headers.Authorization, 'Bearer token-fallback');
+  assert.match(seen.init.headers['X-Gulabo-Signature'], /^sha256=[a-f0-9]{64}$/);
 });
 
 test('GOOD_TO_GO requires approval and dispatches founder decision callback', async () => {
