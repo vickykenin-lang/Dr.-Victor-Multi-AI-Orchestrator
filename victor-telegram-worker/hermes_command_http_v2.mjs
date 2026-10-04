@@ -4,7 +4,7 @@ import { getCommandState, hermesStoreCapability, persistCommandAcceptance } from
 import { routeHermesCommandV2 } from './hermes_command_router_v2.mjs';
 import { centralRioImageCapability, getCentralRioFlyerAsset } from './hermes_rio_image_provider.mjs';
 
-export const HERMES_HTTP_VERSION = 'HERMES_COMMAND_HTTP_V2';
+export const HERMES_HTTP_VERSION='HERMES_COMMAND_HTTP_V2';
 
 function json(body,status=200){return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});}
 function clean(value,max=256){return typeof value==='string'?value.trim().slice(0,max):'';}
@@ -13,9 +13,12 @@ function idemTelegram(message={},route={}){return `telegram:${clean(String(messa
 function commandToken(env={}){return env.HERMES_COMMAND_TOKEN||env.API_VICTOR||'';}
 function webhookSecret(env={}){return env.HERMES_WEBHOOK_SECRET||env.TELEGRAM_WEBHOOK_SECRET||'';}
 function bearerAuthorized(request,env={}){const token=commandToken(env);return Boolean(token&&request.headers.get('Authorization')===`Bearer ${token}`);}
-
 async function auth(request,env,rawBody,idempotencyKey){return authenticateHermesRequest({authorizationHeader:request.headers.get('Authorization')||'',expectedBearerToken:commandToken(env),timestamp:request.headers.get('X-Hermes-Timestamp')||'',rawBody,signature:request.headers.get('X-Hermes-Signature')||'',idempotencyKey,webhookSecret:webhookSecret(env),replayStore:env.HERMES_COMMAND_STORE});}
-export function hermesHttpCapabilityV2(env={}){const store=hermesStoreCapability(env);const token=commandToken(env),secret=webhookSecret(env);const imageProvider=centralRioImageCapability(env);return{http_version:HERMES_HTTP_VERSION,command_token_configured:Boolean(token),webhook_secret_configured:Boolean(secret),command_token_source:env.HERMES_COMMAND_TOKEN?'HERMES_COMMAND_TOKEN':env.API_VICTOR?'API_VICTOR_FALLBACK':'NONE',webhook_secret_source:env.HERMES_WEBHOOK_SECRET?'HERMES_WEBHOOK_SECRET':env.TELEGRAM_WEBHOOK_SECRET?'TELEGRAM_WEBHOOK_SECRET_FALLBACK':'NONE',durable_store:store.durable,store,rio_central_image_provider:imageProvider,ready_for_authenticated_commands:Boolean(token&&secret&&store.durable)};}
+
+export function hermesHttpCapabilityV2(env={}){
+  const store=hermesStoreCapability(env),token=commandToken(env),secret=webhookSecret(env),imageProvider=centralRioImageCapability(env);
+  return{http_version:HERMES_HTTP_VERSION,command_token_configured:Boolean(token),webhook_secret_configured:Boolean(secret),command_token_source:env.HERMES_COMMAND_TOKEN?'HERMES_COMMAND_TOKEN':env.API_VICTOR?'API_VICTOR_FALLBACK':'NONE',webhook_secret_source:env.HERMES_WEBHOOK_SECRET?'HERMES_WEBHOOK_SECRET':env.TELEGRAM_WEBHOOK_SECRET?'TELEGRAM_WEBHOOK_SECRET_FALLBACK':'NONE',durable_store:store.durable,store,rio_central_image_provider:imageProvider,ready_for_authenticated_commands:Boolean(token&&secret&&store.durable)};
+}
 
 async function acceptAndRoute(env,validation,receipt){
   const persisted=await persistCommandAcceptance(env,{command:validation.command,receipt});
@@ -33,6 +36,16 @@ function telegramSummary(action,body={}){
     lines.push(`Command store: ${r?.command_store?.durable?'READY':'NOT READY'}`);
     lines.push(`RIO flyer bridge: ${r?.rio_flyer_bridge?.ready_for_dispatch?'READY':'NOT READY'}`);
     lines.push(`Central image provider: ${r?.rio_central_image_provider?.ready_for_generation?'READY':'NOT READY'}`);
+    lines.push(`Gulabo bridge: ${r?.gulabo_bridge?.ready_for_calls?'READY':'NOT READY'}`);
+  }else if(action==='gulabo.status'){
+    lines.push(`Gulabo: ${r?.status||r?.service||'unknown'}`);
+  }else if(action==='gulabo.request_revision'){
+    lines.push(`Image: ${r?.image_id||'unknown'} • V${r?.revision??'?'}`);
+    if(r?.rating?.overall!=null)lines.push(`Rating: ${r.rating.overall}/10`);
+    lines.push(`QA: ${r?.qa_approved?'PASS':'REVIEW'}`);
+  }else if(action==='gulabo.good_to_go'){
+    lines.push(`Image: ${r?.image_id||'unknown'} • V${r?.revision??'?'}`);
+    lines.push(`Founder approved: ${r?.founder_approved?'YES':'NO'}`);
   }else if(action==='rio.status'){
     const centralReady=r?.central_image_provider?.ready_for_generation===true;
     lines.push(`Flyer transport: ${centralReady?'READY':'NOT READY'}`);
@@ -63,7 +76,7 @@ function telegramSummary(action,body={}){
 
 function sanitizeMirrorValue(value,depth=0){
   if(depth>4)return '[TRUNCATED]';
-  if(Array.isArray(value))return value.slice(0,12).map((item)=>sanitizeMirrorValue(item,depth+1));
+  if(Array.isArray(value))return value.slice(0,12).map(item=>sanitizeMirrorValue(item,depth+1));
   if(value&&typeof value==='object'){
     const out={};
     for(const [key,item] of Object.entries(value).slice(0,40)){
@@ -77,31 +90,14 @@ function sanitizeMirrorValue(value,depth=0){
 }
 
 function compactMirrorJson(value,max=1400){
-  let text='{}';
-  try{text=JSON.stringify(sanitizeMirrorValue(value));}catch{}
+  let text='{}';try{text=JSON.stringify(sanitizeMirrorValue(value));}catch{}
   return text.length>max?`${text.slice(0,max-12)}…[truncated]`:text;
 }
 
 export function chatgptTelegramMirrorText(command={},body={}){
-  const safeCommand={
-    command_id:command.command_id||null,
-    source:command.source||null,
-    actor:command.actor||null,
-    target:command.target||null,
-    action:command.action||null,
-    payload:command.payload||{},
-    execution_mode:command.execution_mode||null,
-    idempotency_key:command.idempotency_key||null,
-  };
-  const lines=[
-    'ChatGPT → Hermes',
-    `Action: ${command.action||'unknown'}`,
-    `Target: ${command.target||'unknown'}`,
-    `Command: ${compactMirrorJson(safeCommand,1600)}`,
-    '— Hermes receipt —',
-    `Status: ${body.status|| (body.duplicate?'DUPLICATE':'UNKNOWN')}`,
-    `Execution: ${body.execution||'UNKNOWN'}`,
-  ];
+  const gulabo=command.action==='hermes.gulabo_review_ready';
+  const safeCommand={command_id:command.command_id||null,source:command.source||null,actor:command.actor||null,target:command.target||null,action:command.action||null,payload:command.payload||{},execution_mode:command.execution_mode||null,idempotency_key:command.idempotency_key||null};
+  const lines=[gulabo?'Gulabo → Hermes':'ChatGPT → Hermes',`Action: ${command.action||'unknown'}`,`Target: ${command.target||'unknown'}`,`Command: ${compactMirrorJson(safeCommand,1600)}`,'— Hermes receipt —',`Status: ${body.status||(body.duplicate?'DUPLICATE':'UNKNOWN')}`,`Execution: ${body.execution||'UNKNOWN'}`];
   if(body.error_code)lines.push(`Code: ${body.error_code}`);
   if(body.receipt_id)lines.push(`Receipt: ${body.receipt_id}`);
   if(body.existing_command_id)lines.push(`Existing command: ${body.existing_command_id}`);
@@ -129,15 +125,14 @@ async function sendTelegramSummary(env,message,action,body){
 }
 
 async function processTelegramUpdate(request,env,{passthroughOnNoMatch=false}={}){
-  let update;
-  try{update=await request.clone().json();}catch{return passthroughOnNoMatch?null:json({error:'invalid_json'},400);}
+  let update;try{update=await request.clone().json();}catch{return passthroughOnNoMatch?null:json({error:'invalid_json'},400);}
   const message=update?.message,route=parseHermesTelegramCommand(message?.text||'');
   if(!route)return passthroughOnNoMatch?null:json({ok:true,ignored:true,reason:'no_hermes_command_match'});
   if(!env.TELEGRAM_WEBHOOK_SECRET)return json({error:'telegram_secret_not_configured'},503);
   if((request.headers.get('X-Telegram-Bot-Api-Secret-Token')||'')!==env.TELEGRAM_WEBHOOK_SECRET)return json({error:'unauthorized'},401);
   const chatId=clean(String(message?.chat?.id??''),64),founderChat=clean(String(env.VICTOR_FOUNDER_CHAT_ID??''),64);
   if(!chatId||!founderChat||chatId!==founderChat)return json({ok:true,ignored:true,reason:'chat_not_authorized'});
-  const command={command_id:commandId(),source:'telegram',actor:'founder',target:route.target,action:route.action,payload:route.payload||{},execution_mode:'manual',idempotency_key:idemTelegram(message,route)};
+  const command={command_id:commandId(),source:'telegram',actor:'founder',target:route.target,action:route.action,payload:route.payload||{},execution_mode:route.execution_mode||'manual',idempotency_key:idemTelegram(message,route)};
   const validation=validateHermesCommandEnvelope(command);
   if(!validation.ok)return json({ok:false,error:'command_validation_failed',reasons:validation.errors},400);
   const receipt=buildHermesReceipt({command:validation.command,status:'ACCEPTED',validation:'PASS',execution:'NOT_STARTED',receiptId:`rcpt_${validation.command.command_id}`});
@@ -177,8 +172,8 @@ export async function handleHermesHttpRequestV2(request,env={}){
     const receipt=buildHermesReceipt({command:validation.command,status:'ACCEPTED',validation:'PASS',execution:'NOT_STARTED',receiptId:`rcpt_${validation.command.command_id}`});
     try{
       const routed=await acceptAndRoute(env,validation,receipt);
-      let mirror={sent:false,reason:'NOT_CHATGPT_SOURCE'};
-      if(validation.command.source==='chatgpt')mirror=await sendFounderTelegramMirror(env,validation.command,routed.body);
+      let mirror={sent:false,reason:'SOURCE_NOT_MIRRORED'};
+      if(validation.command.source==='chatgpt'||validation.command.action==='hermes.gulabo_review_ready')mirror=await sendFounderTelegramMirror(env,validation.command,routed.body);
       return json({...routed.body,telegram_mirror_sent:mirror.sent,telegram_mirror_reason:mirror.reason||null},routed.http_status);
     }catch(error){return json({error:String(error?.message||'command_persistence_or_routing_failed')},503);}
   }
