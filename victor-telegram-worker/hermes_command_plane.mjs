@@ -11,6 +11,10 @@ export const HERMES_ACTIONS = Object.freeze({
   'hermes.status': { target: 'hermes', risk: HERMES_RISK_CLASS.READ_ONLY },
   'hermes.audit': { target: 'hermes', risk: HERMES_RISK_CLASS.READ_ONLY },
   'hermes.context': { target: 'hermes', risk: HERMES_RISK_CLASS.READ_ONLY },
+  'hermes.gulabo_review_ready': { target: 'hermes', risk: HERMES_RISK_CLASS.READ_ONLY },
+  'gulabo.status': { target: 'gulabo', risk: HERMES_RISK_CLASS.READ_ONLY },
+  'gulabo.request_revision': { target: 'gulabo', risk: HERMES_RISK_CLASS.SAFE_EXECUTION },
+  'gulabo.good_to_go': { target: 'gulabo', risk: HERMES_RISK_CLASS.APPROVAL_REQUIRED },
   'rio.status': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.image_usage': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.image_budget': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
@@ -108,41 +112,57 @@ function parseRioProductCommand(action, args) {
   };
 }
 
+function positiveInteger(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
+}
+
 export function parseHermesTelegramCommand(text = '') {
-  const raw = cleanString(text, 1000);
+  const raw = cleanString(text, 4000);
   const parts = raw.split(/\s+/).filter(Boolean);
   if (!parts.length) return null;
 
   const cmd = parts[0].toLowerCase();
-  if (cmd === '/hermes' && parts[1]?.toLowerCase() === 'status') {
-    return { target: 'hermes', action: 'hermes.status', payload: {} };
+  if (cmd === '/hermes' && parts[1]?.toLowerCase() === 'status') return { target: 'hermes', action: 'hermes.status', payload: {} };
+  if (cmd === '/hermes' && parts[1]?.toLowerCase() === 'audit') return { target: 'hermes', action: 'hermes.audit', payload: {} };
+  if (cmd === '/hermes' && parts[1]?.toLowerCase() === 'context') return { target: 'hermes', action: 'hermes.context', payload: {} };
+
+  if (cmd === '/gulabo' && parts[1]?.toLowerCase() === 'status') return { target: 'gulabo', action: 'gulabo.status', payload: {} };
+  if (cmd === '/gulabo' && parts[1]?.toLowerCase() === 'revise' && parts[2] && positiveInteger(parts[3])) {
+    const feedback = parts.slice(4).join(' ').trim();
+    if (!feedback) return null;
+    return {
+      target: 'gulabo',
+      action: 'gulabo.request_revision',
+      payload: {
+        image_id: parts[2],
+        from_revision: positiveInteger(parts[3]),
+        preserve: ['all approved elements not explicitly changed'],
+        change: [feedback],
+        regenerate_from_scratch: false,
+        founder_feedback: feedback,
+      },
+    };
   }
-  if (cmd === '/hermes' && parts[1]?.toLowerCase() === 'audit') {
-    return { target: 'hermes', action: 'hermes.audit', payload: {} };
+  if (cmd === '/gulabo' && parts[1]?.toLowerCase() === 'approve' && parts[2] && positiveInteger(parts[3])) {
+    return {
+      target: 'gulabo',
+      action: 'gulabo.good_to_go',
+      execution_mode: 'approval_required',
+      payload: {
+        image_id: parts[2],
+        revision: positiveInteger(parts[3]),
+        note: parts.slice(4).join(' ').trim() || null,
+      },
+    };
   }
-  if (cmd === '/hermes' && parts[1]?.toLowerCase() === 'context') {
-    return { target: 'hermes', action: 'hermes.context', payload: {} };
-  }
-  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'status') {
-    return { target: 'rio', action: 'rio.status', payload: {} };
-  }
-  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'usage') {
-    return { target: 'rio', action: 'rio.image_usage', payload: {} };
-  }
-  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'budget') {
-    return { target: 'rio', action: 'rio.image_budget', payload: {} };
-  }
-  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'result' && parts[2]) {
-    return { target: 'rio', action: 'rio.flyer_result', payload: { task_id: parts[2] } };
-  }
-  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'preflight' && parts[2]) {
-    return parseRioProductCommand('rio.flyer_preflight', parts.slice(2));
-  }
-  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'flyer' && parts[2]) {
-    return parseRioProductCommand('rio.generate_product_flyer', parts.slice(2));
-  }
-  if (cmd === '/victor' && parts[1]?.toLowerCase() === 'status') {
-    return { target: 'victor', action: 'victor.status', payload: {} };
-  }
+
+  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'status') return { target: 'rio', action: 'rio.status', payload: {} };
+  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'usage') return { target: 'rio', action: 'rio.image_usage', payload: {} };
+  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'budget') return { target: 'rio', action: 'rio.image_budget', payload: {} };
+  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'result' && parts[2]) return { target: 'rio', action: 'rio.flyer_result', payload: { task_id: parts[2] } };
+  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'preflight' && parts[2]) return parseRioProductCommand('rio.flyer_preflight', parts.slice(2));
+  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'flyer' && parts[2]) return parseRioProductCommand('rio.generate_product_flyer', parts.slice(2));
+  if (cmd === '/victor' && parts[1]?.toLowerCase() === 'status') return { target: 'victor', action: 'victor.status', payload: {} };
   return null;
 }
