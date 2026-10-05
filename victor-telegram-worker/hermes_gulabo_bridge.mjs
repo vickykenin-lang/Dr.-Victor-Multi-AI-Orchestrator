@@ -1,3 +1,5 @@
+import { putRequesterDelivery } from './hermes_requester_delivery.mjs';
+
 const clean=(value,max=4000)=>typeof value==='string'?value.trim().slice(0,max):'';
 const configured=(value)=>Boolean(clean(value,4096));
 
@@ -26,6 +28,7 @@ export function gulaboBridgeCapability(env={}){
     callback_secret_configured:Boolean(cbSecret),
     signed_callback_ready:Boolean(base&&cbToken&&cbSecret),
     callback_auth_mode:cbToken&&cbSecret?'BEARER_HMAC_SHA256':'NONE',
+    requester_delivery_mailbox:Boolean(env.HERMES_COMMAND_STORE&&typeof env.HERMES_COMMAND_STORE.put==='function'),
     review_action:'hermes.gulabo_review_ready',
     revision_action:'gulabo.request_revision',
     approval_action:'gulabo.good_to_go',
@@ -117,5 +120,30 @@ export async function approveGulabo(env={},payload={}){
   const result=await callGulaboSigned(env,'/v1/hermes/founder-decision',{image_id:imageId,revision,decision:'GOOD_TO_GO',note:note||null});
   if(!result.ok)return{status:'SAFE_STOP',execution:'BLOCKED',error_code:result.error_code,result:result.data,live_request_verified:result.live_request_verified,real_output_verified:false,business_outcome_verified:false};
   const output=result.data||{};
-  return{status:'COMPLETED',execution:'COMPLETED',error_code:null,result:output,live_request_verified:true,real_output_verified:output.real_output_verified===true,business_outcome_verified:false};
+  let delivery=null;
+  const requester=clean(output.requester,64),requesterRef=clean(output.requester_ref,160);
+  if(output.founder_approved===true&&requester&&requesterRef){
+    try{
+      delivery=await putRequesterDelivery(env,{
+        requester,
+        requester_ref:requesterRef,
+        image_id:output.image_id||imageId,
+        revision:output.revision||revision,
+        asset_url:`${baseUrl(env)}/v1/assets/${encodeURIComponent(output.image_id||imageId)}/${Number(output.revision||revision)}`,
+        status:output.status||'GOOD_TO_GO',
+        founder_approved:true,
+        live_request_verified:true,
+        real_output_verified:output.real_output_verified===true,
+      });
+    }catch(error){
+      return{status:'SAFE_STOP',execution:'BLOCKED',error_code:'GULABO_REQUESTER_DELIVERY_FAILED',result:{...output,delivery_error:error?.message||'delivery failed'},live_request_verified:true,real_output_verified:output.real_output_verified===true,business_outcome_verified:false};
+    }
+  }
+  return{
+    status:'COMPLETED',execution:'COMPLETED',error_code:null,
+    result:{...output,requester_delivery:delivery},
+    live_request_verified:true,
+    real_output_verified:output.real_output_verified===true,
+    business_outcome_verified:Boolean(delivery&&delivery.founder_approved&&delivery.asset_url),
+  };
 }

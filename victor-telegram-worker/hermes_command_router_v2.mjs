@@ -3,6 +3,7 @@ import { hermesStoreCapability, putCommandState, putReceipt } from './hermes_com
 import { loadHermesContext } from './hermes_context_registry.mjs';
 import { readRioFlyerResult, rioFlyerBridgeCapability } from './hermes_rio_flyer_bridge.mjs';
 import { approveGulabo, gulaboBridgeCapability, readGulaboStatus, requestGulaboRevision } from './hermes_gulabo_bridge.mjs';
+import { getRequesterDelivery } from './hermes_requester_delivery.mjs';
 import {
   centralRioImageCapability,
   executeCentralRioFlyer,
@@ -77,6 +78,18 @@ function reviewReadyResult(command={}){
   };
 }
 
+async function requesterDeliveryResult(env,requester,payload={}){
+  const requesterRef=String(payload.requester_ref||'').trim();
+  if(!requesterRef)return{status:'SAFE_STOP',execution:'BLOCKED',error_code:'GULABO_REQUESTER_REF_REQUIRED',result:null,live_request_verified:false,real_output_verified:false,business_outcome_verified:false};
+  try{
+    const read=await getRequesterDelivery(env,{requester,requester_ref:requesterRef});
+    if(!read.found)return{status:'COMPLETED_WITH_LIMITATION',execution:'COMPLETED',error_code:'GULABO_REQUESTER_RESULT_NOT_FOUND',result:{requester,requester_ref:requesterRef,delivery:null},live_request_verified:true,real_output_verified:false,business_outcome_verified:false};
+    return{status:'COMPLETED',execution:'COMPLETED',error_code:null,result:read.delivery,live_request_verified:true,real_output_verified:read.delivery.real_output_verified===true,business_outcome_verified:read.delivery.founder_approved===true&&Boolean(read.delivery.asset_url)};
+  }catch(error){
+    return{status:'SAFE_STOP',execution:'BLOCKED',error_code:error?.message||'GULABO_REQUESTER_RESULT_READ_FAILED',result:null,live_request_verified:false,real_output_verified:false,business_outcome_verified:false};
+  }
+}
+
 export async function routeHermesCommandV2(env,command,options={}){
   const c=classifyHermesAction(command?.action);
   let r;
@@ -92,6 +105,8 @@ export async function routeHermesCommandV2(env,command,options={}){
   else if(command.action==='gulabo.status')r=await readGulaboStatus(env);
   else if(command.action==='gulabo.request_revision')r=await requestGulaboRevision(env,command.payload||{});
   else if(command.action==='gulabo.good_to_go')r=await approveGulabo(env,command.payload||{});
+  else if(command.action==='rio.gulabo_result')r=await requesterDeliveryResult(env,'RIO',command.payload||{});
+  else if(command.action==='aura3.gulabo_result')r=await requesterDeliveryResult(env,'AURA3',command.payload||{});
   else if(command.action==='rio.status')r={status:'COMPLETED',execution:'COMPLETED',result:rioRuntimeSnapshot(env)};
   else if(command.action==='rio.image_usage'){
     const usage=await readCentralRioImageUsage(env);

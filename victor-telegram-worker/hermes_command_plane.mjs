@@ -19,8 +19,10 @@ export const HERMES_ACTIONS = Object.freeze({
   'rio.image_usage': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.image_budget': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.flyer_result': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
+  'rio.gulabo_result': { target: 'rio', risk: HERMES_RISK_CLASS.READ_ONLY },
   'rio.flyer_preflight': { target: 'rio', risk: HERMES_RISK_CLASS.SAFE_EXECUTION },
   'rio.generate_product_flyer': { target: 'rio', risk: HERMES_RISK_CLASS.SAFE_EXECUTION },
+  'aura3.gulabo_result': { target: 'aura3', risk: HERMES_RISK_CLASS.READ_ONLY },
   'victor.status': { target: 'victor', risk: HERMES_RISK_CLASS.READ_ONLY },
 });
 
@@ -161,8 +163,10 @@ export function parseHermesTelegramCommand(text = '') {
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'usage') return { target: 'rio', action: 'rio.image_usage', payload: {} };
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'budget') return { target: 'rio', action: 'rio.image_budget', payload: {} };
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'result' && parts[2]) return { target: 'rio', action: 'rio.flyer_result', payload: { task_id: parts[2] } };
+  if (cmd === '/rio' && parts[1]?.toLowerCase() === 'gulabo' && parts[2]) return { target: 'rio', action: 'rio.gulabo_result', payload: { requester_ref: parts[2] } };
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'preflight' && parts[2]) return parseRioProductCommand('rio.flyer_preflight', parts.slice(2));
   if (cmd === '/rio' && parts[1]?.toLowerCase() === 'flyer' && parts[2]) return parseRioProductCommand('rio.generate_product_flyer', parts.slice(2));
+  if (cmd === '/aura3' && parts[1]?.toLowerCase() === 'gulabo' && parts[2]) return { target: 'aura3', action: 'aura3.gulabo_result', payload: { requester_ref: parts[2] } };
   if (cmd === '/victor' && parts[1]?.toLowerCase() === 'status') return { target: 'victor', action: 'victor.status', payload: {} };
   return null;
 }
