@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { createHmac } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { approveGulabo, gulaboBridgeCapability, readGulaboStatus, requestGulaboRevision } from './hermes_gulabo_bridge.mjs';
 
@@ -45,7 +46,9 @@ test('revision call uses signed Hermes callback endpoint and preserves approved 
     assert.equal(seen.url,'https://gulabo.example/v1/hermes/correction');
     assert.equal(seen.init.headers.authorization,'Bearer callback-token');
     assert.match(seen.init.headers['x-gulabo-timestamp'],/^\d+$/);
-    assert.match(seen.init.headers['x-gulabo-signature'],/^sha256=[0-9a-f]{64}$/);
+    assert.match(seen.init.headers['x-gulabo-timestamp'],/^\d+$/);
+    const expected=createHmac('sha256','callback-secret').update(seen.init.headers['x-gulabo-timestamp']+'.'+seen.init.body).digest('hex');
+    assert.equal(seen.init.headers['x-gulabo-signature'],'sha256='+expected);
     assert.deepEqual(seen.body.change,['make background warmer']);
     assert.deepEqual(seen.body.preserve,['all approved elements not explicitly changed']);
     assert.equal(seen.body.regenerate_from_scratch,false);
@@ -73,9 +76,32 @@ test('founder approval uses signed GOOD_TO_GO endpoint without inventing request
     const out=await approveGulabo(signedEnv(), {image_id:'GULABO-IMG-1',revision:2,note:'good'});
     assert.equal(seen.url,'https://gulabo.example/v1/hermes/founder-decision');
     assert.equal(seen.init.headers.authorization,'Bearer callback-token');
-    assert.match(seen.init.headers['x-gulabo-signature'],/^sha256=[0-9a-f]{64}$/);
+    assert.match(seen.init.headers['x-gulabo-timestamp'],/^\d+$/);
+    const expected=createHmac('sha256','callback-secret').update(seen.init.headers['x-gulabo-timestamp']+'.'+seen.init.body).digest('hex');
+    assert.equal(seen.init.headers['x-gulabo-signature'],'sha256='+expected);
     assert.equal(seen.body.decision,'GOOD_TO_GO');
     assert.equal(out.status,'COMPLETED');
     assert.equal(out.business_outcome_verified,false);
+  }finally{globalThis.fetch=original;}
+});
+
+test('revision and approval never fetch when either callback credential is missing',async()=>{
+  const original=globalThis.fetch;
+  let calls=0;
+  globalThis.fetch=async()=>{calls++;throw new Error('unexpected fetch');};
+  try{
+    for(const missing of ['GULABO_HERMES_CALLBACK_TOKEN','GULABO_HERMES_CALLBACK_SECRET']){
+      const env=signedEnv();
+      delete env[missing];
+      const revision=await requestGulaboRevision(env,{image_id:'GULABO-IMG-1',from_revision:1,founder_feedback:'warmer background'});
+      const approval=await approveGulabo(env,{image_id:'GULABO-IMG-1',revision:2});
+      for(const out of [revision,approval]){
+        assert.equal(out.status,'SAFE_STOP');
+        assert.equal(out.error_code,'GULABO_CALLBACK_AUTH_NOT_CONFIGURED');
+        assert.equal(out.live_request_verified,false);
+        assert.equal(out.real_output_verified,false);
+      }
+    }
+    assert.equal(calls,0);
   }finally{globalThis.fetch=original;}
 });
